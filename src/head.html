@@ -1,0 +1,568 @@
+<title>해상풍력발전기 기초 설계도구</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 좌측 입력 패널 + 우측 도면/표 탭 작업영역 (옹벽 설계도구와 같은 틀). 콘크리트 회색 + 해수 청색 + 속채움 모래색 */
+:root{
+  --bg:#eef1f2; --panel:#ffffff; --sunk:#f6f8f8; --ink:#1a2226; --muted:#5b6970; --line:#d3dade;
+  --accent:#1d5e88; --accent-ink:#ffffff; --accent-soft:#e2edf5;
+  --conc:#c9cfcf; --conc-line:#3a4448; --fill:#e6d3a3; --water:#cfe3f1; --water-line:#2f74a8; --soil:#b89a6a; --grout:#9aa3a6; --steel:#8fa3b0; --rock:#8c8478; --dim:#1d5e88;
+  --l-wind:#7a5cc2; --l-wave:#1f7fb8; --l-cur:#2f8f6b;
+  --ok:#2c7a4b; --ok-bg:#e3f2e8; --bad:#b3261e; --bad-bg:#fbe5e2; --warn:#8a5a00; --warn-bg:#fbf0d9;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111618; --panel:#192024; --sunk:#151b1e; --ink:#e2e8ea; --muted:#94a3aa; --line:#2b353a;
+  --accent:#6aa9d8; --accent-ink:#0d1418; --accent-soft:#1d2d38;
+  --conc:#4a5357; --conc-line:#c9d3d6; --fill:#6b5a35; --water:#16324a; --water-line:#6aa9d8; --soil:#6e5a3c; --grout:#5d676b; --steel:#5f7684; --rock:#5a544b; --dim:#6aa9d8;
+  --l-wind:#b39ae8; --l-wave:#6ab8e8; --l-cur:#6fd0a8;
+  --ok:#6fd096; --ok-bg:#183223; --bad:#ff8a80; --bad-bg:#3a1c19; --warn:#f0c060; --warn-bg:#382c12;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#111618; --panel:#192024; --sunk:#151b1e; --ink:#e2e8ea; --muted:#94a3aa; --line:#2b353a;
+  --accent:#6aa9d8; --accent-ink:#0d1418; --accent-soft:#1d2d38;
+  --conc:#4a5357; --conc-line:#c9d3d6; --fill:#6b5a35; --water:#16324a; --water-line:#6aa9d8; --soil:#6e5a3c; --grout:#5d676b; --steel:#5f7684; --rock:#5a544b; --dim:#6aa9d8;
+  --l-wind:#b39ae8; --l-wave:#6ab8e8; --l-cur:#6fd0a8;
+  --ok:#6fd096; --ok-bg:#183223; --bad:#ff8a80; --bad-bg:#3a1c19; --warn:#f0c060; --warn-bg:#382c12;
+  color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.5}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 32px;max-width:1560px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
+header.top h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
+header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;max-width:70ch}
+.dl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:var(--r);font-weight:500;font-size:13px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.small{padding:4px 9px;font-size:12px}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.note{font-size:12px;color:var(--muted)}
+.typebar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 0 12px;border-top:1px solid var(--line);border-bottom:2px solid var(--line);margin-bottom:14px}
+.typebar .lab{font-size:12px;color:var(--muted)}
+.wt{font:inherit;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--muted);cursor:pointer}
+.wt svg{width:30px;height:24px;fill:currentColor}
+.cats{display:flex;gap:6px}
+.wc{font:inherit;font-size:14px;font-weight:700;padding:7px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--muted);cursor:pointer}
+.wc small{font-weight:400;font-size:11px}
+.wc[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.tsep{width:1px;align-self:stretch;background:var(--line)}
+.wt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:960px){.layout{grid-template-columns:minmax(0,1fr)}}
+aside.inputs{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:4px 14px 14px}
+fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 4px;min-width:0}
+legend{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:6px;float:left;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;clear:both}
+.f{display:flex;flex-direction:column;gap:2px;min-width:0}
+.f label{font-size:12px;color:var(--muted)}
+.f input,.f select,.f textarea{font-family:var(--f-num);font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink);width:100%;min-width:0}
+.f textarea{font-size:11.5px;min-height:96px;resize:vertical}
+.f.wide{grid-column:1/3}
+.hint{font-size:11.5px;color:var(--muted);margin:8px 0 0;clear:both}
+.sub{font-size:12px;font-weight:600;color:var(--ink);clear:both;margin:10px 0 4px}
+table.rings{clear:both;width:100%;border-collapse:collapse;font-size:12px}
+table.rings th{font-weight:500;color:var(--muted);font-size:11px;padding:2px}
+table.rings td{padding:2px}
+table.rings input{font-family:var(--f-num);font-size:12px;padding:4px 5px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink);width:100%;min-width:0}
+table.rings button{border:0;background:none;color:var(--muted);font-size:14px;padding:2px 4px}
+table.soil{border-collapse:collapse;font-size:12px;min-width:760px}
+table.soil th{font-weight:600;color:var(--muted);font-size:11px;padding:4px;text-align:center;border-bottom:1px solid var(--line)}
+table.soil td{padding:2px 3px}
+table.soil input,table.soil select{font-family:var(--f-num);font-size:12px;padding:4px 5px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink);width:100%;min-width:52px}
+table.soil input.nm{font-family:var(--f-ui);min-width:110px}
+table.soil select{font-family:var(--f-ui);min-width:72px}
+table.soil input:disabled{opacity:.3}
+table.soil button{border:0;background:none;color:var(--muted);font-size:14px;padding:2px 6px;cursor:pointer}
+.soilpaste textarea{width:100%;min-height:110px;font-family:var(--f-num);font-size:12px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink);padding:6px}
+.saved{border-bottom:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:8px}
+.sv-head{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--muted)}
+.sv-new{display:flex;gap:6px}
+.sv-new input{flex:1;min-width:0;font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink)}
+#svList{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.sv-row{display:flex;justify-content:space-between;gap:6px;align-items:center;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+.sv-row b{font-size:13px;overflow-wrap:anywhere}
+.sv-row small{display:block;color:var(--muted);font-size:11px;font-family:var(--f-num)}
+.sv-btns{display:flex;gap:4px;flex:none}
+.sv-file{display:flex;gap:6px;flex-wrap:wrap}
+.optres{clear:both;background:var(--accent-soft);border-radius:4px;padding:7px 10px;margin:0 0 8px;font-size:12px;line-height:1.6}
+.rb{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr 1fr;gap:6px;align-items:center;clear:both;margin-bottom:5px}
+.rb span{font-size:11.5px;color:var(--muted);line-height:1.3}
+.rb select,.rb input{font-family:var(--f-num);font-size:12.5px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink);width:100%;min-width:0}
+.opt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.opt .row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.tedit{clear:both;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-top:8px;display:flex;flex-direction:column;gap:8px}
+main{min-width:0;display:flex;flex-direction:column;gap:12px}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;display:flex;flex-direction:column;gap:2px}
+.kpi .k{font-size:11.5px;color:var(--muted)}
+.kpi .v{font-family:var(--f-num);font-size:17px;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:12px;color:var(--muted);font-weight:400}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;margin-left:6px;vertical-align:2px;font-family:var(--f-ui)}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.bad{background:var(--bad-bg);color:var(--bad)} .chip.na{background:var(--sunk);color:var(--muted)}
+.warns{display:flex;flex-direction:column;gap:6px}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:var(--r);padding:8px 11px;font-size:12.5px;display:flex;flex-direction:column;gap:5px}
+.warn .wtip{color:var(--ink);font-size:12px;line-height:1.5}
+.warn .wfix{display:flex;flex-wrap:wrap;gap:6px}
+.warn .wfix .btn{border-color:var(--warn);text-align:left}
+.work{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;padding:0 6px}
+.tab{border:0;background:none;color:var(--muted);padding:10px 12px;font-weight:500;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pane{padding:14px}
+.drw{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px}
+@media (max-width:1100px){.drw{grid-template-columns:minmax(0,1fr)}}
+.sheet{background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:auto;position:relative}
+.sheet svg{display:block;width:100%;height:auto}
+#rbWrap.zoom svg{width:2400px;max-width:none}
+.sheet .cap{font-size:12px;font-weight:600;padding:8px 10px 0;color:var(--muted)}
+#view3d{position:relative;height:600px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+#view3d canvas{display:block;width:100%;height:100%}
+.ctl3d{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:10px;font-size:13px}
+.ctl3d label{display:flex;gap:6px;align-items:center}
+.tblwrap{overflow-x:auto}
+table.t{border-collapse:collapse;width:100%;font-size:12.5px}
+table.t th,table.t td{border:1px solid var(--line);padding:5px 8px;text-align:center;white-space:nowrap}
+table.t th{background:var(--sunk);font-weight:600;font-size:12px}
+table.t td.n{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+table.t td.l{text-align:left;white-space:normal}
+table.t td.fm{text-align:left;font-family:var(--f-num);font-size:11.5px;color:var(--muted);white-space:normal;min-width:220px}
+table.t tr.sub td{background:var(--sunk);font-weight:600}
+table.t tr.tot td{background:var(--accent-soft);font-weight:700}
+table.t tr.gov td{background:var(--warn-bg)}
+.rep{max-width:1000px}
+.rep h2{font-size:16px;margin:24px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.rep h2:first-child{margin-top:0}
+.rep h3{font-size:14px;margin:18px 0 8px}
+.rep h3:first-child{margin-top:0}
+.rep p{margin:6px 0;max-width:80ch}
+.rep .eq{font-family:var(--f-num);font-size:12.5px;background:var(--sunk);border-left:3px solid var(--accent);padding:6px 10px;margin:6px 0;white-space:pre-wrap;overflow-x:auto}
+.rep .fig{background:var(--sunk);border:1px solid var(--line);border-radius:4px;margin:8px 0;overflow:auto;max-width:640px}
+.rep .fig svg{display:block;width:100%;height:auto}
+.ok-t{color:var(--ok);font-weight:600} .bad-t{color:var(--bad);font-weight:600}
+svg [data-k]{cursor:pointer;text-decoration:underline;text-decoration-thickness:1px}
+svg [data-k]:hover{fill:var(--bad)}
+#dimEdit{position:absolute;width:96px;font-family:var(--f-num);font-size:14px;padding:4px 6px;border:2px solid var(--accent);border-radius:4px;background:var(--panel);color:var(--ink);z-index:5;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.flash{outline:2px solid var(--accent)!important;background:var(--accent-soft)!important}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin:0 0 8px}
+.legend i{display:inline-block;width:14px;height:10px;vertical-align:-1px;margin-right:5px;border:1px solid var(--line)}
+.plots{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:8px 0}
+.plots .sheet{padding-bottom:6px;max-width:440px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:var(--r);font-size:13px;z-index:20}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>해상풍력발전기 기초 설계도구</h1>
+    <p>해상풍력발전기 하부 기초. 중력식(원추형·케이슨형), 모노파일(단일 직경·테이퍼형), 자켓(3각·4각)을 다룹니다. 형식과 제원을 고르면 도면, 3D 모델, 하중, 검토, 수량, 구조계산서가 함께 바뀝니다. 단위 m, kN (별도 표기 제외)</p>
+  </div>
+  <div class="dl">
+    <button class="btn" id="btnDxf" type="button">CAD 도면 받기 (.zip)</button>
+    <button class="btn" id="btnDocx" type="button">구조계산서 받기 (.docx)</button>
+    <button class="btn primary" id="btnXlsx" type="button">계산표 받기 (.xlsx)</button>
+  </div>
+</header>
+
+<div class="typebar">
+  <span class="lab">형식</span>
+  <div class="cats" role="group" aria-label="기초 형식 대분류">
+    <button type="button" class="wc" data-cat="grav" aria-pressed="true">중력식</button>
+    <button type="button" class="wc" data-cat="jacket" aria-pressed="false">자켓</button>
+    <button type="button" class="wc" data-cat="mono" aria-pressed="false">모노파일</button>
+  </div>
+  <span class="tsep" aria-hidden="true"></span>
+  <button type="button" class="wt" data-type="cone" data-cat="grav" aria-pressed="true"><svg viewBox="0 0 30 24"><path d="M13 1h4v9l6 8v3h3v2H4v-2h3v-3l6-8z"/></svg>원추형</button>
+  <button type="button" class="wt" data-type="caisson" data-cat="grav" aria-pressed="false"><svg viewBox="0 0 30 24"><path d="M13 1h4v15h9v5h2v2H2v-2h2v-5h9z"/></svg>케이슨형 (평저)</button>
+  <button type="button" class="wt" data-type="jk3" data-cat="jacket" aria-pressed="false" hidden><svg viewBox="0 0 30 24"><path d="M10 2h10l4 21h-2L19 4h-8L8 23H6zM11 6l9 6M19 6l-9 6M10 13l11 6M20 13L9 19" stroke="currentColor" stroke-width="1.2" fill="currentColor"/></svg>3각</button>
+  <button type="button" class="wt" data-type="jk4" data-cat="jacket" aria-pressed="false" hidden><svg viewBox="0 0 30 24"><path d="M9 2h12l5 21h-2L20 4H10L6 23H4zM10 6l11 6M20 6L9 12M9 13l13 6M21 13L8 19" stroke="currentColor" stroke-width="1.2" fill="currentColor"/></svg>4각</button>
+  <button type="button" class="wt" data-type="mono1" data-cat="mono" aria-pressed="false" hidden><svg viewBox="0 0 30 24"><path d="M11 1h8v9h-1v14h-6V10h-1z"/></svg>단일 직경</button>
+  <button type="button" class="wt" data-type="monoT" data-cat="mono" aria-pressed="false" hidden><svg viewBox="0 0 30 24"><path d="M12 1h6v9l2 6v8h-10v-8l2-6z"/></svg>테이퍼형</button>
+  <span class="lab" style="margin-left:12px">최적 제원</span>
+  <button class="btn primary small" data-opt="cone" data-cat="grav" type="button">원추형 최적화</button>
+  <button class="btn primary small" data-opt="caisson" data-cat="grav" type="button">케이슨형 최적화</button>
+  <button class="btn small" data-cat="mono" type="button" disabled title="다음 단계에서 추가합니다" hidden>모노파일 최적화 (준비 중)</button>
+  <button class="btn small" data-cat="jacket" type="button" disabled title="다음 단계에서 추가합니다" hidden>자켓 최적화 (준비 중)</button>
+  <span class="lab" style="margin-left:auto">예시 불러오기</span>
+  <button class="btn small" id="btnSampleMono" data-cat="mono" type="button" hidden>모노파일 기본 제원</button>
+  <button class="btn small" id="btnSampleJk" data-cat="jacket" type="button" hidden>자켓 기본 제원</button>
+</div>
+
+<div class="layout">
+<aside class="inputs">
+  <section class="saved" aria-label="설계 저장">
+    <div class="sv-head">설계 저장 · 불러오기</div>
+    <div class="sv-new"><input id="svName" type="text" placeholder="설계 이름 (예: D30 원추형 1안)" aria-label="설계 이름"><button class="btn primary small" id="svBtn" type="button">저장</button></div>
+    <div id="svList"><p class="note">저장소에 연결하는 중…</p></div>
+    <div class="sv-file"><button class="btn small" id="svExport" type="button">파일로 내보내기 (.json)</button><label class="btn small" for="svImport" style="cursor:pointer">파일 가져오기</label><input id="svImport" type="file" accept=".json,application/json" hidden></div>
+  </section>
+<form id="frm" autocomplete="off">
+  <fieldset data-cat="grav" data-for="cone">
+    <legend>원추형 · 저판 / 하부 원통 / 원추</legend>
+    <button class="btn primary small" data-opt="cone" type="button" style="clear:both;margin:0 0 8px">원추형 최적 제원 찾기</button>
+    <div class="grid2">
+      <div class="f"><label for="Db">저판 직경 D<sub>b</sub></label><input id="Db" type="number" step="0.1"></div>
+      <div class="f"><label for="tb">저판 두께 t<sub>b</sub></label><input id="tb" type="number" step="0.05"></div>
+      <div class="f"><label for="Dw">원통 외경 D<sub>w</sub></label><input id="Dw" type="number" step="0.1"></div>
+      <div class="f"><label for="tw">원통 벽두께 t<sub>w</sub></label><input id="tw" type="number" step="0.05"></div>
+      <div class="f"><label for="hw">원통 높이 h<sub>w</sub></label><input id="hw" type="number" step="0.1"></div>
+      <div class="f"><label for="hk">원추 높이 h<sub>k</sub></label><input id="hk" type="number" step="0.1"></div>
+      <div class="f"><label for="Dt">원추 상단 외경 D<sub>t</sub></label><input id="Dt" type="number" step="0.1"></div>
+      <div class="f"><label for="tkh">원추 벽두께 (수평)</label><input id="tkh" type="number" step="0.025"></div>
+    </div>
+    <p class="hint" id="tkNote"></p>
+  </fieldset>
+  <fieldset data-cat="grav" data-for="caisson" hidden>
+    <legend>케이슨형 · 하부 케이슨</legend>
+    <button class="btn primary small" data-opt="caisson" type="button" style="clear:both;margin:0 0 8px">케이슨형 최적 제원 찾기</button>
+    <div class="grid2">
+      <div class="f"><label for="cDs">하부 슬래브 직경</label><input id="cDs" type="number" step="0.1"></div>
+      <div class="f"><label for="cts">하부 슬래브 두께</label><input id="cts" type="number" step="0.05"></div>
+      <div class="f"><label for="cDw">외벽 직경</label><input id="cDw" type="number" step="0.1"></div>
+      <div class="f"><label for="ctw">외벽 두께</label><input id="ctw" type="number" step="0.05"></div>
+      <div class="f"><label for="cH">케이슨 높이 (하면~상판 윗면)</label><input id="cH" type="number" step="0.1"></div>
+      <div class="f"><label for="ctt">상판 두께</label><input id="ctt" type="number" step="0.05"></div>
+      <div class="f"><label for="cnr">방사형 격벽 개수</label><input id="cnr" type="number" step="1"></div>
+      <div class="f"><label for="ctr">격벽 두께</label><input id="ctr" type="number" step="0.05"></div>
+    </div>
+  </fieldset>
+  <fieldset data-cat="mono" hidden>
+    <legend>모노파일 · 강관 말뚝</legend>
+    <div class="grid2">
+      <div class="f"><label for="mD">하부 직경 D (m)</label><input id="mD" type="number" step="0.1"></div>
+      <div class="f" data-for="monoT"><label for="mDt">상부 직경 (m)</label><input id="mDt" type="number" step="0.1"></div>
+      <div class="f" data-for="monoT"><label for="mzA">테이퍼 구간 하단 표고</label><input id="mzA" type="number" step="0.5"></div>
+      <div class="f" data-for="monoT"><label for="mzB">테이퍼 구간 상단 표고</label><input id="mzB" type="number" step="0.5"></div>
+      <div class="f"><label for="mtop">말뚝 상단 표고</label><input id="mtop" type="number" step="0.1"></div>
+      <div class="f"><label for="mL">근입깊이 (원지반 아래, m)</label><input id="mL" type="number" step="0.5"></div>
+    </div>
+    <div class="sub">두께 구간 (경계는 DL 표고)</div>
+    <div class="grid2">
+      <div class="f"><label for="mz1">하부↔중간 경계 표고</label><input id="mz1" type="number" step="0.5"></div>
+      <div class="f"><label for="mz2">중간↔상부 경계 표고</label><input id="mz2" type="number" step="0.5"></div>
+      <div class="f"><label for="mt1">하부 두께 (mm)</label><input id="mt1" type="number" step="1"></div>
+      <div class="f"><label for="mt2">중간 두께 (mm, 해저면 부근)</label><input id="mt2" type="number" step="1"></div>
+      <div class="f"><label for="mt3">상부 두께 (mm)</label><input id="mt3" type="number" step="1"></div>
+      <div class="f"><label for="mca">부식 여유두께 (mm)</label><input id="mca" type="number" step="0.5"></div>
+      <div class="f"><label for="mfy">강재 항복강도 f<sub>y</sub> (MPa)</label><input id="mfy" type="number" step="5"></div>
+      <div class="f"><label for="mgM">재료계수 γ<sub>M</sub></label><input id="mgM" type="number" step="0.05"></div>
+      <div class="f"><label for="mgs">강재 단위중량 (kN/m³)</label><input id="mgs" type="number" step="0.1"></div>
+      <div class="f"><label for="mgE">환경하중 계수 (ULS)</label><input id="mgE" type="number" step="0.05"></div>
+    </div>
+    <p class="hint" id="monoNote"></p>
+  </fieldset>
+  <fieldset data-cat="mono" hidden>
+    <legend>트랜지션피스 (TP)</legend>
+    <div class="grid2">
+      <div class="f wide"><label for="mTP">연결 방식</label><select id="mTP"><option value="grout">그라우트 연결 (TP가 말뚝 바깥을 감쌈)</option><option value="bolt">볼트 연결 (말뚝 상단 플랜지)</option></select></div>
+      <div class="f"><label for="mtTP">TP 두께 (mm)</label><input id="mtTP" type="number" step="1"></div>
+      <div class="f" data-for-tp="grout"><label for="mgap">그라우트 간격 (m)</label><input id="mgap" type="number" step="0.01"></div>
+      <div class="f" data-for-tp="grout"><label for="mgg">그라우트 단위중량 (kN/m³)</label><input id="mgg" type="number" step="0.1"></div>
+      <div class="f"><label for="mWsec">2차 부재 중량 (kN, 플랫폼·접안시설)</label><input id="mWsec" type="number" step="50"></div>
+    </div>
+    <p class="hint">TP 상단 = 터빈 하중 인터페이스. 그라우트 연결 길이는 1.5 × 말뚝 상단 직경으로 계산합니다. 2차 부재 중량 1,500 kN은 가정값입니다.</p>
+  </fieldset>
+  <fieldset data-cat="jacket" hidden>
+    <legend>자켓 · 형상</legend>
+    <div class="grid2">
+      <div class="f"><label for="jWb">하단 다리 간격 (m, 인접 다리 중심)</label><input id="jWb" type="number" step="0.5"></div>
+      <div class="f"><label for="jWt">상단 다리 간격 (m)</label><input id="jWt" type="number" step="0.5"></div>
+      <div class="f"><label for="jN">브레이스 칸 수</label><input id="jN" type="number" step="1"></div>
+      <div class="f"><label for="jRat">칸 높이 비 (위/아래)</label><input id="jRat" type="number" step="0.05"></div>
+      <div class="f"><label for="jTPh">TP 높이 (자켓 상단 ~ 인터페이스, m)</label><input id="jTPh" type="number" step="0.5"></div>
+      <div class="f"><label for="jStub">해저면 위 다리 하단 (m)</label><input id="jStub" type="number" step="0.5"></div>
+      <div class="f wide"><label for="jHz">중간 수평재</label><select id="jHz"><option value="0">없음 (하단 수평재만)</option><option value="1">칸마다 수평재</option></select></div>
+      <div class="f"><label for="jDir">파랑·바람 방향 (°, x축 기준)</label><input id="jDir" type="number" step="5"></div>
+    </div>
+    <p class="hint" id="jacketNote"></p>
+  </fieldset>
+  <fieldset data-cat="jacket" hidden>
+    <legend>자켓 · 부재 (강관)</legend>
+    <div class="grid2">
+      <div class="f"><label for="jLD">다리 외경 (m)</label><input id="jLD" type="number" step="0.05"></div>
+      <div class="f"><label for="jLt">다리 두께 (mm)</label><input id="jLt" type="number" step="1"></div>
+      <div class="f"><label for="jBrD">X 브레이스 외경 (m)</label><input id="jBrD" type="number" step="0.05"></div>
+      <div class="f"><label for="jBrt">X 브레이스 두께 (mm)</label><input id="jBrt" type="number" step="1"></div>
+      <div class="f"><label for="jMbD">수평재 외경 (m)</label><input id="jMbD" type="number" step="0.05"></div>
+      <div class="f"><label for="jMbt">수평재 두께 (mm)</label><input id="jMbt" type="number" step="1"></div>
+      <div class="f"><label for="jFlood">다리 내부</label><select id="jFlood"><option value="1">침수 (해수 채움)</option><option value="0">밀폐 (부력 있음)</option></select></div>
+      <div class="f"><label for="jMg">해양생물 두께 (mm)</label><input id="jMg" type="number" step="5"></div>
+      <div class="f"><label for="jfy">강재 항복강도 f<sub>y</sub> (MPa)</label><input id="jfy" type="number" step="5"></div>
+      <div class="f"><label for="jgM">재료계수 γ<sub>M</sub></label><input id="jgM" type="number" step="0.05"></div>
+      <div class="f"><label for="jgE">환경하중 계수 (ULS)</label><input id="jgE" type="number" step="0.05"></div>
+    </div>
+    <p class="hint">브레이스는 밀폐(부력 있음)로 봅니다. 해양생물 두께 50 mm는 가정값입니다(현장 설계기준서 값으로 바꾸세요). 부재 검토는 NORSOK N-004(γ<sub>M</sub> 1.15)입니다.</p>
+  </fieldset>
+  <fieldset data-cat="jacket" hidden>
+    <legend>자켓 · 트랜지션피스 · 말뚝</legend>
+    <div class="grid2">
+      <div class="f"><label for="jWtp">TP 중량 (kN)</label><input id="jWtp" type="number" step="50"></div>
+      <div class="f"><label for="jWsec">2차 부재 중량 (kN)</label><input id="jWsec" type="number" step="50"></div>
+      <div class="f"><label for="jPD">말뚝 외경 (m)</label><input id="jPD" type="number" step="0.1"></div>
+      <div class="f"><label for="jPt">말뚝 두께 (mm)</label><input id="jPt" type="number" step="1"></div>
+      <div class="f"><label for="jPL">말뚝 근입깊이 (m)</label><input id="jPL" type="number" step="0.5"></div>
+      <div class="f wide"><label for="jSc">세굴 대책 (말뚝 둘레)</label><select id="jSc"><option value="1">세굴방지공 설치 (세굴 없음)</option><option value="0">세굴방지공 없음 (세굴 깊이 반영)</option></select></div>
+      <div class="f" data-for-jsc="1"><label for="jScK">보호공 외경 / 말뚝 직경</label><input id="jScK" type="number" step="0.5"></div>
+      <div class="f" data-for-jsc="1"><label for="jScT">보호공 두께 (m)</label><input id="jScT" type="number" step="0.1"></div>
+      <div class="f" data-for-jsc="0"><label for="jScS">세굴 깊이 / 말뚝 직경 (S/D)</label><input id="jScS" type="number" step="0.1"></div>
+    </div>
+    <p class="hint">말뚝은 다리마다 1본, 연직 항타로 봅니다. TP 3,500 kN·2차 부재 800 kN은 가정값입니다. 석션버킷은 다음 단계에서 추가합니다. 보호공 외경 5D·두께 1.0 m와 세굴 깊이 1.3D(DNV 경험값)는 가정값입니다.</p>
+  </fieldset>
+  <fieldset data-cat="mono jacket" hidden>
+    <legend>지반 · 말뚝 해석</legend>
+    <div class="grid2">
+      <div class="f wide"><label for="soilPre">지층 자료</label><select id="soilPre"></select></div>
+      <div class="f" data-cat="mono"><label for="mRot">허용 해저면 회전각 (°, 상시)</label><input id="mRot" type="number" step="0.05"></div>
+      <div class="f"><label for="mFSc">축방향 안전율 (상시)</label><input id="mFSc" type="number" step="0.1"></div>
+      <div class="f"><label for="mFSu">축방향 안전율 (폭풍)</label><input id="mFSu" type="number" step="0.1"></div>
+    </div>
+    <p class="hint" id="soilNote"></p>
+    <div class="dl" style="margin-top:6px"><button class="btn small" type="button" id="soilOpen">지층 표 열기 · 고치기</button></div>
+  </fieldset>
+  <fieldset data-cat="mono" hidden>
+    <legend>설치 · 세굴 · 해양생물</legend>
+    <div class="grid2">
+      <div class="f wide"><label for="mInst">설치 방식</label><select id="mInst"><option value="drive">항타</option><option value="drill">드릴드 (암반 천공 후 삽입·그라우트)</option><option value="ddd">항타-천공-항타 (일부 구간 천공)</option></select></div>
+      <div class="f" data-for-inst="drill ddd"><label for="mDrG">천공 여유 (반경, m)</label><input id="mDrG" type="number" step="0.05"></div>
+      <div class="f" data-for-inst="ddd"><label for="mDrL">천공 구간 길이 (m)</label><input id="mDrL" type="number" step="0.5"></div>
+      <div class="f wide"><label for="mSc">세굴 대책</label><select id="mSc"><option value="1">세굴방지공 설치 (세굴 없음)</option><option value="0">세굴방지공 없음 (세굴 깊이 반영)</option></select></div>
+      <div class="f" data-for-sc="1"><label for="mScK">보호공 외경 / 말뚝 직경</label><input id="mScK" type="number" step="0.5"></div>
+      <div class="f" data-for-sc="1"><label for="mScT">보호공 두께 (m)</label><input id="mScT" type="number" step="0.1"></div>
+      <div class="f" data-for-sc="0"><label for="mScS">세굴 깊이 / 말뚝 직경 (S/D)</label><input id="mScS" type="number" step="0.1"></div>
+      <div class="f"><label for="mmg">해양생물 부착 두께 (mm)</label><input id="mmg" type="number" step="5"></div>
+    </div>
+    <p class="hint">세굴 깊이 S = 1.3D는 DNV 평형 세굴 경험값(가정)입니다. 해양생물 50 mm는 가정값이며 MSL+2 m 아래에 붙는다고 봅니다. 천공 여유 0.15 m도 가정값입니다.</p>
+  </fieldset>
+  <fieldset data-cat="grav">
+    <legend>기둥 · 샤프트 / 상부</legend>
+    <div class="grid2">
+      <div class="f wide"><label for="shp">단면 형상</label><select id="shp"><option value="circ">원형</option><option value="hex">육각형 (속 빈 단면)</option></select></div>
+      <div class="f" data-shp="circ"><label for="Dc">외경 D<sub>c</sub></label><input id="Dc" type="number" step="0.1"></div>
+      <div class="f" data-shp="circ"><label for="tc">벽두께 t<sub>c</sub></label><input id="tc" type="number" step="0.05"></div>
+      <div class="f" data-shp="hex"><label for="ha">육각 한 변 a</label><input id="ha" type="number" step="0.05"></div>
+      <div class="f" data-shp="hex"><label for="hth">벽두께</label><input id="hth" type="number" step="0.05"></div>
+      <div class="f" data-shp="hex"><label for="hhn">모서리 헌치 (다리 길이)</label><input id="hhn" type="number" step="0.05"></div>
+      <div class="f"><label for="zc0">기둥 하단 높이</label><input id="zc0" type="number" step="0.1"></div>
+      <div class="f"><label for="ztop">구조물 상단 높이</label><input id="ztop" type="number" step="0.1"></div>
+      <div class="f"><label for="Dp">상부 플랫폼 외경</label><input id="Dp" type="number" step="0.1"></div>
+      <div class="f"><label for="tp">플랫폼 두께</label><input id="tp" type="number" step="0.05"></div>
+    </div>
+    <p class="hint" id="shpNote">높이는 모두 저판 하면 기준입니다.</p>
+    <div class="sub">보강 링 (외경 · 두께 · 높이 · 하단 높이)</div>
+    <table class="rings"><thead><tr><th>외경</th><th>두께</th><th>높이</th><th>하단 z</th><th></th></tr></thead><tbody id="ringBody"></tbody></table>
+    <button class="btn small" type="button" id="ringAdd" style="margin-top:6px">링 추가</button>
+  </fieldset>
+  <fieldset data-cat="grav">
+    <legend>속채움 · 재료</legend>
+    <div class="grid2">
+      <div class="f"><label for="zf1">격실 채움 상단 높이</label><input id="zf1" type="number" step="0.1"></div>
+      <div class="f"><label for="zf2">기둥 내부 채움 상단 높이</label><input id="zf2" type="number" step="0.1"></div>
+      <div class="f"><label for="gf">속채움 단위중량 (kN/m³)</label><input id="gf" type="number" step="0.1"></div>
+      <div class="f"><label for="gc">콘크리트 단위중량 (kN/m³)</label><input id="gc" type="number" step="0.1"></div>
+    </div>
+    <p class="hint">모래는 포화단위중량(예: 19), 물 밸러스트는 해수 단위중량(10.1)을 넣으세요. 격실 = 벽과 기둥 사이.</p>
+  </fieldset>
+  <fieldset>
+    <legend>설치 위치 · 수위 (DL 기준)</legend>
+    <div class="grid2">
+      <div class="f" data-cat="grav"><label for="zbDL">저판 하면 표고</label><input id="zbDL" type="number" step="0.1"></div>
+      <div class="f"><label for="sbDL">원지반(해저면) 표고</label><input id="sbDL" type="number" step="0.1"></div>
+      <div class="f"><label for="hwl">설계조위</label><input id="hwl" type="number" step="0.01"></div>
+      <div class="f"><label for="msl">평균해면 MSL</label><input id="msl" type="number" step="0.01"></div>
+      <div class="f"><label for="gw">해수 단위중량 (kN/m³)</label><input id="gw" type="number" step="0.01"></div>
+      <div class="f" data-cat="grav"><label for="tg">저판 하부 그라우팅 두께</label><input id="tg" type="number" step="0.05"></div>
+    </div>
+    <p class="hint" data-cat="grav">설계조위 = 약최고고조위 + 폭풍해일고. 기본값(DL(+)2.0 m)은 예시이니 현장 조위 자료로 바꾸세요.</p>
+  </fieldset>
+  <fieldset>
+    <legend>터빈</legend>
+    <div class="grid2">
+      <div class="f wide"><label for="turb">터빈 선택</label><select id="turb"></select></div>
+      <div class="f" data-cat="grav"><label for="f1">비교용 고유진동수 (Hz, 0 = 없음)</label><input id="f1" type="number" step="0.001"></div>
+      <div class="f"><label for="fmar">1P·3P 여유율</label><input id="fmar" type="number" step="0.01"></div>
+      <div class="f"><label for="vtip">날개 끝 속도 (m/s, rpm 없을 때)</label><input id="vtip" type="number" step="1"></div>
+      <div class="f"><label for="rpmR">최소/최대 회전수 비 (rpm 없을 때)</label><input id="rpmR" type="number" step="0.01"></div>
+    </div>
+    <p class="hint" id="turbNote"></p>
+    <div class="dl" style="margin-top:6px"><button class="btn small primary" type="button" id="tImpBtn">터빈 파일 가져오기</button><button class="btn small" type="button" id="tExp">선택 터빈 파일로 저장</button><button class="btn small" type="button" id="tExpAll">추가한 터빈 모두 저장</button><input type="file" id="tImp" accept=".json,application/json" multiple hidden></div>
+    <div class="dl" style="margin-top:6px"><button class="btn small" type="button" id="tNew">새 터빈 추가</button><button class="btn small" type="button" id="tDup">선택 터빈 복제해서 편집</button><button class="btn small" type="button" id="tDel" hidden>이 터빈 삭제</button></div>
+    <p class="hint">터빈 자료(제원·하중표)는 도구에 넣지 않고 터빈 파일(.json)로 따로 관리합니다. 기본 목록은 공개 기준 터빈(DTU 10MW·IEA 15MW, 하중표 없음)뿐입니다. 제작사 터빈은 "터빈 파일 가져오기"로 불러오면 이 브라우저에 남습니다.</p>
+    <div class="tedit" id="tEdit" hidden>
+      <div class="grid2">
+        <div class="f wide"><label for="te_name">터빈 이름</label><input id="te_name" type="text"></div>
+        <div class="f"><label for="te_MW">정격출력 (MW)</label><input id="te_MW" type="number" step="0.1"></div>
+        <div class="f"><label for="te_hub">허브높이 (MSL+ m)</label><input id="te_hub" type="number" step="0.1"></div>
+        <div class="f"><label for="te_rotor">로터직경 (m)</label><input id="te_rotor" type="number" step="0.1"></div>
+        <div class="f"><label for="te_ifz">하중 인터페이스 (MSL+ m)</label><input id="te_ifz" type="number" step="0.1"></div>
+        <div class="f"><label for="te_rna">RNA 중량 (t)</label><input id="te_rna" type="number" step="1"></div>
+        <div class="f"><label for="te_tower">타워 중량 (t)</label><input id="te_tower" type="number" step="1"></div>
+        <div class="f"><label for="te_W">총중량 직접입력 (kN, 0=자동)</label><input id="te_W" type="number" step="10"></div>
+        <div class="f"><label for="te_axis">하중표 연직축</label><select id="te_axis"><option value="z">z (보통)</option><option value="x">x</option></select></div>
+        <div class="f"><label for="te_rmin">최소 회전수 (rpm)</label><input id="te_rmin" type="number" step="0.1"></div>
+        <div class="f"><label for="te_rmax">최대 회전수 (rpm)</label><input id="te_rmax" type="number" step="0.1"></div>
+        <div class="f wide"><label for="te_fref">기준 고유진동수 (Hz, 타워 하단 고정 · 0 = 없음)</label><input id="te_fref" type="number" step="0.001"></div>
+        <div class="f"><label for="te_twL">타워 길이 (m, 0 = 모름)</label><input id="te_twL" type="number" step="0.1"></div>
+        <div class="f"><label for="te_twDb">타워 하단 직경 (m)</label><input id="te_twDb" type="number" step="0.01"></div>
+        <div class="f"><label for="te_twDt">타워 상단 직경 (m)</label><input id="te_twDt" type="number" step="0.01"></div>
+        <div class="f wide"><label for="te_uls">ULS 하중표 붙여넣기 (12행 × Mx My Mz Fx Fy Fz)</label><textarea id="te_uls" spellcheck="false"></textarea></div>
+        <div class="f wide"><label for="te_sls">SLS 하중표 붙여넣기 (12행)</label><textarea id="te_sls" spellcheck="false"></textarea></div>
+      </div>
+      <p class="hint">행 순서: Mx Max, Mx Min, My Max, My Min, Mz Max, Mz Min, Fx Max, Fx Min, Fy Max, Fy Min, Fz Max, Fz Min. 엑셀에서 숫자 6열을 복사해 붙여넣으면 됩니다(앞의 글자 열은 무시). 단위 kN·m, kN.</p>
+      <div class="dl"><button class="btn primary small" type="button" id="teSave">터빈 저장</button><button class="btn small" type="button" id="teCancel">닫기</button><span class="note" id="teMsg"></span></div>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>풍 · 파랑 · 조류</legend>
+    <div class="grid2">
+      <div class="f"><label for="Uref">기준 풍속 (10분 평균, m/s)</label><input id="Uref" type="number" step="0.01"></div>
+      <div class="f"><label for="zref">기준 풍속 높이 (m)</label><input id="zref" type="number" step="1"></div>
+      <div class="f"><label for="Cs">풍하중 형상계수</label><input id="Cs" type="number" step="0.05"></div>
+      <div class="f"><label for="Tavg">풍속 평균시간 (s)</label><input id="Tavg" type="number" step="60"></div>
+      <div class="f"><label for="Hw">설계 파고 H (m)</label><input id="Hw" type="number" step="0.01"></div>
+      <div class="f"><label for="Tw">주기 T (s)</label><input id="Tw" type="number" step="0.1"></div>
+      <div class="f wide"><label for="crest">파랑 적분 상단</label><select id="crest"><option value="0">설계조위까지</option><option value="1">파봉(H/2)까지 연장</option></select></div>
+      <div class="f"><label for="Uc">상시 조류 표층 유속 (대조기 최강, m/s)</label><input id="Uc" type="number" step="0.05"></div>
+      <div class="f"><label for="Uce">극치 조류 표층 유속 (50년, m/s)</label><input id="Uce" type="number" step="0.05"></div>
+      <div class="f"><label for="wcf">바람 해류 계수 (U<sub>w</sub> = 계수 × U₀)</label><input id="wcf" type="number" step="0.005"></div>
+      <div class="f"><label for="d0w">바람 해류 영향 깊이 (m)</label><input id="d0w" type="number" step="5"></div>
+      <div class="f wide"><label for="surf">구조물 표면 상태 (항력계수 산정)</label><select id="surf"><option value="conc">콘크리트 표면 (k = 3 mm)</option><option value="mg">해양생물 부착 (k = 20 mm)</option><option value="st">강재 표면 (k = 0.05 mm)</option><option value="">거칠기 직접 입력</option></select></div>
+      <div class="f"><label for="ks">표면 거칠기 k (mm)</label><input id="ks" type="number" step="0.5"></div>
+    </div>
+    <p class="hint">기준 풍속·파고·주기·조류 유속 기본값은 예시(가정)입니다. 현장 설계 조건(해양조사, 설계기준서)으로 바꾸세요. 항력계수는 표면 거칠기와 높이별 직경으로 계산합니다(하중 탭에 산정 과정).</p>
+  </fieldset>
+  <fieldset>
+    <legend>지반 · 지진 · 검토 기준</legend>
+    <div class="grid2">
+      <div class="f wide" data-cat="grav"><label for="gBase">저판 지지 (고유진동수용)</label><select id="gBase"><option value="spr">지반 스프링 (원형 기초 탄성식)</option><option value="fix">고정 (경암)</option></select></div>
+      <div class="f" data-cat="grav"><label for="gG">지반 전단탄성계수 G (MPa)</label><input id="gG" type="number" step="10"></div>
+      <div class="f" data-cat="grav"><label for="gNu">지반 포아송비 ν</label><input id="gNu" type="number" step="0.05"></div>
+      <div class="f wide"><label for="sgc">지반 분류 (지반조사로 결정)</label><select id="sgc"><option value="">직접 입력</option><option value="0.09">S_A 경암 (Vs &gt; 1500 m/s) · PGA 0.09g</option><option value="0.11">S_B 보통암 (760~1500) · PGA 0.11g</option><option value="0.13">S_C 매우 조밀한 토사·연암 (360~760) · PGA 0.13g</option><option value="0.16">S_D 단단한 토사 (180~360) · PGA 0.16g</option><option value="0.22">S_E 연약한 토사 (&lt; 180) · PGA 0.22g</option></select></div>
+      <div class="f"><label for="kfac">진도 환산계수 (k<sub>h</sub> = PGA × 계수)</label><input id="kfac" type="number" step="0.05"></div>
+      <div class="f"><label for="kh">수평 지진계수 k<sub>h</sub></label><input id="kh" type="number" step="0.005"></div>
+      <div class="f wide"><label for="hydro">지진 시 동수압 (수심·형상으로 계산)</label><select id="hydro"><option value="1">포함 (배제수 부가질량)</option><option value="0">제외</option></select></div>
+      <div class="f" data-cat="grav"><label for="mu">저면 마찰계수 μ</label><input id="mu" type="number" step="0.05"></div>
+      <div class="f" data-cat="grav"><label for="qa">허용지지력 (kN/m²)</label><input id="qa" type="number" step="50"></div>
+      <div class="f" data-cat="grav"><label for="tilt">시공 허용 기울기 (°)</label><input id="tilt" type="number" step="0.05"></div>
+      <div class="f" data-cat="grav"><label for="aeff">극한 시 최소 유효접지율</label><input id="aeff" type="number" step="0.05"></div>
+      <div class="f" data-cat="grav"><label for="fsO1">상시 전도 FS</label><input id="fsO1" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="fsS1">상시 활동 FS</label><input id="fsS1" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="fsO2">폭풍 전도 FS</label><input id="fsO2" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="fsS2">폭풍 활동 FS</label><input id="fsS2" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="fsO3">지진 전도 FS</label><input id="fsO3" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="fsS3">지진 활동 FS</label><input id="fsS3" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="qf3">지진 시 지지력 할증</label><input id="qf3" type="number" step="0.1"></div>
+    </div>
+    <p class="hint">지반 분류별 PGA는 지진구역 I(Z = 0.11), 내진 I등급 기준 값입니다(KDS 17 10 00, 현장에 맞게 확인). 지반조사 전에는 k<sub>h</sub> 0.077(= 0.154/2) 가정값을 씁니다. 동수압은 지반과 무관하게 수심과 구조물 형상으로 계산합니다.</p>
+    <p class="hint" data-cat="grav">안전율은 항만 및 어항 설계기준(케이슨) 수준의 기본값입니다. 허용지지력·마찰계수·유효접지율은 지반조사 결과와 발주처 기준으로 바꾸세요.</p>
+  </fieldset>
+  <fieldset data-cat="grav">
+    <legend>부재설계 · 철근</legend>
+    <div class="dl" style="clear:both;margin:0 0 6px">
+      <button class="btn primary small" type="button" id="btnRbF">부재설계 + 진동수 동시 자동 수정</button>
+      <button class="btn small" type="button" id="btnRbA">부재설계만 자동 수정</button>
+      <button class="btn small" type="button" id="btnRbT">철근 + 두께까지만</button>
+      <button class="btn small" type="button" id="btnRb">철근만</button>
+    </div>
+    <input type="checkbox" id="rbAdj" hidden>
+    <div id="rbRes" class="optres" hidden></div>
+    <div id="rbInputs"></div>
+    <div class="grid2" style="margin-top:8px">
+      <div class="f"><label for="fck">콘크리트 f<sub>ck</sub> (MPa)</label><input id="fck" type="number" step="1"></div>
+      <div class="f"><label for="fy">철근 f<sub>y</sub> (MPa)</label><input id="fy" type="number" step="100"></div>
+      <div class="f"><label for="cov">순피복 (mm, 해양 노출)</label><input id="cov" type="number" step="5"></div>
+      <div class="f"><label for="kcr">균열 κ<sub>cr</sub> (건조 280, 그 외 210)</label><input id="kcr" type="number" step="10"></div>
+      <div class="f"><label for="phiF">속채움 내부마찰각 (°)</label><input id="phiF" type="number" step="1"></div>
+      <div class="f"><label for="gH">토압 하중계수</label><input id="gH" type="number" step="0.05"></div>
+      <div class="f"><label for="gE">환경하중 계수 (풍·파랑·조류)</label><input id="gE" type="number" step="0.05"></div>
+    </div>
+    <p class="hint">KDS 14 20 강도설계법. 터빈 ULS 하중은 제작사 하중계수가 들어 있다고 보고 1.0을 곱합니다. 저판 반력은 1.2 × 지반반력 − 0.9 × 자중으로 봅니다.</p>
+  </fieldset>
+  <fieldset data-cat="grav">
+    <legend>예인 · 시공</legend>
+    <div class="grid2">
+      <div class="f"><label for="dTow">예인 경로 수심</label><input id="dTow" type="number" step="0.5"></div>
+      <div class="f"><label for="ukc">최소 여유수심</label><input id="ukc" type="number" step="0.1"></div>
+      <div class="f"><label for="gmMin">GM 판정 기준값</label><input id="gmMin" type="number" step="0.1"></div>
+      <div class="f"><label for="zcut">예인 시 상단 높이 (0=전체)</label><input id="zcut" type="number" step="0.5"></div>
+      <div class="f"><label for="zbal">격실 물 밸러스트 상단 (0=없음)</label><input id="zbal" type="number" step="0.5"></div>
+      <div class="f"><label for="Wadd">예인 시 추가중량 (kN)</label><input id="Wadd" type="number" step="10"></div>
+      <div class="f"><label for="zadd">추가중량 작용 높이</label><input id="zadd" type="number" step="0.1"></div>
+      <div class="f"><label for="padN">거치 패드 개수</label><input id="padN" type="number" step="1"></div>
+      <div class="f"><label for="padB">패드 한 변</label><input id="padB" type="number" step="0.1"></div>
+      <div class="f"><label for="padH">패드 높이</label><input id="padH" type="number" step="0.05"></div>
+    </div>
+    <p class="hint">예인 경로 수심 15 m는 가정값. GM 기준값은 예인 계획에 맞춰 넣으세요.</p>
+  </fieldset>
+</form>
+</aside>
+
+<main>
+  <section class="opt" id="optPanel" hidden></section>
+  <div class="summary" id="summary"></div>
+  <div class="warns" id="warns"></div>
+  <section class="work">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-t="gen" aria-selected="true">일반도</button>
+      <button class="tab" role="tab" data-cat="grav" data-t="rbd" aria-selected="false">배근도</button>
+      <button class="tab" role="tab" data-t="m3d" aria-selected="false">3D 모델</button>
+      <button class="tab" role="tab" data-t="load" aria-selected="false">하중</button>
+      <button class="tab" role="tab" data-cat="grav" data-t="stab" aria-selected="false">안정검토</button>
+      <button class="tab" role="tab" data-cat="grav" data-t="mem" aria-selected="false">부재설계</button>
+      <button class="tab" role="tab" data-cat="grav" data-t="flt" aria-selected="false">부유 안정</button>
+      <button class="tab" role="tab" data-t="wt" aria-selected="false">자중 · 부력</button>
+      <button class="tab" role="tab" data-cat="mono jacket" data-t="mchk" aria-selected="false" hidden>강관 단면</button>
+      <button class="tab" role="tab" data-cat="mono jacket" data-t="mpy" aria-selected="false" hidden>말뚝 해석</button>
+      <button class="tab" role="tab" data-t="qty" aria-selected="false">수량</button>
+      <button class="tab" role="tab" data-t="calc" aria-selected="false">구조계산서</button>
+    </div>
+    <div class="pane" data-p="gen">
+      <p class="note" data-cat="grav" style="margin:0 0 8px">파란 치수 숫자를 누르면 그 자리에서 고칠 수 있습니다. Enter로 적용, Esc로 취소.</p>
+      <div class="legend" data-cat="mono jacket" hidden><span><i style="background:var(--steel)"></i>강재</span><span><i style="background:var(--grout)"></i>그라우트</span><span><i style="background:var(--rock)"></i>세굴방지공</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--soil)"></i>지반</span></div>
+      <div class="legend" data-cat="grav"><span><i style="background:var(--conc)"></i>콘크리트</span><span><i style="background:var(--fill)"></i>속채움</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--grout)"></i>그라우팅</span><span><i style="background:var(--soil)"></i>지반</span></div>
+      <div class="drw">
+        <div class="sheet" id="secWrap"><div class="cap" id="capSec">정면 단면도</div><div id="svgSec"></div><input id="dimEdit" type="number" step="any" aria-label="치수 수정" hidden></div>
+        <div class="sheet"><div class="cap">평면도</div><div id="svgPlan"></div></div>
+      </div>
+    </div>
+    <div class="pane" data-p="rbd" hidden>
+      <div class="ctl3d"><button class="btn small" id="rbZoom" type="button">크게 보기</button><span class="note" id="rbNote"></span></div>
+      <div class="sheet" id="rbWrap" style="background:#fff"><div id="svgRb"></div></div>
+      <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 배근도가 A3 DXF로 들어 있습니다. 철근 규격·간격을 바꾸거나 "최적 배근 자동 계산"을 누르면 도면이 바로 바뀝니다.</p>
+    </div>
+    <div class="pane" data-p="m3d" hidden>
+      <div class="ctl3d">
+        <label><input type="checkbox" id="cut3d" checked> 절반 잘라 보기</label>
+        <label><input type="checkbox" id="water3d" checked> 수면</label>
+        <label data-cat="grav"><input type="checkbox" id="fill3d" checked> 속채움</label>
+        <span class="note">드래그 회전 · 휠 확대 · 우클릭 이동</span>
+      </div>
+      <div id="view3d"></div>
+      <p class="note" id="note3d"></p>
+    </div>
+    <div class="pane" data-p="load" hidden><div class="rep" id="repLoad"></div></div>
+    <div class="pane" data-p="stab" hidden><div class="rep" id="repStab"></div></div>
+    <div class="pane" data-p="mem" hidden><div class="rep" id="repMem"></div></div>
+    <div class="pane" data-p="flt" hidden><div class="rep" id="repFlt"></div></div>
+    <div class="pane" data-p="wt" hidden><div class="rep" id="repWt"></div></div>
+    <div class="pane" data-p="qty" hidden><div class="rep" id="repQty"></div></div>
+    <div class="pane" data-p="calc" hidden><div class="rep" id="report"></div></div>
+    <div class="pane" data-p="mchk" hidden><div class="rep" id="repMchk"></div></div>
+    <div class="pane" data-p="mpy" hidden><div class="rep" id="soilEd"></div><div class="rep" id="repMpy"></div></div>
+  </section>
+</main>
+</div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
