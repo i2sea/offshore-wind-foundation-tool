@@ -681,6 +681,8 @@ function buildParts(P){
   return {parts,z2,wideTop,Rbase,Rwide,S};
 }
 
+/* 반경 x 위치의 링 연직철근이 (아래 링을 거쳐) 저판까지 곧게 내려갈 수 있는지 */
+function ringToSlab(list,g,x,cv){ return g.below.some(b=>b.slab||(x>=b.a0+cv-1e-6&&x<=b.a1-cv+1e-6&&(()=>{ const q=list.find(v=>v.i===b.ring); return q?ringToSlab(list,q,x,cv):false; })())); }
 /* 보강 링이 기대는 부재 찾기 (형상만 봄, 오차 0.05 m)
    아래: 저판(하부 슬래브) 상면 또는 다른 링 상면과 반경 방향으로 겹침
    옆: 기둥 내·외면, 하부 벽체 내면과 같은 반경이고 높이가 겹침 */
@@ -690,8 +692,8 @@ function ringSupport(P,R){
   const rg=(P.rings||[]).map((r,i)=>({...r,i})).filter(r=>r.D>0&&r.t>0&&r.h>0);
   return rg.map(r=>{ const ro=r.D/2, ri=ro-r.t, z0=r.z, z1=r.z+r.h, below=[], side=[];
     const ov=(a0,a1,b0,b1)=>Math.min(a1,b1)-Math.max(a0,b0);
-    if(Math.abs(z0-tb)<eps||z0<tb) below.push({nm:cais?"하부 슬래브":"저판",w:r.t,a0:0,a1:1e9});
-    rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2}); } });
+    if(Math.abs(z0-tb)<eps||z0<tb) below.push({nm:cais?"하부 슬래브":"저판",w:r.t,a0:0,a1:1e9,slab:true});
+    rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2,ring:q.i}); } });
     const hc=ov(z0,z1,P.zc0,P.ztop); if(hc>eps){ if(Math.abs(ro-S.ri)<eps) side.push({nm:"기둥 내면",r:ro,h:hc}); if(Math.abs(ri-S.ro)<eps) side.push({nm:"기둥 외면",r:ri,h:hc}); }
     const hw=ov(z0,z1,zw0,zw1); if(hw>eps&&Math.abs(ro-Rwi)<eps) side.push({nm:cais?"외벽 내면":"원통 내면",r:ro,h:hw});
     const wb=below.reduce((a,b)=>Math.max(a,b.w),0);
@@ -1127,10 +1129,16 @@ function rebarDetail(R,M){
     add("T1","케이슨 상판","상·하면 (X·Y 2방향)",dT,4*(2*Rwi/(dT.s/1000)),At/(2*Rwi),"I");
   }
   // 보강 링: 강도 부재로 보지 않고 최소철근(배력) + 닿는 부재와 연결철근
-  //   G·1 원주 (내·외면), G·2 연직 (내·외면, 아래 부재에 정착 la), G·3 옆 부재 연결철근 (수평, 0.3 m 격자, 양쪽 정착 la)
-  ringSupport(P,R).forEach(g=>{ const k=g.i+1, d=distRB(g.t), Ld=la(BARS[d.bar].d), rmI=g.ri+cv, rmO=g.ro-cv, nm=`보강 링 ${k}`;
+  //   G·1 원주 (내·외면), G·2 연직 (내·외면, 저판까지 닿으면 하부철근 위까지 내려 갈고리 40d), G·3 옆 부재 연결철근 (수평, 0.3 m 격자, 양쪽 정착 la)
+  const RG=ringSupport(P,R);
+  RG.forEach(g=>{ const k=g.i+1, d=distRB(g.t), Ld=la(BARS[d.bar].d), rmI=g.ri+cv, rmO=g.ro-cv, nm=`보강 링 ${k}`;
     add(`G${k}1`,nm,"원주 방향 (내·외면)",d,2*(g.h/(d.s/1000)+1),PI*(rmI+rmO)+2*Ld,"O");
-    add(`G${k}2`,nm,g.below.length?`연직 (내·외면, ${g.below.map(b=>b.nm).join("·")}에 정착)`:"연직 (내·외면)",d,2*PI*(rmI+rmO)/(d.s/1000),g.h-2*cv+(g.below.length?Ld:0)+0.2,"L");
+    // 연직: 저판까지 곧게 닿는 면은 저판 하부철근 위까지 내려 갈고리(40d) — 시공 시 저판 철근에 걸어 세움
+    const dSB=BARS[rb.sB.bar].d/1000, zBot=cv+2*dSB, Lfull=g.z+g.h-cv-zBot+Ld, Lfree=g.h-2*cv+0.2;
+    const fI=ringToSlab(RG,g,g.ri+cv,cv), fO=ringToSlab(RG,g,g.ro-cv,cv), nI=2*PI*rmI/(d.s/1000), nO=2*PI*rmO/(d.s/1000);
+    const lab=f=>f?`, 저판 하부철근까지 내려 갈고리`:(g.side.length?", 옆 부재 연결철근으로 고정":"");
+    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,fI?Lfull:Lfree,"L");
+    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,fI?Lfull:Lfree,"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,fO?Lfull:Lfree,"L"); }
     g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자)`,{bar:d.bar,s:300},n,2*Ld,"I"); });
   });
   // 기둥
@@ -3031,12 +3039,14 @@ function rbDetail(R,th){
   const dots=(x0,zA,x1,zB,s)=>{ const L=Math.hypot(x1-x0,zB-zA), n=Math.max(1,Math.floor(L/s)); for(let i=0;i<=n;i++){ const f=i/n; o.push({t:"dot",L:"RBD",x:x0+(x1-x0)*f,z:zA+(zB-zA)*f,r:dr}); } };
   const tag=(x,z,txt)=>lab.push({x,z,txt});
   // 보강 링: 외곽 + 원주(점, 내·외면) + 연직(선, 아래 부재에 정착) + 옆 부재 연결철근(수평 짧은 선)
-  ringSupport(P,R).forEach(g=>{ const k=g.i+1, r1=D.rows.find(r=>r.mk===`G${k}1`); if(!r1) return; const d=db(r1.bar), sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
+  const RGs=ringSupport(P,R);
+  RGs.forEach(g=>{ const k=g.i+1, r1=D.rows.find(r=>r.mk===`G${k}1`); if(!r1) return; const d=db(r1.bar), sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
     C([[g.ri,g.z],[g.ro,g.z],[g.ro,g.z+g.h],[g.ri,g.z+g.h]]);
     const xi=g.ri+cv+d/2, xo=g.ro-cv-d/2, za=g.z+cv, zb2=g.z+g.h-cv;
     if(xo>xi){ dots(xi+d,za,xi+d,zb2,sp); dots(xo-d,za,xo-d,zb2,sp);
-      const zd=x=>g.below.some(q=>x>q.a0+cv&&x<q.a1-cv)?g.z-Math.min(la,0.6):za;  // 아래 부재가 있는 자리만 정착
-      line(xi,zd(xi),xi,zb2); line(xo,zd(xo),xo,zb2); }
+      // 저판까지 곧게 닿는 면: 저판 하부철근 위까지 내려 갈고리
+      const zBot=cv+2*db(rb.sB.bar);
+      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ line(x,zBot,x,zb2); line(x,zBot,x+sg*Math.min(la,0.6),zBot); } else line(x,za,x,zb2); }); }
     g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) line(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
     tag(xo,g.z+g.h*0.6,`G${k} 보강 링 ${k} ${r1.bar}@${r1.s}${g.side.length?" + 연결철근":""}`); });
   // 저판: X방향 주철근(선) + Y방향(점)

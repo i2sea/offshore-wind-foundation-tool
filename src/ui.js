@@ -1010,12 +1010,14 @@ function rbDetail(R,th){
   const dots=(x0,zA,x1,zB,s)=>{ const L=Math.hypot(x1-x0,zB-zA), n=Math.max(1,Math.floor(L/s)); for(let i=0;i<=n;i++){ const f=i/n; o.push({t:"dot",L:"RBD",x:x0+(x1-x0)*f,z:zA+(zB-zA)*f,r:dr}); } };
   const tag=(x,z,txt)=>lab.push({x,z,txt});
   // 보강 링: 외곽 + 원주(점, 내·외면) + 연직(선, 아래 부재에 정착) + 옆 부재 연결철근(수평 짧은 선)
-  ringSupport(P,R).forEach(g=>{ const k=g.i+1, r1=D.rows.find(r=>r.mk===`G${k}1`); if(!r1) return; const d=db(r1.bar), sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
+  const RGs=ringSupport(P,R);
+  RGs.forEach(g=>{ const k=g.i+1, r1=D.rows.find(r=>r.mk===`G${k}1`); if(!r1) return; const d=db(r1.bar), sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
     C([[g.ri,g.z],[g.ro,g.z],[g.ro,g.z+g.h],[g.ri,g.z+g.h]]);
     const xi=g.ri+cv+d/2, xo=g.ro-cv-d/2, za=g.z+cv, zb2=g.z+g.h-cv;
     if(xo>xi){ dots(xi+d,za,xi+d,zb2,sp); dots(xo-d,za,xo-d,zb2,sp);
-      const zd=x=>g.below.some(q=>x>q.a0+cv&&x<q.a1-cv)?g.z-Math.min(la,0.6):za;  // 아래 부재가 있는 자리만 정착
-      line(xi,zd(xi),xi,zb2); line(xo,zd(xo),xo,zb2); }
+      // 저판까지 곧게 닿는 면: 저판 하부철근 위까지 내려 갈고리
+      const zBot=cv+2*db(rb.sB.bar);
+      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ line(x,zBot,x,zb2); line(x,zBot,x+sg*Math.min(la,0.6),zBot); } else line(x,za,x,zb2); }); }
     g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) line(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
     tag(xo,g.z+g.h*0.6,`G${k} 보강 링 ${k} ${r1.bar}@${r1.s}${g.side.length?" + 연결철근":""}`); });
   // 저판: X방향 주철근(선) + Y방향(점)

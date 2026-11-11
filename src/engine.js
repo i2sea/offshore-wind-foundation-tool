@@ -102,6 +102,8 @@ function buildParts(P){
   return {parts,z2,wideTop,Rbase,Rwide,S};
 }
 
+/* 반경 x 위치의 링 연직철근이 (아래 링을 거쳐) 저판까지 곧게 내려갈 수 있는지 */
+function ringToSlab(list,g,x,cv){ return g.below.some(b=>b.slab||(x>=b.a0+cv-1e-6&&x<=b.a1-cv+1e-6&&(()=>{ const q=list.find(v=>v.i===b.ring); return q?ringToSlab(list,q,x,cv):false; })())); }
 /* 보강 링이 기대는 부재 찾기 (형상만 봄, 오차 0.05 m)
    아래: 저판(하부 슬래브) 상면 또는 다른 링 상면과 반경 방향으로 겹침
    옆: 기둥 내·외면, 하부 벽체 내면과 같은 반경이고 높이가 겹침 */
@@ -111,8 +113,8 @@ function ringSupport(P,R){
   const rg=(P.rings||[]).map((r,i)=>({...r,i})).filter(r=>r.D>0&&r.t>0&&r.h>0);
   return rg.map(r=>{ const ro=r.D/2, ri=ro-r.t, z0=r.z, z1=r.z+r.h, below=[], side=[];
     const ov=(a0,a1,b0,b1)=>Math.min(a1,b1)-Math.max(a0,b0);
-    if(Math.abs(z0-tb)<eps||z0<tb) below.push({nm:cais?"하부 슬래브":"저판",w:r.t,a0:0,a1:1e9});
-    rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2}); } });
+    if(Math.abs(z0-tb)<eps||z0<tb) below.push({nm:cais?"하부 슬래브":"저판",w:r.t,a0:0,a1:1e9,slab:true});
+    rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2,ring:q.i}); } });
     const hc=ov(z0,z1,P.zc0,P.ztop); if(hc>eps){ if(Math.abs(ro-S.ri)<eps) side.push({nm:"기둥 내면",r:ro,h:hc}); if(Math.abs(ri-S.ro)<eps) side.push({nm:"기둥 외면",r:ri,h:hc}); }
     const hw=ov(z0,z1,zw0,zw1); if(hw>eps&&Math.abs(ro-Rwi)<eps) side.push({nm:cais?"외벽 내면":"원통 내면",r:ro,h:hw});
     const wb=below.reduce((a,b)=>Math.max(a,b.w),0);
