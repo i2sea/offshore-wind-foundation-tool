@@ -102,6 +102,10 @@ function buildParts(P){
   if(P.Dp>0&&P.tp>0) parts.push({k:"plat",nm:(P.type==="caisson"?"⑥":"⑤")+" 상부 플랫폼",z0:P.ztop-P.tp,z1:P.ztop,ro:()=>Math.max(P.Dp/2,rso),ri:()=>rso,V:Math.max(0,PI*((P.Dp/2)**2-rso**2))*P.tp,f:`π × (${fmt(P.Dp/2)}² − ${fmt(rso)}²) × ${P.tp}`});
   (P.rings||[]).forEach((r,i)=>{ if(!(r.D>0&&r.t>0&&r.h>0)) return;
     parts.push({k:"ring"+i,nm:`보강 링 ${i+1}`,z0:r.z,z1:r.z+r.h,ro:()=>r.D/2,ri:()=>Math.max(0,r.D/2-r.t),V:ann(r.D,r.t)*r.h,f:`π/4 × (${r.D}² − ${fmt(Math.max(0,r.D-2*r.t))}²) × ${r.h}`}); });
+  // 보강 링과 방사형 격벽이 겹치는 부분은 격벽에서 공제 (같은 콘크리트를 두 번 세지 않음)
+  { const rad=parts.find(q=>q.k==="rad"); if(rad){ const h0=P.cts, h1=P.cH-P.ctt, r0=rso, r1=P.cDw/2-P.ctw; let dV=0;
+      (P.rings||[]).forEach(r=>{ if(!(r.D>0&&r.t>0&&r.h>0)) return; const dr=Math.min(r1,r.D/2)-Math.max(r0,r.D/2-r.t), dz=Math.min(h1,r.z+r.h)-Math.max(h0,r.z); if(dr>0&&dz>0) dV+=P.cnr*P.ctr*dr*dz; });
+      if(dV>1e-9){ rad.V-=dV; rad.f+=` − 보강 링 겹침 ${fmt(dV)} m³`; } } }
   return {parts,z2,wideTop,Rbase,Rwide,S};
 }
 

@@ -398,13 +398,13 @@ function planPrims(R){
   if(P.type==="caisson") lab(P.cDw/2-P.ctw,-145,`격벽 ${Math.round(P.cnr)}개`); else lab(P.Dw/2-P.tw,-145,`Ø${fx((P.Dw-2*P.tw)*1000,0)} 원통 내경`);
   return {o,box:[-Rmax-13,-Rmax-2-(RG.length?1.2+RG.length*fs*1.05:0),Rmax+13,Rmax+2],fs};
 }
-const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" stroke-linejoin="round"`,FILL:`fill="var(--fill)"`,WATER:`fill="var(--water)" opacity=".75"`,
+const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" stroke-linejoin="round"`,CFIL:`fill="var(--conc)" stroke="var(--conc)" stroke-width=".02"`,FILL:`fill="var(--fill)"`,WATER:`fill="var(--water)" opacity=".75"`,
   SOIL:`fill="var(--soil)" opacity=".55"`,GROUT:`fill="var(--grout)" stroke="var(--conc-line)" stroke-width=".06"`,RAD:`fill="none" stroke="var(--conc-line)" stroke-width=".06" stroke-dasharray=".6 .35"`,
   LINE:`fill="none" stroke="var(--conc-line)" stroke-width=".08"`,HID:`fill="none" stroke="var(--conc-line)" stroke-width=".06" stroke-dasharray=".7 .35"`,
   SHT:`fill="none" stroke="#222" stroke-width=".1"`,STEEL:`fill="var(--steel)" stroke="var(--conc-line)" stroke-width=".05" stroke-linejoin="round"`,ROCK:`fill="var(--rock)" opacity=".7"`,PLUG:`fill="var(--soil)" opacity=".3"`,SHC:`fill="#f4f6f6" stroke="#999" stroke-width=".05"`};
 const SC={RB:"#c23b2e",RBD:"#c23b2e",SHT:"#222",STX:"#222",SDM:"#1d5e88",SMU:"#5b6970",WL:"var(--water-line)",TXT:"var(--ink)",DIM:"var(--dim)",MUT:"var(--muted)",CEN:"var(--muted)",LINE:"var(--conc-line)",HID:"var(--conc-line)",CONC:"var(--conc-line)"};
 /* 흑백 도면용 (일반도 A3): 채움 없이 검은 선·글자 */
-const K="#222", SVM={CONC:`fill="#fff" stroke="${K}" stroke-width=".07" stroke-linejoin="round"`,GROUT:`fill="#fff" stroke="${K}" stroke-width=".06"`,RAD:`fill="none" stroke="${K}" stroke-width=".06" stroke-dasharray=".6 .35"`,
+const K="#222", SVM={CONC:`fill="#fff" stroke="${K}" stroke-width=".07" stroke-linejoin="round"`,CFIL:`fill="#e6e6e6" stroke="#e6e6e6" stroke-width=".02"`,GROUT:`fill="#fff" stroke="${K}" stroke-width=".06"`,RAD:`fill="none" stroke="${K}" stroke-width=".06" stroke-dasharray=".6 .35"`,
   LINE:`fill="none" stroke="${K}" stroke-width=".08"`,HID:`fill="none" stroke="${K}" stroke-width=".06" stroke-dasharray=".7 .35"`,SHT:`fill="none" stroke="${K}" stroke-width=".1"`};
 const SCM=new Proxy({},{get:()=>K});
 function primsSVG(pr,label){
@@ -915,7 +915,7 @@ function dxfStr(s){ return String(s).replace(/[^\x20-\x7e]/g,c=>"\\U+"+c.codePoi
 const DXL={RB:[1,"REBAR"],RBD:[1,"REBAR"],SHT:[7,"SHEET"],STX:[7,"TEXT"],SDM:[3,"DIM"],SMU:[8,"TEXT"],SHC:[8,"HIDDEN"],CONC:[8,"CONC"],FILL:[42,"FILL"],WATER:[5,"WATER"],SOIL:[34,"SOIL"],GROUT:[9,"GROUT"],STEEL:[4,"STEEL"],ROCK:[33,"ROCK"],PLUG:[34,"SOIL"],RAD:[8,"HIDDEN"],LINE:[7,"OUTLINE"],HID:[8,"HIDDEN"],CEN:[1,"CENTER"],WL:[5,"WATER"],TXT:[7,"TEXT"],DIM:[3,"DIM"],MUT:[8,"TEXT"]};
 function primsDXF(prs){
   const k=1000, e=[]; const L=l=>(DXL[l]||[7,"0"])[1];
-  prs.forEach(({pr,dx,dy})=>pr.o.forEach(p=>{
+  prs.forEach(({pr,dx,dy})=>pr.o.forEach(p=>{ if(p.L==="CFIL") return; // 채움 띠는 DXF에 넣지 않음
     const X=x=>((x+dx)*k).toFixed(1), Yd=z=>((z+dy)*k).toFixed(1);
     if(p.t==="poly"){ e.push(`0\nPOLYLINE\n8\n${L(p.L)}\n66\n1\n70\n${p.open?0:1}\n10\n0\n20\n0\n30\n0`); p.pts.forEach(q=>e.push(`0\nVERTEX\n8\n${L(p.L)}\n10\n${X(q[0])}\n20\n${Yd(q[1])}\n30\n0`)); e.push(`0\nSEQEND\n8\n${L(p.L)}`); }
     else if(p.t==="line") e.push(`0\nLINE\n8\n${L(p.L)}\n10\n${X(p.x1)}\n20\n${Yd(p.z1)}\n30\n0\n11\n${X(p.x2)}\n21\n${Yd(p.z2)}\n31\n0`);
@@ -1358,8 +1358,16 @@ function clipPoly(pts,x0,x1,z0,z1){ let out=pts; const edge=(inside,cut)=>{ cons
 function wallSecCell(R,th,rebar,bg){
   const P=R.P, cro=R.S.hex?R.S.hex.flats/2:R.rso, cri=R.S.hex?cro-P.hth:R.rsi, Rw=P.cDw/2, Rwi=Rw-P.ctw, o=[], x0=rebar?0:Math.max(0,cri-0.8), x1=Math.max(Rw+0.8,R.Rbase), z0=0, z1=P.cH+0.8; // 오른쪽은 하부 슬래브 끝까지
   if(!bg) { clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,P.cts); clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop); clipRect(o,x0,x1,z0,z1,Rwi,Rw,P.cts,P.cH); clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH); }
-  o.push({t:"poly",L:"CONC",pts:[[cro,P.cts],[Rwi,P.cts],[Rwi,P.cH-P.ctt],[cro,P.cH-P.ctt]],w:th*.12});
-  o.push({t:"poly",L:"HID",pts:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]});
+  if(!bg) o.push({t:"poly",L:"CONC",pts:[[cro,P.cts],[Rwi,P.cts],[Rwi,P.cH-P.ctt],[cro,P.cH-P.ctt]],w:th*.12});
+  else { // 격벽만 채움, 보강 링과 겹치는 부분은 공제(높이 구간으로 나눠 링 폭을 뺀 띠로 채움)
+    const h0=P.cts, h1=P.cH-P.ctt, rg=(P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0), zs=[...new Set([h0,h1,...rg.flatMap(r=>[r.z,r.z+r.h]).filter(z=>z>h0&&z<h1)])].sort((a,b)=>a-b);
+    for(let i=0;i<zs.length-1;i++){ const za=zs[i], zb=zs[i+1], zm=(za+zb)/2; let segs=[[cro,Rwi]];
+      rg.filter(r=>zm>r.z&&zm<r.z+r.h).forEach(r=>{ const a=r.D/2-r.t, b=r.D/2; segs=segs.flatMap(([u,v])=>b<=u||a>=v?[[u,v]]:[[u,a],[b,v]].filter(([p,q])=>q-p>1e-6)); });
+      segs.forEach(([u,v])=>o.push({t:"poly",L:"CFIL",pts:[[u,za],[v,za],[v,zb],[u,zb]]})); } }
+  if(!bg) o.push({t:"poly",L:"HID",pts:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]});
+  else { // 위 배근 상세처럼: 테두리 없이, 중심선과 기둥 상단 끊음 표시
+    o.push({t:"line",L:"CEN",x1:0,z1:-0.6,x2:0,z2:z1+0.6});
+    const bk=cro-cri; o.push({t:"poly",open:1,L:"SHT",w:.05,pts:[[cri-bk*.3,z1],[cri+bk*.3,z1],[cri+bk*.45,z1+bk*.25],[cri+bk*.55,z1-bk*.25],[cri+bk*.7,z1],[cro+bk*.3,z1]]}); }
   if(x0>1e-6){ const e=Math.min(0.25,P.cts*0.25), zm=P.cts/2, bl=[[x0,-e],[x0,zm-e],[x0-e,zm-e*0.3],[x0+e,zm+e*0.3],[x0,zm+e],[x0,P.cts+e]]; // 파단선(왼쪽은 잘라서 그림)
     for(let i=1;i<bl.length;i++) o.push({t:"line",L:"CONC",x1:bl[i-1][0],z1:bl[i-1][1],x2:bl[i][0],z2:bl[i][1],w:th*.08}); }
   dimH(o,cro,Rwi,-th*1.8,th,mm(Rwi-cro)); dimV(o,P.cts,P.cH-P.ctt,x1+th*1.4,th,mm(P.cH-P.ctt-P.cts)); dimV(o,0,P.cts,x1+th*1.4,th,mm(P.cts)); dimV(o,P.cH-P.ctt,P.cH,x1+th*1.4,th,mm(P.ctt));
@@ -1370,7 +1378,7 @@ function wallSecCell(R,th,rebar,bg){
       for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) ln(cro-Math.min(la,cro-cri-cv),z,Rwi+Math.min(la,P.ctw-cv),z);
       for(let x=cro+cv;x<=Rwi-cv+1e-6;x+=sp) ln(x,P.cts-Math.min(la,P.cts-cv),x,P.cH-P.ctt+Math.min(la,P.ctt-cv));
       lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·상판·기둥·외벽에 40d(부재 두께 이내)`]); } }
-  if(bg){ const ol=[]; bg.forEach(p=>{ const q=clipPoly(p.pts,x0,x1,z0,z1); if(q.length>2) ol.push({t:"poly",L:"SHT",pts:q,w:th*.1}); }); o.unshift(...ol.slice(0,0)); const iF=o.findIndex(p=>p.t==="poly"&&p.L==="CONC"); o.splice(iF+1,0,...ol); } // 배근도: 위 상세와 같은 단면 외곽선(채움 없음)을 격벽 채움 위에, 철근은 그 위에
+  if(bg){ const ol=[]; bg.forEach(p=>{ const q=clipPoly(p.pts,x0,x1,z0,z1); if(q.length<3) return; const cut=q.findIndex((v,j)=>Math.abs(v[1]-z1)<1e-9&&Math.abs(q[(j+1)%q.length][1]-z1)<1e-9); const W=.07; if(cut<0) ol.push({t:"poly",open:1,L:"SHT",pts:[...q,q[0]],w:W}); else ol.push({t:"poly",open:1,L:"SHT",pts:[...q.slice(cut+1),...q.slice(0,cut+1)],w:W}); }); o.unshift(...ol.slice(0,0)); const iF=o.reduce((m,p,i)=>p.t==="poly"&&p.L==="CFIL"?i:m,-1); o.splice(iF+1,0,...ol); } // 배근도: 위 상세와 같은 단면 외곽선(채움 없음)을 격벽 채움 위에, 철근은 그 위에
   return {o,box:[x0,-th*3,x1+th*2.4,z1],lab,title:`단면 A-A — 방사형 격벽${rebar?" 배근":""}`};
 }
 /* 상세 그림 한 칸 배치: 칸(sx, sz 위끝, sw×sh, 종이 mm) 안에 맞는 가장 큰 축척으로. 넣었으면 축척, 못 넣으면 0 */
