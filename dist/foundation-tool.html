@@ -3232,7 +3232,22 @@ function sheetPrims(R){
   const cx=330*k, cz=H-15*k-c.r*f-6*k;
   o.push(...mapPrims(c.o,f,cx,cz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
   o.push({t:"text",L:"STX",x:252*k,z:H-14*k,h:3.4*k,s:`기둥 단면 배근도   S = 1 : ${scC}`});
-  // 철근재료표는 배근 상세도(2번장)에 둠
+  // 철근재료표는 배근 상세도(2번장)에 둠. 이 자리에 설계 조건표·주기
+  { const M=R.M, cais=P.type==="caisson", x0=252*k, cw=[34*k,122*k], rh=5.2*k; let z=cz-c.r*f-1*k;
+    const hl=zz=>o.push({t:"line",L:"SHT",x1:x0,z1:zz,x2:x0+cw[0]+cw[1],z2:zz,w:k*.18});
+    o.push({t:"text",L:"STX",x:x0,z:z+1.5*k,h:3.2*k,s:"설계 조건"}); const zt=z; hl(z);
+    const cond=[["설계 기준","KDS 14 20 (콘크리트구조 강도설계법)"],["콘크리트",`f_ck = ${P.fck} MPa`],["철근",`SD${P.fy} (f_y = ${P.fy} MPa), 이형철근`],["피복",`순피복 ${P.cov} mm (해양 노출)`],
+      ["정착·이음","정착길이 40d, 겹침이음 40d (가정)"],["철근량",`${fx(M.qty.tot/1000,1)} t (${fx(M.qty.perM3,0)} kg/m³, 이음·할증 제외)`]];
+    cond.forEach(r=>{ o.push({t:"text",L:"STX",x:x0+cw[0]/2,z:z-rh+1.6*k,h:2.3*k,s:r[0],anchor:"middle"}); o.push({t:"text",L:"STX",x:x0+cw[0]+1.5*k,z:z-rh+1.6*k,h:2.3*k,s:r[1]}); z-=rh; hl(z); });
+    [0,cw[0],cw[0]+cw[1]].forEach(xx=>o.push({t:"line",L:"SHT",x1:x0+xx,z1:zt,x2:x0+xx,z2:z,w:k*.18}));
+    z-=8*k; o.push({t:"text",L:"STX",x:x0,z,h:3.2*k,s:"주기"}); z-=5*k;
+    const notes=["치수 단위는 mm이며, 높이는 저판 하면 기준이다.","철근 규격·간격은 부재설계 탭의 검토 결과이며, 철근 번호는 배근 상세도의 철근재료표와 같다.",
+      "피복은 철근 표면까지의 순피복이다.","원주 방향 철근의 이음 위치는 서로 엇갈리게 배치한다.",
+      "보강 링 배근 상세, 철근 가공도, 철근재료표는 배근 상세도를 참조한다.",
+      ...(cais&&P.cnr>=2?["방사형 격벽 철근(R1·R2)은 하부 슬래브·상판·기둥·외벽에 정착한다."]:[]),
+      "정착·이음 길이는 예비값(가정)이며 실시설계에서 KDS 14 20 52에 따라 확인한다."];
+    notes.forEach((s2,i)=>{ wrapTxt(s2,2.3*k,150*k).forEach((ln,j)=>{ if(!j) o.push({t:"text",L:"STX",x:x0,z,h:2.3*k,s:`${i+1}.`}); o.push({t:"text",L:"STX",x:x0+5*k,z,h:2.3*k,s:ln}); z-=3.7*k; }); });
+  }
   // 표제란
   const tx=250*k, ty=12*k, tw=158*k, thh=34*k;
   o.push({t:"poly",L:"SHT",pts:[[tx,ty],[tx+tw,ty],[tx+tw,ty+thh],[tx,ty+thh]],w:k*.4});
@@ -3242,11 +3257,10 @@ function sheetPrims(R){
   T(tx+2*k,ty+27*k,"공사명"); T(tx+42*k,ty+27*k,"해상풍력발전기 기초 — 중력식 "+(P.type==="caisson"?"케이슨형":"원추형"),3);
   T(tx+2*k,ty+16*k,"도면명"); T(tx+42*k,ty+16*k,"해상풍력발전기 기초 배근도 (중력식)",3.6);
   T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (상세), 1 : ${scC} (기둥 단면)${P.type==="caisson"&&P.cnr>=2?`, 1 : ${sc} (단면 A-A)`:""}    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
-  T(15*k,13*k,`f_ck ${P.fck} MPa, 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 규격·간격은 부재설계 탭의 검토 결과입니다.`,2.2);
   // 케이슨: 방사형 격벽 단면 A-A 배근을 상세도 아래 왼쪽 빈 곳에
-  let aa=0; if(P.type==="caisson"&&P.cnr>=2){ const top=(d.z0+dz)/k-8, bot=20; if(top-bot>=45){ // 단면 A-A 오른쪽 끝(하부 슬래브 끝)을 위 배근 상세의 저판 오른쪽 끝에 맞춤
-      const kA=sc/1000, cA=wallSecCell(R,2.4*kA,true), xR=(R.Rbase+dx)/k, sx=Math.max(15,xR-2-(P.cDw/2+0.8-cA.box[0])/kA);
-      aa=placeCell(o,th2=>wallSecCell(R,th2,true),sx,top,240-sx,top-bot,k,2.4,3,sc); } }
+  let aa=0; if(P.type==="caisson"&&P.cnr>=2){ const top=(d.z0+dz)/k-8, bot=20; if(top-bot>=45){ // 단면 A-A를 위 배근 상세와 같은 x 좌표로
+      const bgA=d.o.filter(p=>p.t==="poly"&&p.L==="CONC"), kA=sc/1000, cA=wallSecCell(R,2.4*kA,true,bgA), sx=(dx+cA.box[0])/k-2; // 같은 축척, 같은 x 좌표 → 기둥 외면·외벽 내면·슬래브 끝이 위 상세와 일직선
+      aa=placeCell(o,th2=>wallSecCell(R,th2,true,bgA),sx,top,240-sx,top-bot,k,2.4,3,sc); } }
   return {o,box:[0,0,W,H],sc,scC,bg:1,aa};
 }
 /* ---------- 일반도 A3 (단면도 + 평면도 + 주기 + 표제란) ---------- */
@@ -3407,11 +3421,17 @@ function wallPlanCell(R,th){
   return {o,box:[cro*Math.cos(a1)-th*3,Math.min(...ys)-th*2,Rw+th*3,Math.max(...ys)+th*2],lab:[`방사형 격벽 ${n}개, 두께 ${mm(P.ctr)}, 격실 길이 ${mm(Lr)}, 외벽 쪽 간격 ${mm(La)} · 격벽을 따라 자른 단면이 A-A`],title:`상세 ${det} — 방사형 격벽 평면`};
 }
 /* 방사형 격벽 단면 (격벽을 따라 자른 A-A) */
-function wallSecCell(R,th,rebar){
-  const P=R.P, cro=R.S.hex?R.S.hex.flats/2:R.rso, cri=R.S.hex?cro-P.hth:R.rsi, Rw=P.cDw/2, Rwi=Rw-P.ctw, o=[], x0=Math.max(0,cri-0.8), x1=Rw+0.8, z0=0, z1=P.cH+0.8;
-  clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,P.cts); clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop); clipRect(o,x0,x1,z0,z1,Rwi,Rw,P.cts,P.cH); clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH);
+/* 다각형을 사각형(x0..x1, z0..z1)으로 자름 (Sutherland–Hodgman) */
+function clipPoly(pts,x0,x1,z0,z1){ let out=pts; const edge=(inside,cut)=>{ const res=[]; for(let i=0;i<out.length;i++){ const A=out[i], B=out[(i+1)%out.length], ia=inside(A), ib=inside(B); if(ia) res.push(A); if(ia!==ib) res.push(cut(A,B)); } out=res; };
+  const cx=(A,B,x)=>[x,A[1]+(B[1]-A[1])*(x-A[0])/(B[0]-A[0])], cz=(A,B,z)=>[A[0]+(B[0]-A[0])*(z-A[1])/(B[1]-A[1]),z];
+  edge(q=>q[0]>=x0,(A,B)=>cx(A,B,x0)); if(out.length) edge(q=>q[0]<=x1,(A,B)=>cx(A,B,x1)); if(out.length) edge(q=>q[1]>=z0,(A,B)=>cz(A,B,z0)); if(out.length) edge(q=>q[1]<=z1,(A,B)=>cz(A,B,z1)); return out; }
+function wallSecCell(R,th,rebar,bg){
+  const P=R.P, cro=R.S.hex?R.S.hex.flats/2:R.rso, cri=R.S.hex?cro-P.hth:R.rsi, Rw=P.cDw/2, Rwi=Rw-P.ctw, o=[], x0=rebar?0:Math.max(0,cri-0.8), x1=Math.max(Rw+0.8,R.Rbase), z0=0, z1=P.cH+0.8; // 오른쪽은 하부 슬래브 끝까지
+  if(!bg) { clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,P.cts); clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop); clipRect(o,x0,x1,z0,z1,Rwi,Rw,P.cts,P.cH); clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH); }
   o.push({t:"poly",L:"CONC",pts:[[cro,P.cts],[Rwi,P.cts],[Rwi,P.cH-P.ctt],[cro,P.cH-P.ctt]],w:th*.12});
   o.push({t:"poly",L:"HID",pts:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]});
+  if(x0>1e-6){ const e=Math.min(0.25,P.cts*0.25), zm=P.cts/2, bl=[[x0,-e],[x0,zm-e],[x0-e,zm-e*0.3],[x0+e,zm+e*0.3],[x0,zm+e],[x0,P.cts+e]]; // 파단선(왼쪽은 잘라서 그림)
+    for(let i=1;i<bl.length;i++) o.push({t:"line",L:"CONC",x1:bl[i-1][0],z1:bl[i-1][1],x2:bl[i][0],z2:bl[i][1],w:th*.08}); }
   dimH(o,cro,Rwi,-th*1.8,th,mm(Rwi-cro)); dimV(o,P.cts,P.cH-P.ctt,x1+th*1.4,th,mm(P.cH-P.ctt-P.cts)); dimV(o,0,P.cts,x1+th*1.4,th,mm(P.cts)); dimV(o,P.cH-P.ctt,P.cH,x1+th*1.4,th,mm(P.ctt));
   o.push({t:"text",L:"TXT",x:(cro+Rwi)/2,z:(P.cts+P.cH-P.ctt)/2,h:th,s:"격벽",anchor:"middle"});
   let lab=[`높이 ${mm(P.cH-P.ctt-P.cts)} (하부 슬래브 위 ~ 상판 아래)`,`길이 ${mm(Rwi-cro)} (기둥 외면 ~ 외벽 내면)`];
@@ -3420,6 +3440,7 @@ function wallSecCell(R,th,rebar){
       for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) ln(cro-Math.min(la,cro-cri-cv),z,Rwi+Math.min(la,P.ctw-cv),z);
       for(let x=cro+cv;x<=Rwi-cv+1e-6;x+=sp) ln(x,P.cts-Math.min(la,P.cts-cv),x,P.cH-P.ctt+Math.min(la,P.ctt-cv));
       lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·상판·기둥·외벽에 40d(부재 두께 이내)`]); } }
+  if(bg){ const ol=[]; bg.forEach(p=>{ const q=clipPoly(p.pts,x0,x1,z0,z1); if(q.length>2) ol.push({t:"poly",L:"SHT",pts:q,w:th*.1}); }); o.unshift(...ol.slice(0,0)); const iF=o.findIndex(p=>p.t==="poly"&&p.L==="CONC"); o.splice(iF+1,0,...ol); } // 배근도: 위 상세와 같은 단면 외곽선(채움 없음)을 격벽 채움 위에, 철근은 그 위에
   return {o,box:[x0,-th*3,x1+th*2.4,z1],lab,title:`단면 A-A — 방사형 격벽${rebar?" 배근":""}`};
 }
 /* 상세 그림 한 칸 배치: 칸(sx, sz 위끝, sw×sh, 종이 mm) 안에 맞는 가장 큰 축척으로. 넣었으면 축척, 못 넣으면 0 */
