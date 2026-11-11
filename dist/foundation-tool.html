@@ -121,7 +121,7 @@ main{min-width:0;display:flex;flex-direction:column;gap:12px}
 @media (max-width:1100px){.drw{grid-template-columns:minmax(0,1fr)}}
 .sheet{background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:auto;position:relative}
 .sheet svg{display:block;width:100%;height:auto}
-#rbWrap.zoom svg{width:2400px;max-width:none}
+#rbWrap.zoom svg,#genWrap.zoom svg{width:2400px;max-width:none}
 .sheet .cap{font-size:12px;font-weight:600;padding:8px 10px 0;color:var(--muted)}
 #view3d{position:relative;height:600px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:hidden}
 #view3d canvas{display:block;width:100%;height:100%}
@@ -533,6 +533,11 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="drw">
         <div class="sheet" id="secWrap"><div class="cap" id="capSec">정면 단면도</div><div id="svgSec"></div><input id="dimEdit" type="number" step="any" aria-label="치수 수정" hidden></div>
         <div class="sheet"><div class="cap">평면도</div><div id="svgPlan"></div></div>
+      </div>
+      <div data-cat="grav" style="margin-top:14px">
+        <div class="ctl3d"><b style="font-size:13px">일반도 (A3)</b><button class="btn small" id="genZoom" type="button">크게 보기</button><span class="note" id="genNote"></span></div>
+        <div class="sheet" id="genWrap" style="background:#fff"><div id="svgGen"></div></div>
+        <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 일반도가 A3 DXF로 들어 있습니다. 주기·설계 조건·검토 결과·수량은 입력값과 계산 결과에서 바로 만들어집니다.</p>
       </div>
     </div>
     <div class="pane" data-p="rbd" hidden>
@@ -2192,7 +2197,7 @@ function renderTab(t){
   if(!dirty[t]) return; dirty[t]=0;
   if(R.cat==="mono"){ renderMonoTab(t); return; }
   if(R.cat==="jacket"){ renderJacketTab(t); return; }
-  if(t==="gen"){ $("capSec").textContent="정면 단면도"; drawSection(); drawPlan(); }
+  if(t==="gen"){ $("capSec").textContent="정면 단면도"; drawSection(); drawPlan(); drawGenSheet(); }
   else if(t==="rbd") drawRebarSheet();
   else if(t==="m3d") build3D();
   else if(t==="load") $("repLoad").innerHTML=htmlLoad();
@@ -2910,6 +2915,7 @@ $("btnDxf").addEventListener("click",async()=>{ try{
   const all=primsDXF([{pr:sp,dx:0,dy:0},{pr:pp,dx:off,dy:R.P.ztop/2}]);
   const z=new JSZip(); z.file(`${baseName()}_일반도.dxf`,all); z.file(`${baseName()}_단면도.dxf`,primsDXF([{pr:sp,dx:0,dy:0}])); z.file(`${baseName()}_평면도.dxf`,primsDXF([{pr:pp,dx:0,dy:0}]));
   { const sh=sheetPrims(R); z.file(`${baseName()}_배근도_A3.dxf`,primsDXF([{pr:sh,dx:0,dy:0}])); }
+  { const gs=genSheetPrims(R); z.file(`${baseName()}_일반도_A3.dxf`,primsDXF([{pr:gs,dx:0,dy:0}])); }
   z.file("읽어보기.txt",`단위: mm, 원점 = 기초 중심 · 저판 하면.\r\n레이어: REBAR 철근, SHEET 도면 테두리·표, CONC 콘크리트, FILL 속채움, WATER 해수·수위, SOIL 지반, GROUT 그라우팅, HIDDEN 숨은선(격벽 등), CENTER 중심선, DIM 치수, TEXT 문자.\r\n한글 문자는 \\U+ 형식으로 들어 있어 AutoCAD에서 그대로 보입니다. 글꼴이 깨지면 문자 스타일을 한글 글꼴(맑은 고딕 등)로 바꾸세요.\r\n`);
   saveFile(`${baseName()}_도면_${stamp()}.zip`,await z.generateAsync({type:"blob"}));
 }catch(e){ toast("도면을 만들지 못했습니다"); console.error(e); } });
@@ -3145,6 +3151,79 @@ function sheetPrims(R){
   T(15*k,13*k,`f_ck ${P.fck} MPa, 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 규격·간격은 부재설계 탭의 검토 결과입니다.`,2.2);
   return {o,box:[0,0,W,H],sc,scC,bg:1};
 }
+/* ---------- 일반도 A3 (단면도 + 평면도 + 주기 + 표제란) ---------- */
+/* 글자 줄바꿈: 한글은 글자 높이, 영문·숫자는 0.55배 폭으로 보고 maxW(m)에 맞춤 */
+function wrapTxt(s,h,maxW){ const out=[]; let line="", w=0;
+  const cw=c=>/[ᄀ-ᇿ　-鿿가-힯①-⓿]/.test(c)?h*0.95:h*0.55;
+  for(const word of String(s).split(/(\s+)/)){ const ww=[...word].reduce((a,c)=>a+cw(c),0);
+    if(w+ww>maxW&&line.trim()){ out.push(line.trimEnd()); line=word.trimStart(); w=[...line].reduce((a,c)=>a+cw(c),0); } else { line+=word; w+=ww; } }
+  if(line.trim()) out.push(line.trimEnd()); return out; }
+function genNotes(R){
+  const P=R.P, T=R.T, cais=P.type==="caisson", L=R.LC, M=R.M, ok=x=>x?"O.K":"N.G";
+  const minO=Math.min(...L.map(l=>l.FSo/l.fs.o)), minS=Math.min(...L.map(l=>l.FSs/l.fs.s)), wQ=L.reduce((a,b)=>b.qcheck/b.qa>a.qcheck/a.qa?b:a);
+  const rg=ringList(P);
+  const notes=[
+    `치수 단위는 mm, 표고는 DL(약최저저조위 기준, m)이며 구조물 높이는 저판 하면 기준이다.`,
+    `콘크리트 fck = ${P.fck} MPa(해양 노출), 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 상세는 배근도를 따른다.`,
+    `속채움(단위중량 ${P.gf} kN/m³)은 ${cais?"격실":"원통·원추 내부"} 상단 높이 ${fx(P.zf1,1)} m, 기둥 내부 ${fx(P.zf2,1)} m까지 채운다.`,
+    `저판 하부 그라우팅 두께 ${fx(P.tg*1000,0)} mm. 허용지지력 ${fx(P.qa,0)} kPa는 가정값이며 지반조사 결과로 확인한다.`,
+    rg.length?`보강 링 ${rg.length}개(${P.ringAuto==="1"?"자동 배치: 기둥 하단·벽체 접합부":"직접 입력"})는 강도 부재가 아니며 최소철근과 연결철근으로 저판·기둥·벽체에 일체화한다.`:`보강 링 없음.`,
+    `터빈 ${T.name}: 하중 작용점(인터페이스) MSL+${T.ifz} m, 하중표 ${T.uls?(T.scaled?"축척 추정값(제작사 하중으로 교체 필요)":"제작사 값"):"없음(자중만 반영)"}.`,
+    `상부 플랫폼·접안시설·J-tube·부속 강재는 이 도면에 표시하지 않는다.`,
+  ];
+  const cond=[
+    `설계조위 ${dl(P.hwl)}, MSL ${dl(P.msl)}, 해저면 ${dl(P.sbDL)}, 저판 하면 ${dl(P.zbDL)}`,
+    `설계파 H = ${fx(P.Hw,2)} m, T = ${fx(P.Tw,1)} s · 기준 풍속 ${fx(P.Uref,2)} m/s(${P.zref} m) · 조류 ${fx(P.Uc,2)} / ${fx(P.Uce,2)} m/s · 수평진도 kh = ${fx(P.kh,3)}`,
+  ];
+  const res=[
+    `안정: 전도 ${ok(minO>=1)}(최소 여유 ${fx(minO,2)}), 활동 ${ok(minS>=1)}(${fx(minS,2)}), 지지력 ${ok(wQ.okQ)}(${wQ.id} ${fx(wQ.qcheck,0)} / ${fx(wQ.qa,0)} kPa), 유효 접지 ${ok(L.every(l=>l.okE))}`,
+    `부재설계: ${M.ok?"O.K":"N.G — 부재설계 탭 확인"} · 고유진동수 ${R.freq&&R.freq.f?`${fx(R.freq.f,3)} Hz ${R.freq.ok===false?"N.G":"O.K"}`:"계산 안 함"}`,
+  ];
+  const qty=[["콘크리트",`${fx(R.Vc,1)} m³`,`${fx(R.Wc,0)} kN`],["속채움",`${fx(R.Vf,1)} m³`,`${fx(R.Wf,0)} kN`],["철근",`${fx(M.qty.tot/1000,1)} t`,`${fx(M.qty.perM3,0)} kg/m³`]];
+  return {notes,cond,res,qty};
+}
+function genSheetPrims(R){
+  const P=R.P;
+  const sp=secPrims(R), [sx0,sz0,sx1,sz1]=sp.box;
+  let sc=SCALES[SCALES.length-1]; for(const s of SCALES){ const k=s/1000; if((sx1-sx0)/k<=232&&(sz1-sz0)/k<=262){ sc=s; break; } }
+  const k=sc/1000, W=420*k, H=297*k, o=[];
+  o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:k*.2}); o.push({t:"poly",L:"SHT",pts:[[10*k,10*k],[W-10*k,10*k],[W-10*k,H-10*k],[10*k,H-10*k]],w:k*.5});
+  // 정면 단면도 (왼쪽)
+  const dx=14*k-sx0, dz=H-22*k-sz1;
+  o.push(...mapPrims(sp.o,1,dx,dz));
+  o.push({t:"text",L:"STX",x:14*k,z:H-15*k,h:3.4*k,s:`정면 단면도   S = 1 : ${sc}`});
+  // 평면도 (오른쪽 위)
+  const pp=planPrims(R), [px0,pz0,px1,pz1]=pp.box;
+  let scP=SCALES[SCALES.length-1]; for(const s of SCALES){ if((px1-px0)/(s/1000)<=150&&(pz1-pz0)/(s/1000)<=92){ scP=s; break; } }
+  const f=sc/scP, pcx=252*k-px0*f+ (150*k-(px1-px0)*f)/2, pcz=H-22*k-pz1*f;
+  o.push(...mapPrims(pp.o,f,pcx,pcz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
+  o.push({t:"text",L:"STX",x:252*k,z:H-15*k,h:3.4*k,s:`평면도   S = 1 : ${scP}`});
+  // 주기·설계 조건·검토 결과·수량
+  const N=genNotes(R), x0=252*k, wmax=156*k; let z=pcz+pz0*f-6*k;
+  const head=s=>{ o.push({t:"text",L:"STX",x:x0,z,h:3.0*k,s}); z-=5.0*k; };
+  const para=(s,num)=>{ const h=2.3*k, lines=wrapTxt(s,h,wmax-(num?6*k:0)); lines.forEach((ln,i)=>{ if(i===0&&num) o.push({t:"text",L:"STX",x:x0,z,h,s:num}); o.push({t:"text",L:"STX",x:x0+(num?6*k:0),z,h,s:ln}); z-=3.7*k; }); z-=0.6*k; };
+  head("주기"); N.notes.forEach((s,i)=>para(s,`${i+1}.`));
+  z-=1.5*k; head("설계 조건"); N.cond.forEach(s=>para(s,"·"));
+  z-=1.5*k; head("검토 결과 요약"); N.res.forEach(s=>para(s,"·"));
+  // 수량표
+  z-=1.0*k; const rh=5*k, cw=[40,58,58].map(v=>v*k); const tz0=z+rh*0.2;
+  const hl=zz=>o.push({t:"line",L:"SHT",x1:x0,z1:zz,x2:x0+cw[0]+cw[1]+cw[2],z2:zz,w:k*.18});
+  o.push({t:"text",L:"STX",x:x0,z:z+1.2*k,h:3.0*k,s:"주요 수량 (1기)"}); z-=1.5*k; const zt=z; hl(z);
+  [["구분","수량","중량·단위량"],...N.qty].forEach(r=>{ let xx=x0; r.forEach((v,i)=>{ o.push({t:"text",L:"STX",x:xx+cw[i]/2,z:z-rh+1.5*k,h:2.3*k,s:v,anchor:"middle",num:i>0}); xx+=cw[i]; }); z-=rh; hl(z); });
+  { let xx=x0; [0,...cw].forEach(c=>{ xx+=c; o.push({t:"line",L:"SHT",x1:xx,z1:zt,x2:xx,z2:z,w:k*.18}); }); }
+  // 표제란
+  const tx=250*k, ty=12*k, tw=158*k, thh=34*k;
+  o.push({t:"poly",L:"SHT",pts:[[tx,ty],[tx+tw,ty],[tx+tw,ty+thh],[tx,ty+thh]],w:k*.4});
+  [ty+12*k,ty+23*k].forEach(zz=>o.push({t:"line",L:"SHT",x1:tx,z1:zz,x2:tx+tw,z2:zz,w:k*.2}));
+  o.push({t:"line",L:"SHT",x1:tx+40*k,z1:ty,x2:tx+40*k,z2:ty+thh,w:k*.2});
+  const T=(x,zz,s,h)=>o.push({t:"text",L:"STX",x,z:zz,h:(h||2.6)*k,s});
+  T(tx+2*k,ty+27*k,"공사명"); T(tx+42*k,ty+27*k,"해상풍력발전기 기초 — 중력식 "+(P.type==="caisson"?"케이슨형":"원추형"),3);
+  T(tx+2*k,ty+16*k,"도면명"); T(tx+42*k,ty+16*k,"해상풍력발전기 기초 일반도 (중력식)",3.6);
+  T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (단면도), 1 : ${scP} (평면도)    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
+  const over=z<ty+thh+3*k;
+  return {o,box:[0,0,W,H],sc,scP,bg:1,over};
+}
+function drawGenSheet(){ const pr=genSheetPrims(R); $("svgGen").innerHTML=primsSVG(pr,"일반도"); $("genNote").textContent=`A3 도면, 단면도 1:${pr.sc}, 평면도 1:${pr.scP}${pr.over?" · 주기가 길어 표제란과 겹칩니다":""}`; }
 function drawRebarSheet(){
   const pr=sheetPrims(R);
   $("svgRb").innerHTML=primsSVG(pr,"배근도");
@@ -3288,6 +3367,7 @@ document.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()
   openOpt(); $("optPanel").scrollIntoView({behavior:"smooth",block:"start"});
 }));
 
+$("genZoom").addEventListener("click",()=>{ const w=$("genWrap"); w.classList.toggle("zoom"); $("genZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 $("rbZoom").addEventListener("click",()=>{ const w=$("rbWrap"); w.classList.toggle("zoom"); $("rbZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 
 /* ---------- 모노파일 화면 ---------- */
