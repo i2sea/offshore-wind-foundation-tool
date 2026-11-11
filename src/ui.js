@@ -9,7 +9,7 @@ const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH"
   "mu","qa","tilt","aeff","fck","fy","cov","kcr","phiF","gH","gE","fsO1","fsS1","fsO2","fsS2","fsO3","fsS3","qf3","dTow","ukc","gmMin","zcut","zbal","Wadd","zadd","padN","padB","padH",
   "mD","mDt","mzA","mzB","mtop","mL","mz1","mz2","mt1","mt2","mt3","mca","mfy","mgM","mgs","mgE","mtTP","mgap","mWsec","mgg","mDrG","mDrL","mScK","mScT","mScS","mmg","mRot","mFSc","mFSu",
   "jWb","jWt","jN","jRat","jTPh","jStub","jDir","jLD","jLt","jBrD","jBrt","jMbD","jMbt","jMg","jfy","jgM","jgE","jWtp","jWsec","jPD","jPt","jPL","jScK","jScT","jScS"];
-const SEL=["shp","turb","crest","hydro","sgc","surf","mTP","mInst","mSc","soilPre","jHz","jFlood","jSc","gBase"];
+const SEL=["ringAuto","shp","turb","crest","hydro","sgc","surf","mTP","mInst","mSc","soilPre","jHz","jFlood","jSc","gBase"];
 const LS="gbs-tool-v3";
 let ST={...DEF}; // 현재 상태 (rings, customT, type 포함)
 try{ localStorage.removeItem("gbs-tool-v1"); localStorage.removeItem("gbs-tool-v2"); }catch(e){}
@@ -27,7 +27,7 @@ function fillTurbSel(){
   $("turb").value=ST.turb;
 }
 function setInputs(o){
-  ST={...DEF,...o}; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null;
+  ST={...DEF,...o}; if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null;
   ST.rb=Object.fromEntries(MEMB.map(m=>[m[0],{...(DEF_RB[m[0]]),...((o.rb||{})[m[0]]||{})}]));
   NUM.forEach(k=>{ if(ST[k]!==undefined) $(k).value=ST[k]; });
   fillTurbSel(); fillSoilSel(); SEL.forEach(k=>{ if(k!=="turb") $(k).value=String(ST[k]); });
@@ -62,10 +62,18 @@ function applyType(){
   const cur=document.querySelector(`.tab[data-t="${curTab}"]`); if(cur&&cur.hidden) selectTab("gen");
 }
 function drawRings(){
+  const auto=ST.ringAuto==="1"; $("ringAdd").hidden=auto;
+  if(auto){ const rg=(R&&R.P&&R.P.ringAuto==="1"&&R.P.rings)||autoRings(readInputs());
+    $("ringBody").innerHTML=rg.map(r=>`<tr>${["D","t","h","z"].map(k=>`<td class="n" style="padding:4px 6px">${fx(r[k],2)}</td>`).join("")}<td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.auto}</td></tr>`).join("")||`<tr><td colspan="5" class="hint">자동 배치할 자리가 없습니다</td></tr>`;
+    $("ringNote").innerHTML="자동 배치(가정): 기둥 하단 링 = 기둥 내경 · 기둥 벽두께, 벽체 접합부 링 = 벽체 내경 · max(0.5, 벽두께). 둘 다 저판 상면에서 시작, 높이 = 1.5 × 정착길이 40d(기둥 주철근·벽체 연직철근) → 0.5 m 올림(최소 1.0 m). 직접 고치려면 \"직접 입력\"으로 바꾸세요(지금 값이 옮겨집니다)."; return; }
+  $("ringNote").textContent="직접 입력: 외경·두께·높이·하단 높이(z, 저판 하면 기준). 아래(저판·다른 링)나 옆(기둥·벽체 면)에 닿아야 연결철근이 들어갑니다.";
   $("ringBody").innerHTML=ST.rings.map((r,i)=>`<tr>${["D","t","h","z"].map(k=>`<td><input id="rg_${i}_${k}" type="number" step="0.1" value="${r[k]}" aria-label="링 ${i+1} ${k}"></td>`).join("")}<td><button type="button" data-del="${i}" aria-label="링 ${i+1} 삭제">✕</button></td></tr>`).join("")||`<tr><td colspan="5" class="note">없음</td></tr>`;
   $("ringBody").querySelectorAll("input").forEach(el=>el.addEventListener("input",()=>{ const [,i,k]=el.id.split("_"); ST.rings[+i][k]=parseFloat(el.value)||0; run(); }));
   $("ringBody").querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{ ST.rings.splice(+b.dataset.del,1); drawRings(); run(); }));
 }
+$("ringAuto").addEventListener("change",()=>{ ST.ringAuto=$("ringAuto").value;
+  if(ST.ringAuto==="0"&&R&&R.P&&R.P.rings) ST.rings=R.P.rings.map(({D,t,h,z})=>({D,t,h,z}));
+  drawRings(); run(); });
 $("ringAdd").addEventListener("click",()=>{ ST.rings.push({D:6,t:0.5,h:1,z:1}); drawRings(); run(); });
 document.querySelectorAll(".wt").forEach(b=>b.addEventListener("click",()=>{ readInputs(); if(ST.type!==b.dataset.type){ optRun++; $("optPanel").hidden=true; } ST.type=b.dataset.type;
   if(ST.type==="caisson"&&ST.zc0>ST.cH) ST.zc0=ST.cts;
@@ -154,7 +162,7 @@ function run(){
   const P=readInputs(); persist();
   const mono=catOf(P.type)==="mono", jack=catOf(P.type)==="jacket";
   if(jack){ R=computeJacket(P); }
-  else if(mono){ R=computeMono(P); R.py=computePile(P,R); R.fq=monoFreq(P,R,R.py); R.warns=R.warns.filter(w=>w.k!=="sig").concat(R.py.warns,freqWarns(R)); } else { R=compute(P); R.tow=null; R.M=memberDesign(R,P.rb); const mw=memberWarn(R.M); if(mw) R.warns.push(mw); }
+  else if(mono){ R=computeMono(P); R.py=computePile(P,R); R.fq=monoFreq(P,R,R.py); R.warns=R.warns.filter(w=>w.k!=="sig").concat(R.py.warns,freqWarns(R)); } else { R=compute(P); R.tow=null; R.M=memberDesign(R,P.rb); const mw=memberWarn(R.M); if(mw) R.warns.push(mw); if(ST.ringAuto==="1") drawRings(); }
   const t=R.T; $("tDel").hidden=!(ST.customT||[]).some(c=>c.id===t.id);
   $("turbNote").textContent=`${t.MW} MW · 허브 MSL+${t.hub} m · 인터페이스 MSL+${t.ifz} m · 총중량 ${fx(R.Wt,0)} kN · ${t.uls?"하중표 있음":"하중표 없음"}${t.fref>0?` · 기준 진동수 ${t.fref} Hz`:""}${t.twDb>0?` · 타워 ${t.twL||t.hub-t.ifz} m Ø${t.twDb}→${t.twDt}`:""}${t.scaled?" · 하중표는 기준 터빈 축척 추정":""}`;
   if(P.type==="cone"){ const s=Math.sqrt(1+((P.Dw-P.Dt)/2/P.hk)**2); $("tkNote").textContent=`원추 벽 법선두께 = ${fx(P.tkh/s,3)} m (수평 ${P.tkh} ÷ ${fx(s,3)}), 경사 1 : ${fx(P.hk/((P.Dw-P.Dt)/2),3)}`; }

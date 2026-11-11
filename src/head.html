@@ -357,8 +357,10 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint" id="shpNote">높이는 모두 저판 하면 기준입니다.</p>
     <div class="sub">보강 링 (외경 · 두께 · 높이 · 하단 높이)</div>
+    <div class="f" style="margin-bottom:4px"><label for="ringAuto">배치 방법</label><select id="ringAuto"><option value="1">자동 (기둥 하단 + 벽체 접합부)</option><option value="0">직접 입력</option></select></div>
     <table class="rings"><thead><tr><th>외경</th><th>두께</th><th>높이</th><th>하단 z</th><th></th></tr></thead><tbody id="ringBody"></tbody></table>
     <button class="btn small" type="button" id="ringAdd" style="margin-top:6px">링 추가</button>
+    <p class="hint" id="ringNote"></p>
   </fieldset>
   <fieldset data-cat="grav">
     <legend>속채움 · 재료</legend>

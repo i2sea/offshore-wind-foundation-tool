@@ -23,7 +23,7 @@ const DEF={
   cDs:36,cts:1.0,cDw:34,ctw:0.5,cH:10,ctt:0.5,cnr:12,ctr:0.3,
   // 기둥(샤프트)
   shp:"circ",Dc:7.0,tc:0.6,ha:4.0,hth:0.40,hhn:0.80,zc0:1.0,ztop:60,Dp:12,tp:0.5,
-  rings:[],
+  rings:[],ringAuto:"1",
   zf1:20,zf2:35,gf:19,gc:24.5,
   // 위치·수위
   zbDL:-30.0,sbDL:-30.0,hwl:2.0,msl:0.5,gw:10.1,tg:0.35,
@@ -56,6 +56,22 @@ function shaftR(P){
   return {ro:P.Dc/2,ri:Math.max(0,P.Dc/2-P.tc),hex:null};
 }
 
+/* 보강 링 자동 배치 (가정): 두 곳
+   ① 기둥 하단 링: 기둥 내면에 붙여 저판 상면에서 시작. 외경 = 기둥 내경, 두께 = 기둥 벽두께,
+      높이 = 1.5 × 기둥 주철근 정착길이(40d) → 0.5 m 단위 올림 (최소 1.0 m)
+   ② 벽체 접합부 링: 하부 원통(케이슨 외벽) 내면에 붙여 저판 상면에서 시작. 외경 = 벽체 내경, 두께 = max(0.5, 벽두께),
+      높이 = 1.5 × 벽체 연직철근 정착길이(40d) → 0.5 m 단위 올림 (최소 1.0 m, 벽 높이 이하) */
+function autoRings(P){
+  const cais=P.type==="caisson", tb=cais?P.cts:P.tb, S=shaftR(P), rb=P.rb||{};
+  const dbOf=b=>(typeof BARS!=="undefined"&&BARS[b])?BARS[b].d/1000:(parseInt(String(b).slice(1))||25)/1000;
+  const hOf=(bar,hmax)=>Math.min(hmax,Math.max(1.0,Math.ceil(1.5*40*dbOf(bar)/0.5)*0.5));
+  const out=[];
+  const zc=Math.max(tb,P.zc0), tcw=S.ro-S.ri;
+  if(S.ri>0.5&&tcw>0) out.push({D:+(2*S.ri).toFixed(3),t:+Math.min(tcw,S.ri-0.3).toFixed(3),h:hOf((rb.cL||{}).bar||"H32",Math.max(1,P.ztop-zc-1)),z:+zc.toFixed(3),auto:"기둥 하단"});
+  const Rwi=cais?P.cDw/2-P.ctw:P.Dw/2-P.tw, tw=cais?P.ctw:P.tw, hw=cais?P.cH-P.cts-P.ctt:P.hw;
+  const tr=Math.max(0.5,tw); if(Rwi-tr>S.ro+0.5) out.push({D:+(2*Rwi).toFixed(3),t:+tr.toFixed(3),h:hOf((rb.wV||{}).bar||"H22",Math.max(1,hw)),z:+tb.toFixed(3),auto:"벽체 접합부"});
+  return out;
+}
 function buildParts(P){
   const S=shaftR(P), rso=S.ro, rsi=S.ri, parts=[];
   let wideTop, z2, Rbase, Rwide;
@@ -144,6 +160,7 @@ function turbWeight(t){ return t.Wdirect>0?t.Wdirect:((t.rna||0)+(t.tower||0))*G
 
 /* ---------- 계산 ---------- */
 function compute(P){
+  if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};
   const warns=[];
   const {parts,z2,wideTop,Rbase,Rwide,S}=buildParts(P);
   const rso=S.ro, rsi=S.ri;
