@@ -123,7 +123,7 @@ function rebarDetail(R,M){
   const P=R.P, cais=P.type==="caisson", rb=M.rb, out=[];
   const B=k=>BARS[rb[k].bar], cv=P.cov/1000, la=db=>Math.ceil(40*db/1000*10)/10; // 정착길이 약 40d (m)
   const tb=cais?P.cts:P.tb, Rb=R.Rbase, Rw=cais?P.cDw/2:P.Dw/2, tw=cais?P.ctw:P.tw, Rwi=Rw-tw;
-  const add=(mk,nm,face,r,n,L,shape)=>{ const w=BARS[r.bar].w; out.push({mk,nm,face,bar:r.bar,s:r.s,n:Math.ceil(n),L,tot:Math.ceil(n)*L,w,kg:Math.ceil(n)*L*w,shape}); };
+  const add=(mk,nm,face,r,n,L,shape,seg)=>{ const w=BARS[r.bar].w; out.push({mk,nm,face,bar:r.bar,s:r.s,n:Math.ceil(n),L,tot:Math.ceil(n)*L,w,kg:Math.ceil(n)*L*w,shape,seg}); };
   // 저판: 직교 2방향 그물, 원형 면적
   const Dslab=2*Rb, Aslab=PI*Rb*Rb, Lavg=Aslab/Dslab, dS=distRB(tb);
   const sT=rb.sT, sB=rb.sB;
@@ -143,8 +143,8 @@ function rebarDetail(R,M){
     add("K3","원추","자오선 외측 배력철근",dK,2*PI*(Rw-cv)/(dK.s/1000)*0.75,slant+2*la(BARS[dK.bar].d),"I");
   } else {
     const n=Math.round(P.cnr), Lr=Rwi-R.rso, hr=P.cH-P.ctt-P.cts, dR=distRB(P.ctr), dT=distRB(P.ctt);
-    if(n>0){ add("R1","방사형 격벽","수평 배력 (양면)",dR,n*2*(hr/(dR.s/1000)+1),Lr+2*la(BARS[dR.bar].d),"I");
-      add("R2","방사형 격벽","연직 배력 (양면)",dR,n*2*(Lr/(dR.s/1000)+1),hr+2*la(BARS[dR.bar].d),"I"); }
+    if(n>0){ add("R1","방사형 격벽","수평 배력 (양면)",dR,n*2*(hr/(dR.s/1000)+1),Lr+2*la(BARS[dR.bar].d),"I",{type:"I",a:Lr+2*la(BARS[dR.bar].d),note:`격벽 길이 ${Math.round(Lr*1000)} + 양 끝 정착 40d`});
+      add("R2","방사형 격벽","연직 배력 (양면)",dR,n*2*(Lr/(dR.s/1000)+1),hr+2*la(BARS[dR.bar].d),"I",{type:"I",a:hr+2*la(BARS[dR.bar].d),note:`격벽 높이 ${Math.round(hr*1000)} + 위·아래 정착 40d`}); }
     const At=PI*(Rwi**2-R.rso**2);
     add("T1","케이슨 상판","상·하면 (X·Y 2방향)",dT,4*(2*Rwi/(dT.s/1000)),At/(2*Rwi),"I");
   }
@@ -152,17 +152,17 @@ function rebarDetail(R,M){
   //   G·1 원주 (내·외면), G·2 연직 (내·외면, 저판까지 닿으면 하부철근 위까지 내려 갈고리 40d), G·3 옆 부재 연결철근 (수평, 0.3 m 격자, 양쪽 정착 la)
   const RG=ringSupport(P,R);
   RG.forEach(g=>{ const k=g.i+1, d=distRB(g.t), Ld=la(BARS[d.bar].d), rmI=g.ri+cv, rmO=g.ro-cv, nm=`보강 링 ${k}`;
-    add(`G${k}1`,nm,"원주 방향 (내·외면)",d,2*(g.h/(d.s/1000)+1),PI*(rmI+rmO)+2*Ld,"O");
+    add(`G${k}1`,nm,"원주 방향 (내·외면)",d,2*(g.h/(d.s/1000)+1),PI*(rmI+rmO)+2*Ld,"O",{type:"O",D:rmI+rmO,lap:Ld,note:"내·외면 평균 지름, 정척 이음 겹침 40d"});
     // 연직: 저판까지 곧게 닿는 면은 저판 하부철근 위까지 내려 갈고리(40d) — 시공 시 저판 철근에 걸어 세움
     const dSB=BARS[rb.sB.bar].d/1000, zBot=cv+2*dSB, Lfull=g.z+g.h-cv-zBot+Ld, Lfree=g.h-2*cv+0.2;
     const fI=ringToSlab(RG,g,g.ri+cv,cv), fO=ringToSlab(RG,g,g.ro-cv,cv), nI=2*PI*rmI/(d.s/1000), nO=2*PI*rmO/(d.s/1000);
     // 상판에 매달린 링: 위로 상판 상부철근 아래까지 올려 갈고리
     const up=(g.above||[]).length>0, Lup=up?(P.cH-cv-2*BARS[distRB(P.ctt).bar].d/1000)-(g.z+cv)+Ld:0;
     const lab=f=>f?`, 저판 하부철근까지 내려 갈고리`:up?", 상판 상부철근까지 올려 갈고리":(g.side.length?", 옆 부재 연결철근으로 고정":"");
-    const len=f=>f?Lfull:up?Lup:Lfree;
-    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,len(fI),"L");
-    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,len(fI),"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,len(fO),"L"); }
-    g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3), w=ringDowel(g,sd,Ld,cv); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자${w.hook?", 두께가 모자란 쪽 끝 갈고리":""})`,{bar:d.bar,s:300},n,w.eR+w.eM+0.3*w.hook,w.hook?"L":"I"); });
+    const len=f=>f?Lfull:up?Lup:Lfree, seg=f=>f?{type:"L",a:Lfull-Ld,b:Ld,note:"저판 하부철근 위까지 + 갈고리"}:up?{type:"L",a:Lup-Ld,b:Ld,up:1,note:"상판 상부철근 아래까지 + 갈고리"}:{type:"I",a:Lfree,note:"링 안"};
+    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,len(fI),"L",seg(fI));
+    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,len(fI),"L",seg(fI)); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,len(fO),"L",seg(fO)); }
+    g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*ringDowelZ(g,cv,BARS[d.bar].d/1000).length, w=ringDowel(g,sd,Ld,cv); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자${w.hook?", 두께가 모자란 쪽 끝 갈고리":""})`,{bar:d.bar,s:300},n,w.eR+w.eM+0.3*w.hook,w.hook?"L":"I",{type:"D",a:w.eR+w.eM,eR:w.eR,eM:w.eM,hR:w.eR<Ld-1e-6,hM:w.eM<Ld-1e-6,hk:0.3,note:`링 ${Math.round(w.eR*1000)} + ${sd.nm} ${Math.round(w.eM*1000)}`}); });
   });
   // 기둥
   const Lc=P.ztop-P.zc0, c=M.cL, tie=c.tie||distRB(R.rso-R.rsi);

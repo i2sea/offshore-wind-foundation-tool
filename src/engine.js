@@ -109,6 +109,8 @@ function buildParts(P){
 function ringToSlab(list,g,x,cv){ return g.below.some(b=>b.slab||(x>=b.a0+cv-1e-6&&x<=b.a1-cv+1e-6&&(()=>{ const q=list.find(v=>v.i===b.ring); return q?ringToSlab(list,q,x,cv):false; })())); }
 /* 옆 부재 연결철근의 묻힘 길이: 링 쪽·부재 쪽 각각 min(40d, 두께 − 피복), 모자라면 끝을 갈고리(0.3 m)로 */
 function ringDowel(g,sd,Ld,cv){ const eR=Math.min(Ld,g.t-cv), eM=Math.min(Ld,sd.tm-cv); return {eR,eM,hook:(eR<Ld-1e-6?1:0)+(eM<Ld-1e-6?1:0)}; }
+/* 연결철근 높이: 링 위·아래 피복 + 원주철근 한 개 안쪽부터, 0.3 m 이하 같은 간격 */
+function ringDowelZ(g,cv,d){ const za=g.z+cv+2*d, zb=g.z+g.h-cv-2*d; if(zb<=za) return [(g.z+g.z+g.h)/2]; const n=Math.ceil((zb-za)/0.3); return [...Array(n+1)].map((_,i)=>za+(zb-za)*i/n); }
 /* 상판에 매단 링의 연직철근 갈고리 방향: 기둥 외면에 붙으면 바깥(+), 벽에 붙으면 안쪽(−) — 옆 부재를 넘지 않게 */
 function ringUpHook(g,sg){ return g.side.some(s=>s.dir===-1)?1:g.side.some(s=>s.dir===1)?-1:sg; }
 /* 보강 링이 기대는 부재 찾기 (형상만 봄, 오차 0.05 m)
