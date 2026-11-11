@@ -1377,9 +1377,13 @@ function wallSecCell(R,th,rebar,bg){
       const ln=(a,b,c,d2)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:d2,w:th*.14});
       for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) ln(cro-Math.min(la,cro-cri-cv),z,Rwi+Math.min(la,P.ctw-cv),z);
       for(let x=cro+cv;x<=Rwi-cv+1e-6;x+=sp) ln(x,P.cts-Math.min(la,P.cts-cv),x,P.cH-P.ctt+Math.min(la,P.ctt-cv));
+      // 철근 번호(원표시): R1 수평, R2 연직 — 오른쪽 치수선 밖으로 인출
+      { const zs=[], xs=[]; for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) zs.push(z); for(let x=cro+cv;x<=Rwi-cv+1e-6;x+=sp) xs.push(x);
+        const h=P.cH-P.ctt-P.cts, tx=x1+th*4.2, tg=[{mk:"R1",x:cro+(Rwi-cro)*0.62,z:zs[Math.floor(zs.length*0.7)]||P.cts+h*0.7,tz:P.cts+h*0.62},{mk:"R2",x:xs[Math.floor(xs.length*0.88)]||Rwi-0.5,z:P.cts+h*0.3,tz:P.cts+h*0.38}];
+        tg.forEach(t=>{ o.push({t:"line",L:"DIM",x1:t.x,z1:t.z,x2:tx-th*0.1,z2:t.tz,w:th*.04}); o.push({t:"dot",L:"DIM",x:t.x,z:t.z,r:th*.18}); o.push({t:"circle",L:"DIM",x:tx+th*0.9,z:t.tz,r:th*1.0,w:th*.05}); o.push({t:"text",L:"DIM",x:tx+th*0.9,z:t.tz-th*0.32,h:th*.7,s:t.mk,anchor:"middle"}); }); }
       lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·상판·기둥·외벽에 40d(부재 두께 이내)`]); } }
   if(bg){ const ol=[]; bg.forEach(p=>{ const q=clipPoly(p.pts,x0,x1,z0,z1); if(q.length<3) return; const cut=q.findIndex((v,j)=>Math.abs(v[1]-z1)<1e-9&&Math.abs(q[(j+1)%q.length][1]-z1)<1e-9); const W=.07; if(cut<0) ol.push({t:"poly",open:1,L:"SHT",pts:[...q,q[0]],w:W}); else ol.push({t:"poly",open:1,L:"SHT",pts:[...q.slice(cut+1),...q.slice(0,cut+1)],w:W}); }); o.unshift(...ol.slice(0,0)); const iF=o.reduce((m,p,i)=>p.t==="poly"&&p.L==="CFIL"?i:m,-1); o.splice(iF+1,0,...ol); } // 배근도: 위 상세와 같은 단면 외곽선(채움 없음)을 격벽 채움 위에, 철근은 그 위에
-  return {o,box:[x0,-th*3,x1+th*2.4,z1],lab,title:`단면 A-A — 방사형 격벽${rebar?" 배근":""}`};
+  return {o,box:[x0,-th*3,x1+th*(rebar?6.5:2.4),z1],lab,title:`단면 A-A — 방사형 격벽${rebar?" 배근":""}`};
 }
 /* 상세 그림 한 칸 배치: 칸(sx, sz 위끝, sw×sh, 종이 mm) 안에 맞는 가장 큰 축척으로. 넣었으면 축척, 못 넣으면 0 */
 function placeCell(o,mk,sx,sz,sw,sh,sheetK,tmm,maxLab,fixSc){
