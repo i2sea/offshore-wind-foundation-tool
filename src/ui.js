@@ -937,7 +937,7 @@ $("btnDxf").addEventListener("click",async()=>{ try{
   const z=new JSZip(); z.file(`${baseName()}_일반도.dxf`,all); z.file(`${baseName()}_단면도.dxf`,primsDXF([{pr:sp,dx:0,dy:0}])); z.file(`${baseName()}_평면도.dxf`,primsDXF([{pr:pp,dx:0,dy:0}]));
   { const sh=sheetPrims(R); z.file(`${baseName()}_배근도_A3.dxf`,primsDXF([{pr:sh,dx:0,dy:0}])); }
   { const gs=genSheetPrims(R); z.file(`${baseName()}_일반도_A3.dxf`,primsDXF([{pr:gs,dx:0,dy:0}])); }
-  { const g0=genSheetPrims(R), b=detailSheetPrims(R,true); if(g0.dLeft){ const a=detailSheetPrims(R,false,g0.dN-g0.dLeft); z.file(`${baseName()}_상세도_A3.dxf`,primsDXF([{pr:a,dx:0,dy:0}])); } if(b.n) z.file(`${baseName()}_배근상세도_A3.dxf`,primsDXF([{pr:b,dx:0,dy:0}])); }
+  { const g0=genSheetPrims(R), b=detailSheetPrims(R,true); if(g0.dLeft){ const a=detailSheetPrims(R,false,g0.dN-g0.dLeft); z.file(`${baseName()}_상세도_A3.dxf`,primsDXF([{pr:a,dx:0,dy:0}])); } z.file(`${baseName()}_배근상세도_A3.dxf`,primsDXF([{pr:b,dx:0,dy:0}])); }
   z.file("읽어보기.txt",`단위: mm, 원점 = 기초 중심 · 저판 하면.\r\n레이어: REBAR 철근, SHEET 도면 테두리·표, CONC 콘크리트, FILL 속채움, WATER 해수·수위, SOIL 지반, GROUT 그라우팅, HIDDEN 숨은선(격벽 등), CENTER 중심선, DIM 치수, TEXT 문자.\r\n한글 문자는 \\U+ 형식으로 들어 있어 AutoCAD에서 그대로 보입니다. 글꼴이 깨지면 문자 스타일을 한글 글꼴(맑은 고딕 등)로 바꾸세요.\r\n`);
   saveFile(`${baseName()}_도면_${stamp()}.zip`,await z.generateAsync({type:"blob"}));
 }catch(e){ toast("도면을 만들지 못했습니다"); console.error(e); } });
@@ -1162,9 +1162,7 @@ function sheetPrims(R){
   const cx=330*k, cz=H-15*k-c.r*f-6*k;
   o.push(...mapPrims(c.o,f,cx,cz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
   o.push({t:"text",L:"STX",x:252*k,z:H-14*k,h:3.4*k,s:`기둥 단면 배근도   S = 1 : ${scC}`});
-  // 재료표
-  const tb=rbTable(R,k,252*k,cz-c.r*f-12*k,158,(12+34+4)*k);
-  o.push(...tb.o);
+  // 철근재료표는 배근 상세도(2번장)에 둠
   // 표제란
   const tx=250*k, ty=12*k, tw=158*k, thh=34*k;
   o.push({t:"poly",L:"SHT",pts:[[tx,ty],[tx+tw,ty],[tx+tw,ty+thh],[tx,ty+thh]],w:k*.4});
@@ -1173,10 +1171,10 @@ function sheetPrims(R){
   const T=(x,z,s,h)=>o.push({t:"text",L:"STX",x,z,h:(h||2.6)*k,s});
   T(tx+2*k,ty+27*k,"공사명"); T(tx+42*k,ty+27*k,"해상풍력발전기 기초 — 중력식 "+(P.type==="caisson"?"케이슨형":"원추형"),3);
   T(tx+2*k,ty+16*k,"도면명"); T(tx+42*k,ty+16*k,"해상풍력발전기 기초 배근도 (중력식)",3.6);
-  T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (상세), 1 : ${scC} (기둥 단면)    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
+  T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (상세), 1 : ${scC} (기둥 단면)${P.type==="caisson"&&P.cnr>=2?", 1 : 150 (단면 A-A)":""}    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
   T(15*k,13*k,`f_ck ${P.fck} MPa, 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 규격·간격은 부재설계 탭의 검토 결과입니다.`,2.2);
   // 케이슨: 방사형 격벽 단면 A-A 배근을 상세도 아래 왼쪽 빈 곳에
-  let aa=0; if(P.type==="caisson"&&P.cnr>=2){ const top=(d.z0+dz)/k-8, bot=20; if(top-bot>=45) aa=placeCell(o,th2=>wallSecCell(R,th2,true),15,top,228,top-bot,k,2.4,3); }
+  let aa=0; if(P.type==="caisson"&&P.cnr>=2){ const top=(d.z0+dz)/k-8, bot=20; if(top-bot>=45) aa=placeCell(o,th2=>wallSecCell(R,th2,true),15,top,228,top-bot,k,2.4,3,150); }
   return {o,box:[0,0,W,H],sc,scC,bg:1,aa};
 }
 /* ---------- 일반도 A3 (단면도 + 평면도 + 주기 + 표제란) ---------- */
@@ -1353,9 +1351,9 @@ function wallSecCell(R,th,rebar){
   return {o,box:[x0,-th*3,x1+th*2.4,z1],lab,title:`단면 A-A — 방사형 격벽${rebar?" 배근":""}`};
 }
 /* 상세 그림 한 칸 배치: 칸(sx, sz 위끝, sw×sh, 종이 mm) 안에 맞는 가장 큰 축척으로. 넣었으면 축척, 못 넣으면 0 */
-function placeCell(o,mk,sx,sz,sw,sh,sheetK,tmm,maxLab){
+function placeCell(o,mk,sx,sz,sw,sh,sheetK,tmm,maxLab,fixSc){
   const fit=cl=>Math.min(cl.lab.length,maxLab);
-  let sc=0, cell=null; for(const s2 of DSCALES){ const k=s2/1000, cl=mk(tmm*k), [a,b,c2,d]=cl.box; if((c2-a)/k<=sw-4&&(d-b)/k<=sh-8-fit(cl)*tmm*1.6-tmm*3.2){ sc=s2; cell=cl; break; } }
+  let sc=0, cell=null; if(fixSc){ sc=fixSc; cell=mk(tmm*fixSc/1000); } else for(const s2 of DSCALES){ const k=s2/1000, cl=mk(tmm*k), [a,b,c2,d]=cl.box; if((c2-a)/k<=sw-4&&(d-b)/k<=sh-8-fit(cl)*tmm*1.6-tmm*3.2){ sc=s2; cell=cl; break; } }
   if(!cell) return 0;
   const k=sc/1000, f=sheetK/k, [a]=cell.box, dx=sx*sheetK-a*f+2*sheetK, dz=(sz-tmm*3.9)*sheetK-cell.box[3]*f;
   o.push(...mapPrims(cell.o,f,dx,dz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
@@ -1387,14 +1385,15 @@ function bbsBlock(o,R,x,ztop,w,h,K){ const rows=R.M.qty.detail.rows.filter(r=>/^
 function detailSheetPrims(R,rebar,skip){
   const P=R.P, cais=P.type==="caisson", makers=detailMakers(R,rebar).slice(skip||0);
   const Wp=420, Hp=297, o=[], cols=3, rows=Math.max(1,Math.ceil(makers.length/cols)), sw=(Wp-28)/cols;
-  const nB=rebar?R.M.qty.detail.rows.filter(r=>/^G\d|^R\d/.test(r.mk)).length:0, bbsH=rebar?Math.min(150,8+Math.ceil(nB/4)*28):0, sh=rebar?Math.max(110,(Hp-22-bbsH-6)/Math.min(2,rows)-4):(Hp-22-52)/Math.min(2,rows)-4;
+  const nB=rebar?R.M.qty.detail.rows.filter(r=>/^G\d|^R\d/.test(r.mk)).length:0, bbsH=rebar?Math.min(150,8+Math.ceil(nB/4)*28):0, sh=rebar?(makers.length?95:0):(Hp-22-52)/Math.min(2,rows)-4;
   // 도면 좌표는 종이 mm(×0.001 m)로 두고 상세마다 축척을 따로 씀
   const sheetK=0.4; const W=Wp*sheetK, H=Hp*sheetK;  // 종이 1 mm = 0.4 (선 굵기 기본값이 1:400 도면과 같게)
   o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:.2*sheetK}); o.push({t:"poly",L:"SHT",pts:[[10*sheetK,10*sheetK],[W-10*sheetK,10*sheetK],[W-10*sheetK,H-10*sheetK],[10*sheetK,H-10*sheetK]],w:.5*sheetK});
   const scs=[];
-  makers.slice(0,6).forEach((mk,i)=>{ const c=i%cols, r=Math.floor(i/cols), sc2=placeCell(o,mk,14+c*sw,Hp-16-r*(sh+4),sw-4,sh,sheetK,2.2,4); if(sc2) scs.push(sc2); });
-  if(!makers.length) o.push({t:"text",L:"STX",x:20*sheetK,z:(Hp-40)*sheetK,h:4*sheetK,s:"보강 링·격벽이 없어 상세가 없습니다."});
-  if(rebar){ const used=Math.min(2,rows)*(sh+4), top=Math.min(Hp-16-used-4, 12+bbsH); bbsBlock(o,R,14,top,232,top-20,sheetK); }
+  makers.slice(0,6).forEach((mk,i)=>{ const c=i%cols, r=Math.floor(i/cols), sc2=placeCell(o,mk,14+c*sw,Hp-16-r*(sh+4),sw-4,sh,sheetK,2.2,4,rebar?80:0); if(sc2) scs.push(sc2); });
+  if(!makers.length) o.push({t:"text",L:"STX",x:20*sheetK,z:(Hp-24)*sheetK,h:4*sheetK,s:rebar?"보강 링이 없어 링 배근 상세가 없습니다.":"보강 링·격벽이 없어 상세가 없습니다."});
+  if(rebar){ const used=makers.length?Math.min(2,rows)*(sh+4):14, top=Math.min(Hp-16-used-4, 12+bbsH); if(nB) bbsBlock(o,R,14,top,232,top-20,sheetK);
+    const tb=rbTable(R,sheetK,252*sheetK,(Hp-16-used-8)*sheetK,158,(12+34+4)*sheetK); o.push(...tb.o); }
   // 표제란
   const tx=250*sheetK, ty=12*sheetK, tw=158*sheetK, thh=34*sheetK;
   o.push({t:"poly",L:"SHT",pts:[[tx,ty],[tx+tw,ty],[tx+tw,ty+thh],[tx,ty+thh]],w:.4*sheetK});
@@ -1404,7 +1403,7 @@ function detailSheetPrims(R,rebar,skip){
   T(tx+2*sheetK,ty+27*sheetK,"공사명"); T(tx+42*sheetK,ty+27*sheetK,"해상풍력발전기 기초 — 중력식 "+(cais?"케이슨형":"원추형"),3);
   T(tx+2*sheetK,ty+16*sheetK,"도면명"); T(tx+42*sheetK,ty+16*sheetK,`해상풍력발전기 기초 ${rebar?"배근 상세도":"상세도"} (보강 링${cais?"·격벽":""})`,3.4);
   T(tx+2*sheetK,ty+5*sheetK,"축척"); T(tx+42*sheetK,ty+5*sheetK,`상세별 표기 (1 : ${[...new Set(scs)].join(", 1 : ")})    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
-  T(14*sheetK,14*sheetK,rebar?"치수 mm. 철근 규격·간격은 배근도 철근재료표와 같다. 보강 링 연직철근은 저판 하부철근(또는 상판 상부철근)까지 이어 갈고리로 건다.":"치수 mm, 높이는 저판 하면 기준. 보강 링 위치·크기는 가정값(자동 배치 또는 직접 입력).",2.2);
+  T(14*sheetK,14*sheetK,rebar?"치수 mm. 철근 규격·간격·수량은 이 도면의 철근재료표 참조. 보강 링 연직철근은 저판 하부철근(또는 상판 상부철근)까지 이어 갈고리로 건다.":"치수 mm, 높이는 저판 하면 기준. 보강 링 위치·크기는 가정값(자동 배치 또는 직접 입력).",2.2);
   return {o,box:[0,0,W,H],bg:1,mono:rebar?0:1,sc:scs[0]||0,n:makers.length};
 }
 function drawDetailSheets(which){
