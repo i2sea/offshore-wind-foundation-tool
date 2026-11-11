@@ -656,6 +656,23 @@ function buildParts(P){
   return {parts,z2,wideTop,Rbase,Rwide,S};
 }
 
+/* 보강 링이 기대는 부재 찾기 (형상만 봄, 오차 0.05 m)
+   아래: 저판(하부 슬래브) 상면 또는 다른 링 상면과 반경 방향으로 겹침
+   옆: 기둥 내·외면, 하부 벽체 내면과 같은 반경이고 높이가 겹침 */
+function ringSupport(P,R){
+  const cais=P.type==="caisson", tb=cais?P.cts:P.tb, eps=0.05, S=R&&R.S?R.S:shaftR(P);
+  const Rwi=cais?P.cDw/2-P.ctw:P.Dw/2-P.tw, zw0=tb, zw1=cais?P.cH:P.tb+P.hw;
+  const rg=(P.rings||[]).map((r,i)=>({...r,i})).filter(r=>r.D>0&&r.t>0&&r.h>0);
+  return rg.map(r=>{ const ro=r.D/2, ri=ro-r.t, z0=r.z, z1=r.z+r.h, below=[], side=[];
+    const ov=(a0,a1,b0,b1)=>Math.min(a1,b1)-Math.max(a0,b0);
+    if(Math.abs(z0-tb)<eps||z0<tb) below.push({nm:cais?"하부 슬래브":"저판",w:r.t,a0:0,a1:1e9});
+    rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2}); } });
+    const hc=ov(z0,z1,P.zc0,P.ztop); if(hc>eps){ if(Math.abs(ro-S.ri)<eps) side.push({nm:"기둥 내면",r:ro,h:hc}); if(Math.abs(ri-S.ro)<eps) side.push({nm:"기둥 외면",r:ri,h:hc}); }
+    const hw=ov(z0,z1,zw0,zw1); if(hw>eps&&Math.abs(ro-Rwi)<eps) side.push({nm:cais?"외벽 내면":"원통 내면",r:ro,h:hw});
+    const wb=below.reduce((a,b)=>Math.max(a,b.w),0);
+    return {...r,ro,ri,below,side,wb,float:!below.length&&!side.length,part:below.length&&wb<r.t-eps&&!side.length}; });
+}
+
 /* ---------- Bessel (Numerical Recipes) ---------- */
 function J0(x){const ax=Math.abs(x);if(ax<8){const y=x*x;return (57568490574.0+y*(-13362590354.0+y*(651619640.7+y*(-11214424.18+y*(77392.33017+y*(-184.9052456))))))/(57568490411.0+y*(1029532985.0+y*(9494680.718+y*(59272.64853+y*(267.8532712+y)))));}
   const z=8/ax,y=z*z,xx=ax-0.785398164;return Math.sqrt(0.636619772/ax)*(Math.cos(xx)*(1+y*(-0.1098628627e-2+y*(0.2734510407e-4+y*(-0.2073370639e-5+y*0.2093887211e-6))))-z*Math.sin(xx)*(-0.1562499995e-1+y*(0.1430488765e-3+y*(-0.6911147651e-5+y*(0.7621095161e-6-y*0.934935152e-7)))));}
@@ -703,6 +720,8 @@ function compute(P){
   if(P.type==="cone"){
     if(P.Dw>P.Db+1e-9) warns.push("원통 외경이 저판 직경보다 큽니다.");
     if(P.Dt>P.Dw) warns.push("원추 상단 외경이 하단(원통 외경)보다 큽니다.");
+    ringSupport(P,{S}).forEach(g=>{ if(g.float) warns.push(`보강 링 ${g.i+1}(z ${fmt(g.z)} m)이 아래·옆으로 닿는 부재가 없어 공중에 떠 있습니다. 하단 높이나 외경을 저판·다른 링·기둥·벽체에 맞추세요.`);
+      else if(g.part) warns.push(`보강 링 ${g.i+1}이 아래 부재에 두께 ${fmt(g.t)} m 중 ${fmt(g.wb)} m만 얹혀 있습니다. 내민 부분은 연결철근으로만 버팁니다.`); });
     if(Math.abs(P.Dt-2*rso)>0.05) warns.push(`원추 상단 외경 ${P.Dt} m와 기둥 외경 ${fmt(2*rso)} m가 다릅니다. 연결부를 확인하세요.`);
     if(P.tkh*2>=P.Dt) warns.push("원추 벽두께가 상단 반경보다 큽니다.");
   }else{
@@ -1059,6 +1078,13 @@ function rebarDetail(R,M){
     const At=PI*(Rwi**2-R.rso**2);
     add("T1","케이슨 상판","상·하면 (X·Y 2방향)",dT,4*(2*Rwi/(dT.s/1000)),At/(2*Rwi),"I");
   }
+  // 보강 링: 강도 부재로 보지 않고 최소철근(배력) + 닿는 부재와 연결철근
+  //   G·1 원주 (내·외면), G·2 연직 (내·외면, 아래 부재에 정착 la), G·3 옆 부재 연결철근 (수평, 0.3 m 격자, 양쪽 정착 la)
+  ringSupport(P,R).forEach(g=>{ const k=g.i+1, d=distRB(g.t), Ld=la(BARS[d.bar].d), rmI=g.ri+cv, rmO=g.ro-cv, nm=`보강 링 ${k}`;
+    add(`G${k}1`,nm,"원주 방향 (내·외면)",d,2*(g.h/(d.s/1000)+1),PI*(rmI+rmO)+2*Ld,"O");
+    add(`G${k}2`,nm,g.below.length?`연직 (내·외면, ${g.below.map(b=>b.nm).join("·")}에 정착)`:"연직 (내·외면)",d,2*PI*(rmI+rmO)/(d.s/1000),g.h-2*cv+(g.below.length?Ld:0)+0.2,"L");
+    g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자)`,{bar:d.bar,s:300},n,2*Ld,"I"); });
+  });
   // 기둥
   const Lc=P.ztop-P.zc0, c=M.cL, tie=c.tie||distRB(R.rso-R.rsi);
   add("C1","기둥","축방향 주철근 (내·외 2단)",rb.cL,c.nb,Lc+tb-cv+la(B("cL").d)-0.1,"L");
@@ -2873,6 +2899,15 @@ function rbDetail(R,th){
   const line=(x1,z1_,x2,z2_)=>o.push({t:"line",L:"RB",x1,z1:z1_,x2,z2:z2_,w:th*.09});
   const dots=(x0,zA,x1,zB,s)=>{ const L=Math.hypot(x1-x0,zB-zA), n=Math.max(1,Math.floor(L/s)); for(let i=0;i<=n;i++){ const f=i/n; o.push({t:"dot",L:"RBD",x:x0+(x1-x0)*f,z:zA+(zB-zA)*f,r:dr}); } };
   const tag=(x,z,txt)=>lab.push({x,z,txt});
+  // 보강 링: 외곽 + 원주(점, 내·외면) + 연직(선, 아래 부재에 정착) + 옆 부재 연결철근(수평 짧은 선)
+  ringSupport(P,R).forEach(g=>{ const k=g.i+1, r1=D.rows.find(r=>r.mk===`G${k}1`); if(!r1) return; const d=db(r1.bar), sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
+    C([[g.ri,g.z],[g.ro,g.z],[g.ro,g.z+g.h],[g.ri,g.z+g.h]]);
+    const xi=g.ri+cv+d/2, xo=g.ro-cv-d/2, za=g.z+cv, zb2=g.z+g.h-cv;
+    if(xo>xi){ dots(xi+d,za,xi+d,zb2,sp); dots(xo-d,za,xo-d,zb2,sp);
+      const zd=x=>g.below.some(q=>x>q.a0+cv&&x<q.a1-cv)?g.z-Math.min(la,0.6):za;  // 아래 부재가 있는 자리만 정착
+      line(xi,zd(xi),xi,zb2); line(xo,zd(xo),xo,zb2); }
+    g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) line(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
+    tag(xo,g.z+g.h*0.6,`G${k} 보강 링 ${k} ${r1.bar}@${r1.s}${g.side.length?" + 연결철근":""}`); });
   // 저판: X방향 주철근(선) + Y방향(점)
   const dT=db(rb.sT.bar), dB=db(rb.sB.bar);
   const zt=tb-cv-dT/2, zb=cv+dB/2, xe=Rb-cv-Math.max(dT,dB)/2;
@@ -2942,13 +2977,14 @@ function rbColumn(R,th){
   return {o,r:ro*1.32+th*14};
 }
 /* 철근재료표 (시트 좌표 m 단위로 그림, k: 종이 1 mm = k m) */
-function rbTable(R,k,x0,ztop,wmm){
+function rbTable(R,k,x0,ztop,wmm,zmin){
   const rows=R.M.qty.detail.rows, o=[], cols=[["번호",10],["부재 · 위치",50],["규격",13],["간격",12],["개수",15],["길이(m)",16],["총길이(m)",18],["중량(t)",wmm-134]];
-  const rh=5.2*k, th=2.3*k; let z=ztop;
+  // 행이 많으면(보강 링 등) 표제란 위까지 들어가게 행 높이·글자 줄임
+  const fit=zmin!=null?(ztop-zmin)/(rows.length+2):5.2*k, rh=Math.max(3.0*k,Math.min(5.2*k,fit)), th=Math.min(2.3*k,rh*0.45); let z=ztop;
   const xs=[]; let x=x0; cols.forEach(c=>{ xs.push(x); x+=c[1]*k; }); const xe=x;
   const hline=zz=>o.push({t:"line",L:"SHT",x1:x0,z1:zz,x2:xe,z2:zz,w:k*.18});
   o.push({t:"text",L:"STX",x:x0,z:z+1.5*k,h:3.2*k,s:"철근재료표"}); hline(z);
-  const row=(vals,bold)=>{ vals.forEach((v,i)=>o.push({t:"text",L:"STX",x:i===1?xs[i]+1.2*k:(i>=4?xs[i]+cols[i][1]*k-1.2*k:xs[i]+cols[i][1]*k/2),z:z-rh+1.6*k,h:th,s:String(v),anchor:i===1?"start":i>=4?"end":"middle",num:i!==1})); z-=rh; hline(z); };
+  const row=(vals,bold)=>{ vals.forEach((v,i)=>o.push({t:"text",L:"STX",x:i===1?xs[i]+1.2*k:(i>=4?xs[i]+cols[i][1]*k-1.2*k:xs[i]+cols[i][1]*k/2),z:z-rh+(rh-th)/2+th*0.15,h:th,s:String(v),anchor:i===1?"start":i>=4?"end":"middle",num:i!==1})); z-=rh; hline(z); };
   row(cols.map(c=>c[0]));
   rows.forEach(r=>row([r.mk,`${r.nm} ${r.face}`.slice(0,24),r.bar,r.s,fx(r.n,0),fx(r.L,2),fx(r.tot,0),fx(r.kg/1000,2)]));
   const tot=rows.reduce((a,b)=>a+b.kg,0); row(["","합계 (이음·할증 제외)","","","","","",fx(tot/1000,2)]);
@@ -2974,7 +3010,7 @@ function sheetPrims(R){
   o.push(...mapPrims(c.o,f,cx,cz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
   o.push({t:"text",L:"STX",x:252*k,z:H-14*k,h:3.4*k,s:`기둥 단면 배근도   S = 1 : ${scC}`});
   // 재료표
-  const tb=rbTable(R,k,252*k,cz-c.r*f-12*k,158);
+  const tb=rbTable(R,k,252*k,cz-c.r*f-12*k,158,(12+34+4)*k);
   o.push(...tb.o);
   // 표제란
   const tx=250*k, ty=12*k, tw=158*k, thh=34*k;

@@ -86,6 +86,23 @@ function buildParts(P){
   return {parts,z2,wideTop,Rbase,Rwide,S};
 }
 
+/* 보강 링이 기대는 부재 찾기 (형상만 봄, 오차 0.05 m)
+   아래: 저판(하부 슬래브) 상면 또는 다른 링 상면과 반경 방향으로 겹침
+   옆: 기둥 내·외면, 하부 벽체 내면과 같은 반경이고 높이가 겹침 */
+function ringSupport(P,R){
+  const cais=P.type==="caisson", tb=cais?P.cts:P.tb, eps=0.05, S=R&&R.S?R.S:shaftR(P);
+  const Rwi=cais?P.cDw/2-P.ctw:P.Dw/2-P.tw, zw0=tb, zw1=cais?P.cH:P.tb+P.hw;
+  const rg=(P.rings||[]).map((r,i)=>({...r,i})).filter(r=>r.D>0&&r.t>0&&r.h>0);
+  return rg.map(r=>{ const ro=r.D/2, ri=ro-r.t, z0=r.z, z1=r.z+r.h, below=[], side=[];
+    const ov=(a0,a1,b0,b1)=>Math.min(a1,b1)-Math.max(a0,b0);
+    if(Math.abs(z0-tb)<eps||z0<tb) below.push({nm:cais?"하부 슬래브":"저판",w:r.t,a0:0,a1:1e9});
+    rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2}); } });
+    const hc=ov(z0,z1,P.zc0,P.ztop); if(hc>eps){ if(Math.abs(ro-S.ri)<eps) side.push({nm:"기둥 내면",r:ro,h:hc}); if(Math.abs(ri-S.ro)<eps) side.push({nm:"기둥 외면",r:ri,h:hc}); }
+    const hw=ov(z0,z1,zw0,zw1); if(hw>eps&&Math.abs(ro-Rwi)<eps) side.push({nm:cais?"외벽 내면":"원통 내면",r:ro,h:hw});
+    const wb=below.reduce((a,b)=>Math.max(a,b.w),0);
+    return {...r,ro,ri,below,side,wb,float:!below.length&&!side.length,part:below.length&&wb<r.t-eps&&!side.length}; });
+}
+
 /* ---------- Bessel (Numerical Recipes) ---------- */
 function J0(x){const ax=Math.abs(x);if(ax<8){const y=x*x;return (57568490574.0+y*(-13362590354.0+y*(651619640.7+y*(-11214424.18+y*(77392.33017+y*(-184.9052456))))))/(57568490411.0+y*(1029532985.0+y*(9494680.718+y*(59272.64853+y*(267.8532712+y)))));}
   const z=8/ax,y=z*z,xx=ax-0.785398164;return Math.sqrt(0.636619772/ax)*(Math.cos(xx)*(1+y*(-0.1098628627e-2+y*(0.2734510407e-4+y*(-0.2073370639e-5+y*0.2093887211e-6))))-z*Math.sin(xx)*(-0.1562499995e-1+y*(0.1430488765e-3+y*(-0.6911147651e-5+y*(0.7621095161e-6-y*0.934935152e-7)))));}
@@ -133,6 +150,8 @@ function compute(P){
   if(P.type==="cone"){
     if(P.Dw>P.Db+1e-9) warns.push("원통 외경이 저판 직경보다 큽니다.");
     if(P.Dt>P.Dw) warns.push("원추 상단 외경이 하단(원통 외경)보다 큽니다.");
+    ringSupport(P,{S}).forEach(g=>{ if(g.float) warns.push(`보강 링 ${g.i+1}(z ${fmt(g.z)} m)이 아래·옆으로 닿는 부재가 없어 공중에 떠 있습니다. 하단 높이나 외경을 저판·다른 링·기둥·벽체에 맞추세요.`);
+      else if(g.part) warns.push(`보강 링 ${g.i+1}이 아래 부재에 두께 ${fmt(g.t)} m 중 ${fmt(g.wb)} m만 얹혀 있습니다. 내민 부분은 연결철근으로만 버팁니다.`); });
     if(Math.abs(P.Dt-2*rso)>0.05) warns.push(`원추 상단 외경 ${P.Dt} m와 기둥 외경 ${fmt(2*rso)} m가 다릅니다. 연결부를 확인하세요.`);
     if(P.tkh*2>=P.Dt) warns.push("원추 벽두께가 상단 반경보다 큽니다.");
   }else{

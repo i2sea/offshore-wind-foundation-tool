@@ -148,6 +148,13 @@ function rebarDetail(R,M){
     const At=PI*(Rwi**2-R.rso**2);
     add("T1","케이슨 상판","상·하면 (X·Y 2방향)",dT,4*(2*Rwi/(dT.s/1000)),At/(2*Rwi),"I");
   }
+  // 보강 링: 강도 부재로 보지 않고 최소철근(배력) + 닿는 부재와 연결철근
+  //   G·1 원주 (내·외면), G·2 연직 (내·외면, 아래 부재에 정착 la), G·3 옆 부재 연결철근 (수평, 0.3 m 격자, 양쪽 정착 la)
+  ringSupport(P,R).forEach(g=>{ const k=g.i+1, d=distRB(g.t), Ld=la(BARS[d.bar].d), rmI=g.ri+cv, rmO=g.ro-cv, nm=`보강 링 ${k}`;
+    add(`G${k}1`,nm,"원주 방향 (내·외면)",d,2*(g.h/(d.s/1000)+1),PI*(rmI+rmO)+2*Ld,"O");
+    add(`G${k}2`,nm,g.below.length?`연직 (내·외면, ${g.below.map(b=>b.nm).join("·")}에 정착)`:"연직 (내·외면)",d,2*PI*(rmI+rmO)/(d.s/1000),g.h-2*cv+(g.below.length?Ld:0)+0.2,"L");
+    g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자)`,{bar:d.bar,s:300},n,2*Ld,"I"); });
+  });
   // 기둥
   const Lc=P.ztop-P.zc0, c=M.cL, tie=c.tie||distRB(R.rso-R.rsi);
   add("C1","기둥","축방향 주철근 (내·외 2단)",rb.cL,c.nb,Lc+tb-cv+la(B("cL").d)-0.1,"L");
