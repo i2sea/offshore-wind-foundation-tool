@@ -162,7 +162,7 @@ function rebarDetail(R,M){
     const len=f=>f?Lfull:up?Lup:Lfree;
     if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,len(fI),"L");
     else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,len(fI),"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,len(fO),"L"); }
-    g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자)`,{bar:d.bar,s:300},n,2*Ld,"I"); });
+    g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3), w=ringDowel(g,sd,Ld,cv); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자${w.hook?", 두께가 모자란 쪽 끝 갈고리":""})`,{bar:d.bar,s:300},n,w.eR+w.eM+0.3*w.hook,w.hook?"L":"I"); });
   });
   // 기둥
   const Lc=P.ztop-P.zc0, c=M.cL, tie=c.tie||distRB(R.rso-R.rsi);

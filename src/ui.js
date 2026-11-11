@@ -1057,8 +1057,9 @@ function rbDetail(R,th){
       // 저판까지 곧게 닿는 면: 저판 하부철근 위까지 내려 갈고리
       const zBot=cv+2*db(rb.sB.bar);
       const up=(g.above||[]).length>0, zUp=P.cH-cv-2*db(distRB(P.ctt).bar);
-      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ line(x,zBot,x,zb2); line(x,zBot,x+sg*Math.min(la,0.6),zBot); } else if(up){ line(x,za,x,zUp); line(x,zUp,x+sg*Math.min(la,0.6),zUp); } else line(x,za,x,zb2); }); }
-    g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) line(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
+      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ line(x,zBot,x,zb2); line(x,zBot,x+sg*Math.min(la,0.6),zBot); } else if(up){ line(x,za,x,zUp); line(x,zUp,x+ringUpHook(g,sg)*Math.min(la,0.6),zUp); } else line(x,za,x,zb2); }); }
+    g.side.forEach(sd=>{ const w=ringDowel(g,sd,la,cv), hk=Math.min(0.25,g.h/4); for(let z=g.z+0.15;z<g.z+g.h;z+=0.3){ const xa=sd.r-sd.dir*w.eR, xb=sd.r+sd.dir*w.eM; line(xa,z,xb,z);
+        if(w.eR<la-1e-6) line(xa,z,xa,z-hk); if(w.eM<la-1e-6) line(xb,z,xb,z-hk); } });  // 두께가 모자란 쪽 끝은 갈고리
     tag(xo,g.z+g.h*0.6,`G${k} 보강 링 ${k} ${r1.bar}@${r1.s}${g.side.length?" + 연결철근":""}`); });
   // 저판: X방향 주철근(선) + Y방향(점)
   const dT=db(rb.sT.bar), dB=db(rb.sB.bar);
@@ -1291,8 +1292,9 @@ function ringCell(R,g,th,rebar){
       const xi=g.ri+cv+d/2, xo=g.ro-cv-d/2, za=g.z+cv, zb2=g.z+g.h-cv, zBot=cv+2*BARS[rb.sB.bar].d/1000, zUp=P.cH-cv-2*BARS[distRB(P.ctt).bar].d/1000, RGs=ringSupport(P,R);
       const ln=(a,b,c,d2)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:d2,w:th*.16});
       for(let z=za;z<=zb2+1e-6;z+=sp){ o.push({t:"dot",L:"RBD",x:xi+d,z,r:th*.22}); o.push({t:"dot",L:"RBD",x:xo-d,z,r:th*.22}); }
-      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ ln(x,zBot,x,zb2); ln(x,zBot,x+sg*Math.min(la,0.6),zBot); } else if(up){ ln(x,za,x,zUp); ln(x,zUp,x+sg*Math.min(la,0.6),zUp); } else ln(x,za,x,zb2); });
-      g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) ln(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
+      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ ln(x,zBot,x,zb2); ln(x,zBot,x+sg*Math.min(la,0.6),zBot); } else if(up){ ln(x,za,x,zUp); ln(x,zUp,x+ringUpHook(g,sg)*Math.min(la,0.6),zUp); } else ln(x,za,x,zb2); });
+      g.side.forEach(sd=>{ const w=ringDowel(g,sd,la,cv), hk=Math.min(0.25,g.h/4); for(let z=g.z+0.15;z<g.z+g.h;z+=0.3){ const xa=sd.r-sd.dir*w.eR, xb=sd.r+sd.dir*w.eM; ln(xa,z,xb,z);
+          if(w.eR<la-1e-6) ln(xa,z,xa,z-hk); if(w.eM<la-1e-6) ln(xb,z,xb,z-hk); } });  // 두께가 모자란 쪽 끝은 갈고리
       lab.length=0; D.rows.filter(r=>r.mk.startsWith(`G${g.i+1}`)).forEach(r=>lab.push(`${r.mk} ${r.bar}@${r.s} ${r.face}`)); } }
   return {o,box:[x0,z0,x1+th*2.4,z1],lab,title:`보강 링 ${g.no} ${rebar?"배근 ":""}상세${g.auto?` (${g.auto})`:""}`};
 }
