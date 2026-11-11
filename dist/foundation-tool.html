@@ -3247,7 +3247,7 @@ function sheetPrims(R){
     z-=8*k; o.push({t:"text",L:"STX",x:x0,z,h:3.2*k,s:"주기"}); z-=5*k;
     const notes=["치수 단위는 mm이며, 높이는 저판 하면 기준이다.","철근 규격·간격은 부재설계 탭의 검토 결과이며, 철근 번호는 배근 상세도의 철근재료표와 같다.",
       "피복은 철근 표면까지의 순피복이다.","원주 방향 철근의 이음 위치는 서로 엇갈리게 배치한다.",
-      "보강 링 배근 상세, 철근 가공도, 철근재료표는 배근 상세도를 참조한다.",
+      `보강 링 배근 상세${cais&&P.cnr>=2?", 격벽 접합부 배근 상세":""}, 철근 가공도, 철근재료표는 배근 상세도를 참조한다.`,
       ...(cais&&P.cnr>=2?["방사형 격벽 철근(R1·R2)은 하부 슬래브·상판·기둥·외벽에 정착한다."]:[]),
       "정착·이음 길이는 예비값(가정)이며 실시설계에서 KDS 14 20 52에 따라 확인한다."];
     notes.forEach((s2,i)=>{ wrapTxt(s2,2.3*k,150*k).forEach((ln,j)=>{ if(!j) o.push({t:"text",L:"STX",x:x0,z,h:2.3*k,s:`${i+1}.`}); o.push({t:"text",L:"STX",x:x0+5*k,z,h:2.3*k,s:ln}); z-=3.7*k; }); });
@@ -3373,14 +3373,14 @@ function ringCell(R,g,th,rebar){
   o.push({t:"poly",L:"HID",pts:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]});
   // 치수: 링 두께·높이·하단 높이, 저판 두께, 옆 부재 두께
   const det=String.fromCharCode(65+g.i), sideM=g.side[0];
-  dimH(o,g.ri,g.ro,g.z+g.h+th*1.6,th,mm(g.t));
-  if(sideM){ const a=sideM.dir>0?sideM.r:sideM.r-sideM.tm, b2=a+sideM.tm; if(a>=x0-1e-6&&b2<=x1+1e-6) dimH(o,a,b2,g.z+g.h+th*1.6,th,mm(sideM.tm)); }
+  const zDw=up?g.z-th*1.6:g.z+g.h+th*1.6;   // 상판에 매단 링은 폭 치수를 링 아래에
+  dimH(o,g.ri,g.ro,zDw,th,mm(g.t));
+  if(sideM){ const a=sideM.dir>0?sideM.r:sideM.r-sideM.tm, b2=a+sideM.tm; if(a>=x0-1e-6&&b2<=x1+1e-6) dimH(o,a,b2,zDw,th,mm(sideM.tm)); }
   dimV(o,g.z,g.z+g.h,x1+th*1.4,th,mm(g.h));
   if(g.z-tb>0.05&&z0<=tb+1e-6) dimV(o,tb,g.z,x1+th*1.4,th,mm(g.z-tb));
   if(z0<=1e-6) dimV(o,0,tb,x1+th*1.4,th,mm(tb));
   if(up) dimV(o,P.cH-P.ctt,P.cH,x1+th*1.4,th,mm(P.ctt));
   o.push({t:"text",L:"TXT",x:(g.ri+g.ro)/2,z:g.z+g.h/2,h:th*.9,s:g.no,anchor:"middle"});
-  o.push({t:"text",L:"DIM",x:(g.ri+g.ro)/2,z:g.z+g.h+th*3.2,h:th*.85,s:`외경 Ø${mm(g.D)}`,anchor:"middle",num:1});
   const lab=[`외경 Ø${mm(g.D)}, 두께 ${mm(g.t)}, 높이 ${mm(g.h)}`,`하단 z ${mm(g.z)} (저판 상면 ${g.z-tb>0.005?"+"+mm(g.z-tb):"위"})`,
     `${g.below.length?"아래 "+g.below.map(b=>b.nm).join("·"):""}${g.side.length?(g.below.length?" · ":"")+"옆 "+g.side.map(sd=>sd.nm).join("·"):""}${(g.above||[]).length?" · 위 상판":""}`];
   let xR=x1+th*2.4;
@@ -3401,7 +3401,7 @@ function ringCell(R,g,th,rebar){
       dimV(o,zb2,g.z+g.h,g.ri-th*1.0,th*.8,mm(cv)); dimH(o,g.ri,xi,g.z+g.h*0.35,th*.8,mm(xi-g.ri));
       // 연직철근 정착·갈고리
       vb.forEach(v=>{ if(v.kind==="down"){ if(g.z-zBot>0.05) dimV(o,zBot,g.z,v.x+v.sg*th*0.9,th*.8,mm(g.z-zBot)); dimH(o,Math.min(v.x,v.x+v.sg*la),Math.max(v.x,v.x+v.sg*la),zBot-th*1.2,th*.8,mm(la)); }
-        else if(v.kind==="up"){ dimH(o,Math.min(v.x,v.x+v.sg*la),Math.max(v.x,v.x+v.sg*la),zUp+th*0.6,th*.8,mm(la)); } });
+        else if(v.kind==="up"){ dimH(o,Math.min(v.x,v.x+v.sg*la),Math.max(v.x,v.x+v.sg*la),P.cH+th*0.9,th*.8,mm(la)); } });
       // 철근 기호 꼬리표 (오른쪽)
       const tags=[]; tags.push({mk:`G${g.i+1}1`,x:xo-d,z:za+sp*Math.max(0,Math.floor((zb2-za)/sp/2))});
       tags.push({mk:`G${g.i+1}2`,x:vb[1]?vb[1].x:xo,z:g.z+g.h*0.25}); if(dz0) tags.push({mk:`G${g.i+1}3`,...dz0});
@@ -3409,6 +3409,59 @@ function ringCell(R,g,th,rebar){
       xR=x1+th*5.6;
       lab.length=0; D.rows.filter(r=>r.mk.startsWith(`G${g.i+1}`)).forEach(r=>lab.push(`${r.mk} ${r.bar}@${r.s} ${r.face}`)); } }
   return {o,box:[x0,z0-(rebar?th*2.5:0),xR,z1+th*4],lab,title:`상세 ${det} — 보강 링 ${g.no}${rebar?" 배근":""}${g.auto?` (${g.auto})`:""}`};
+}
+/* 방사형 격벽 접합부 배근 상세 (배근 상세도): kind = col(기둥, 평면) / wall(외벽, 평면) / slab(하부 슬래브·상판, 격벽 직각 단면) */
+function wallJointCell(R,th,kind,det){
+  const P=R.P, D=R.M.qty.detail, r1=D.rows.find(r=>r.mk==="R1"), r2=D.rows.find(r=>r.mk==="R2"), o=[], cv=P.cov/1000, rb=R.M.rb;
+  const d=BARS[r1.bar].d/1000, sp1=r1.s/1000, sp2=r2.s/1000, la=Math.ceil(40*d*10)/10, hk=Math.max(0.15,Math.ceil(12*d*20)/20), tw=P.ctr, tc=R.rso-R.rsi;
+  const ln=(a,b,c,d2)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:d2,w:th*.16}), dot=(x,z)=>o.push({t:"dot",L:"RBD",x,z,r:th*.22});
+  const ol=pts=>o.push({t:"poly",open:1,L:"SHT",pts:[...pts,pts[0]],w:th*.09}), brk=(xa,za,xb,zb)=>{ const mx=(xa+xb)/2, mz=(za+zb)/2, e=th*.5, vx=xb-xa, vz=zb-za, L=Math.hypot(vx,vz), nx=-vz/L*e, nz=vx/L*e;
+    o.push({t:"poly",open:1,L:"SHT",w:th*.06,pts:[[xa-vx*.08,za-vz*.08],[mx-vx*.06,mz-vz*.06],[mx+nx,mz+nz],[mx-nx,mz-nz],[mx+vx*.06,mz+vz*.06],[xb+vx*.08,zb+vz*.08]]}); };
+  const tags=[], lab=[`R1 ${r1.bar}@${r1.s} 수평 배력 (양면)`,`R2 ${r2.bar}@${r2.s} 연직 배력 (양면)`];
+  const fy=tw/2-cv-d/2, fy2=tw/2-cv-d*1.5;   // 면에서 R1 중심, R2 중심 (R1 바깥)
+  let box, title;
+  if(kind==="col"||kind==="wall"){ // 평면: x = 반경 방향(접합 면 x=0), z = 격벽 두께 방향
+    const isC=kind==="col", tm=isC?tc:P.ctw, sg=isC?-1:1, Lw=2.2, Hm=Math.max(1.6,tw*2.5), e=Math.min(la,tm-cv), hook=e<la-1e-6;
+    const mx0=sg<0?-tm:0, mx1=sg<0?0:tm, wx0=sg<0?0:-Lw, wx1=sg<0?Lw:0;
+    o.push({t:"poly",L:"CONC",pts:[[wx0,-tw/2],[wx1,-tw/2],[wx1,tw/2],[wx0,tw/2]],w:th*.05});
+    ol([[mx0,-Hm],[mx1,-Hm],[mx1,Hm],[mx0,Hm]]);
+    brk(mx0,Hm,mx1,Hm); brk(mx0,-Hm,mx1,-Hm); brk(sg<0?wx1:wx0,-tw/2,sg<0?wx1:wx0,tw/2);
+    const xc=sg*e, xf=sg<0?wx1:wx0;
+    [-1,1].forEach(f=>{ ln(xf,f*fy,xc,f*fy); if(hook) ln(xc,f*fy,xc,f*(fy+hk)); });
+    for(let x=sg<0?cv:-cv;Math.abs(x)<=Lw-0.05;x+=-sg*sp2){ dot(x,fy2); dot(x,-fy2); }
+    // 치수
+    dimH(o,mx0,mx1,Hm+th*1.2,th,mm(tm)); dimV(o,-tw/2,tw/2,xf-sg*th*1.6,th,mm(tw));
+    dimH(o,Math.min(0,xc),Math.max(0,xc),fy+th*0.9,th*.8,mm(e)); if(hook) dimV(o,fy,fy+hk,xc+sg*th*0.9,th*.8,mm(hk));
+    dimV(o,fy+d/2,tw/2,(sg<0?0.35:-0.35),th*.75,mm(cv));
+    const xa=sg<0?cv:-cv; dimH(o,Math.min(xa,xa-sg*sp2),Math.max(xa,xa-sg*sp2),-tw/2-th*1.0,th*.8,mm(sp2));
+    o.push({t:"text",L:"TXT",x:(mx0+mx1)/2,z:-Hm*0.55,h:th*.85,s:isC?"기둥":"외벽",anchor:"middle"}); o.push({t:"text",L:"TXT",x:(wx0+wx1)/2,z:-tw/2-th*2.6,h:th*.85,s:"격벽",anchor:"middle"});
+    tags.push({mk:"R1",x:-sg*0.6*Lw,z:fy}); tags.push({mk:"R2",x:sg>0?-(cv+sp2*2):cv+sp2*2,z:-fy2});
+    lab.push(`R1 ${isC?"기둥":"외벽"} 안 정착 ${mm(e)} (40d = ${mm(la)}${hook?`, 두께 부족 → 끝 90° 갈고리 ${mm(hk)} (12d 이상)`:""})`);
+    const xs=[mx0,mx1,wx0,wx1]; box=[Math.min(...xs)-th*2.2,-Hm-th*1.5,Math.max(...xs)+th*(sg<0?6.5:2.5),Hm+th*2.6];
+    title=`상세 ${det} — 격벽·${isC?"기둥":"외벽"} 접합부 (평면)`;
+  } else { // 격벽 직각 단면: x = 두께 방향, z = 높이(하부 슬래브 상면 0), 가운데 생략
+    const h=P.cH-P.ctt-P.cts, show=1.4, gap=0.8, cmp=h>2*show+gap+0.2, Z=z=>!cmp||z<=show?z:z-(h-2*show-gap), hT=Z(h), Wm=Math.max(1.6,tw*2.6);
+    const dS=BARS[rb.sB.bar].d/1000, dT=BARS[distRB(P.ctt).bar].d/1000, eb=Math.min(la,P.cts-cv-2*dS), et=Math.min(la,P.ctt-cv-2*dT), hb=eb<la-1e-6, ht=et<la-1e-6;
+    o.push({t:"poly",L:"CONC",pts:[[-tw/2,0],[tw/2,0],[tw/2,Z(show)],[-tw/2,Z(show)]],w:th*.05});
+    if(cmp) o.push({t:"poly",L:"CONC",pts:[[-tw/2,Z(h-show)],[tw/2,Z(h-show)],[tw/2,hT],[-tw/2,hT]],w:th*.05});
+    ol([[-Wm,-P.cts],[Wm,-P.cts],[Wm,0],[-Wm,0]]); ol([[-Wm,hT],[Wm,hT],[Wm,hT+P.ctt],[-Wm,hT+P.ctt]]);
+    [[-P.cts,0],[hT,hT+P.ctt]].forEach(([a,b])=>{ brk(-Wm,a,-Wm,b); brk(Wm,a,Wm,b); });
+    if(cmp){ brk(-tw/2,Z(show),tw/2,Z(show)); brk(-tw/2,Z(h-show),tw/2,Z(h-show)); }
+    [-1,1].forEach(f=>{ const x=f*fy; ln(x,-eb,x,Z(show)); if(hb) ln(x,-eb,x+f*hk,-eb); if(cmp){ ln(x,Z(h-show),x,hT+et); } else ln(x,Z(show),x,hT+et); if(ht) ln(x,hT+et,x+f*hk,hT+et); });
+    for(let z=cv;z<=h-cv+1e-6;z+=sp1){ if(cmp&&z>show-0.05&&z<h-show+0.05) continue; dot(fy2,Z(z)); dot(-fy2,Z(z)); }
+    dimV(o,-P.cts,0,Wm+th*1.4,th,mm(P.cts)); dimV(o,hT,hT+P.ctt,Wm+th*1.4,th,mm(P.ctt)); dimV(o,0,hT,Wm+th*1.4,th,mm(h)+(cmp?" (중간 생략)":""));
+    dimH(o,-tw/2,tw/2,hT+P.ctt+th*1.2,th,mm(tw));
+    dimV(o,-eb,0,-fy-th*1.0,th*.8,mm(eb)); dimV(o,hT,hT+et,-fy-th*1.0,th*.8,mm(et));
+    if(hb) dimH(o,fy,fy+hk,-eb-th*1.0,th*.8,mm(hk)); if(ht) dimH(o,fy,fy+hk,hT+et+th*0.5,th*.8,mm(hk));
+    dimV(o,cv,cv+sp1,-tw/2-th*1.0,th*.8,mm(sp1)); dimH(o,-tw/2,-tw/2+cv,Z(show)*0.6,th*.75,mm(cv));
+    o.push({t:"text",L:"TXT",x:-Wm*0.62,z:-P.cts*0.6,h:th*.85,s:"하부 슬래브",anchor:"middle"}); o.push({t:"text",L:"TXT",x:-Wm*0.62,z:hT+P.ctt*0.3,h:th*.85,s:"상판",anchor:"middle"});
+    tags.push({mk:"R2",x:fy,z:Z(show)*0.7}); tags.push({mk:"R1",x:fy2,z:Z(cv+sp1*Math.max(1,Math.floor((show-cv)/sp1)))});
+    lab.push(`R2 하부 슬래브 정착 ${mm(eb)}${hb?` + 갈고리 ${mm(hk)}`:""}, 상판 정착 ${mm(et)}${ht?` + 갈고리 ${mm(hk)}`:""} (40d = ${mm(la)}, 슬래브 철근 안쪽까지)`);
+    box=[-Wm-th*1.5,-P.cts-th*1.6,Wm+th*6.5,hT+P.ctt+th*2.8]; title=`상세 ${det} — 격벽·슬래브 접합부 (직각 단면)`;
+  }
+  // 철근 번호 원표시 (오른쪽)
+  const tx=box[2]-th*2.4; tags.sort((a,b)=>b.z-a.z).forEach((t,i)=>{ const tz=box[3]-th*3.5-i*th*2.6; o.push({t:"line",L:"DIM",x1:t.x,z1:t.z,x2:tx-th*0.1,z2:tz,w:th*.04}); o.push({t:"dot",L:"DIM",x:t.x,z:t.z,r:th*.18}); o.push({t:"circle",L:"DIM",x:tx+th*0.9,z:tz,r:th*1.0}); o.push({t:"text",L:"DIM",x:tx+th*0.9,z:tz-th*0.32,h:th*.7,s:t.mk,anchor:"middle"}); });
+  return {o,box,lab,title};
 }
 /* 방사형 격벽 평면 (케이슨): 격벽 두 개 사이 한 칸 */
 function wallPlanCell(R,th){
@@ -3466,12 +3519,13 @@ function placeCell(o,mk,sx,sz,sw,sh,sheetK,tmm,maxLab,fixSc){
   if(!cell) return 0;
   const k=sc/1000, f=sheetK/k, [a]=cell.box, dx=sx*sheetK-a*f+2*sheetK, dz=(sz-tmm*3.9)*sheetK-cell.box[3]*f;
   o.push(...mapPrims(cell.o,f,dx,dz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
-  wrapTxt(`${cell.title}  S = 1 : ${sc}`,tmm*1.2*sheetK,(sw-2)*sheetK).slice(0,2).forEach((ln,i)=>o.push({t:"text",L:"STX",x:sx*sheetK,z:(sz-tmm*0.9-i*tmm*1.5)*sheetK,h:tmm*1.2*sheetK,s:ln}));
+  (()=>{ const h=tmm*1.2*sheetK, mw=(sw-2)*sheetK, L=wrapTxt(cell.title,h,mw), tail=`S = 1 : ${sc}`, last=L[L.length-1]; if(wrapTxt(`${last}  ${tail}`,h,mw).length===1) L[L.length-1]=`${last}  ${tail}`; else L.push(tail); return L; })().slice(0,3).forEach((ln,i)=>o.push({t:"text",L:"STX",x:sx*sheetK,z:(sz-tmm*0.9-i*tmm*1.5)*sheetK,h:tmm*1.2*sheetK,s:ln}));
   let zl=(cell.box[1]*f+dz)-tmm*1.8*sheetK; cell.lab.slice(0,maxLab).forEach(t=>{ wrapTxt(t,tmm*sheetK,(sw-4)*sheetK).forEach(ln=>{ o.push({t:"text",L:"STX",x:sx*sheetK+1*sheetK,z:zl,h:tmm*sheetK,s:ln}); zl-=tmm*1.55*sheetK; }); });
   return sc;
 }
 function detailMakers(R,rebar){ const P=R.P, cais=P.type==="caisson", rg=ringSupport(P,R).map(g=>({...g,no:String.fromCharCode(0x2460+Math.min(g.i,19))}));
-  const m=rg.map(g=>th=>ringCell(R,g,th,rebar)); if(cais&&P.cnr>=2&&!rebar){ m.push(th=>wallPlanCell(R,th)); m.push(th=>wallSecCell(R,th,false)); } return m; }
+  const m=rg.map(g=>th=>ringCell(R,g,th,rebar)); if(cais&&P.cnr>=2&&!rebar){ m.push(th=>wallPlanCell(R,th)); m.push(th=>wallSecCell(R,th,false)); }
+  if(cais&&P.cnr>=2&&rebar&&R.M.qty.detail.rows.some(r=>r.mk==="R1")){ const b=rg.length+1; ["col","wall","slab"].forEach((kd,j)=>m.push(th=>wallJointCell(R,th,kd,String.fromCharCode(65+b+j)))); } return m; }
 /* 철근 가공도 한 칸 (종이 mm 기준, 모양은 축척 없이 그림) */
 function bbsCell(o,r,x,z,w,h,K){ const T=(xx,zz,t,hh,an)=>o.push({t:"text",L:"STX",x:xx*K,z:zz*K,h:(hh||2)*K,s:t,anchor:an,num:1}), RB=(a,b,c,d)=>o.push({t:"line",L:"RB",x1:a*K,z1:b*K,x2:c*K,z2:d*K,w:.35*K});
   const sg=r.seg||{type:r.shape==="O"?"O":"I",a:r.L}, m=v=>fx(v*1000,0);
@@ -3493,7 +3547,7 @@ function bbsBlock(o,R,x,ztop,w,h,K){ const rows=R.M.qty.detail.rows.filter(r=>/^
 }
 function detailSheetPrims(R,rebar,skip){
   const P=R.P, cais=P.type==="caisson", makers=detailMakers(R,rebar).slice(skip||0);
-  const Wp=420, Hp=297, o=[], cols=3, rows=Math.max(1,Math.ceil(makers.length/cols)), sw=(Wp-28)/cols;
+  const Wp=420, Hp=297, o=[], cols=rebar?Math.min(6,Math.max(3,makers.length)):3, rows=Math.max(1,Math.ceil(makers.length/cols)), sw=(Wp-28)/cols;
   const nB=rebar?R.M.qty.detail.rows.filter(r=>/^G\d|^R\d/.test(r.mk)).length:0, bbsH=rebar?Math.min(150,8+Math.ceil(nB/4)*28):0, sh=rebar?(makers.length?95:0):(Hp-22-52)/Math.min(2,rows)-4;
   // 도면 좌표는 종이 mm(×0.001 m)로 두고 상세마다 축척을 따로 씀
   const sheetK=0.4; const W=Wp*sheetK, H=Hp*sheetK;  // 종이 1 mm = 0.4 (선 굵기 기본값이 1:400 도면과 같게)
