@@ -120,6 +120,7 @@ $("teSave").addEventListener("click",()=>{
   const t={id:teId,name:$("te_name").value.trim()||"사용자 터빈",MW:n("te_MW"),hub:n("te_hub"),rotor:n("te_rotor"),rna:n("te_rna"),tower:n("te_tower"),Wdirect:n("te_W"),ifz:n("te_ifz"),
     rpmMin:n("te_rmin"),rpmMax:n("te_rmax"),fref:n("te_fref"),twL:n("te_twL"),twDb:n("te_twDb"),twDt:n("te_twDt"),axis:$("te_axis").value,src:"사용자 입력",uls,sls};
   if(teBase&&teBase.scaled&&$("te_uls").value===tableText(teBase.uls)&&$("te_sls").value===tableText(teBase.sls)) t.scaled=teBase.scaled;
+  if(teBase) Object.keys(teBase).forEach(k=>{ if(!(k in t)&&!["scaled","ifzNote"].includes(k)) t[k]=JSON.parse(JSON.stringify(teBase[k])); }); // 출력곡선(power) 등 발전량 계산 도구 칸 유지
   ST.customT=(ST.customT||[]).filter(c=>c.id!==teId); ST.customT.push(t); ST.turb=t.id; libSet(mergeT(libGet().filter(c=>c.id!==teId),[t]));
   fillTurbSel(); $("tEdit").hidden=true; run(); toast("터빈을 저장했습니다");
 });
@@ -129,14 +130,21 @@ function turbOK(t){ return t&&typeof t==="object"&&t.name&&isFinite(t.hub)&&isFi
 function cleanT(t){ const n=k=>Number(t[k])||0, tab=a=>Array.isArray(a)&&a.length===12&&a.every(r=>Array.isArray(r)&&r.length>=6)?a.map(r=>r.slice(0,6).map(Number)):null;
   const o={id:String(t.id||("c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5))),name:String(t.name),MW:n("MW"),hub:n("hub"),rotor:n("rotor"),rna:n("rna"),tower:n("tower"),Wdirect:n("Wdirect"),ifz:n("ifz"),
     rpmMin:n("rpmMin"),rpmMax:n("rpmMax"),fref:n("fref"),twL:n("twL"),twDb:n("twDb"),twDt:n("twDt"),axis:t.axis==="x"?"x":"z",src:String(t.src||"터빈 파일"),uls:tab(t.uls),sls:tab(t.sls)};
-  if(t.scaled) o.scaled=t.scaled; if(TURB_PRESETS.some(b=>b.id===o.id)) o.id+="_f"; return o; }
+  if(t.scaled) o.scaled=t.scaled; if(TURB_PRESETS.some(b=>b.id===o.id)) o.id+="_f";
+  Object.keys(t).forEach(k=>{ if(!(k in o)&&k!=="scaled") o[k]=JSON.parse(JSON.stringify(t[k])); }); // 이 도구가 쓰지 않는 칸(발전량 계산 도구의 power·ifzNote 등)은 그대로 보관해 내보낼 때 같이 넘김
+  return o; }
+/* 같은 터빈 찾기: id(기본 터빈과 겹쳐 _f가 붙은 것 포함) → 이름. 들어온 자료에 하중표·중량이 없으면 있던 값 유지 (발전량 계산 도구에서 만든 파일은 하중표가 없음) */
+function absorbT(list,t){ const i0=list.findIndex(x=>x.id===t.id||x.id===t.id+"_f"||x.id+"_f"===t.id), i=i0>=0?i0:list.findIndex(x=>x.name===t.name); if(i<0) return {t,rep:false};
+  const old=list[i], o={...t,id:old.id}; if(!o.uls&&old.uls){ o.uls=old.uls; if(old.scaled) o.scaled=old.scaled; } if(!o.sls&&old.sls) o.sls=old.sls;
+  ["rna","tower","Wdirect","rpmMin","rpmMax","fref","twL","twDb","twDt"].forEach(k=>{ if(!(o[k]>0)&&old[k]>0) o[k]=old[k]; });
+  if(o.ifzNote&&isFinite(old.ifz)&&old.ifz>0&&!old.ifzNote){ o.ifz=old.ifz; delete o.ifzNote; } if(!o.power&&old.power) o.power=old.power; return {t:o,rep:true}; }
 $("tImpBtn").addEventListener("click",()=>$("tImp").click());
 $("tImp").addEventListener("change",async e=>{
   const files=[...e.target.files]; e.target.value=""; if(!files.length) return; let got=[], bad=0;
   for(const f of files){ try{ const o=JSON.parse(await f.text()); const arr=Array.isArray(o)?o:o.turbines?o.turbines:(o.P&&o.P.customT)?o.P.customT:o.customT?o.customT:[o];
     arr.forEach(t=>{ if(turbOK(t)) got.push(cleanT(t)); else bad++; }); }catch(err){ bad++; } }
   if(!got.length){ toast("터빈 자료를 찾지 못했습니다. 터빈 파일(.json)인지 확인하세요."); return; }
-  const had=new Set((ST.customT||[]).map(t=>t.id)), rep=got.filter(t=>had.has(t.id)).length;
+  const pool=mergeT(libGet(),ST.customT||[]); let rep=0; got=got.map(t=>{ const r=absorbT(pool,t); if(r.rep) rep++; return r.t; });
   libSet(mergeT(libGet(),got)); ST.customT=mergeT(ST.customT||[],got);
   ST.turb=(turbMiss&&got.some(t=>t.id===turbMiss))?turbMiss:got[0].id; turbMiss=null;
   fillTurbSel(); run();
@@ -164,7 +172,7 @@ function run(){
   if(jack){ R=computeJacket(P); }
   else if(mono){ R=computeMono(P); R.py=computePile(P,R); R.fq=monoFreq(P,R,R.py); R.warns=R.warns.filter(w=>w.k!=="sig").concat(R.py.warns,freqWarns(R)); } else { R=compute(P); R.tow=null; R.M=memberDesign(R,P.rb); const mw=memberWarn(R.M); if(mw) R.warns.push(mw); if(ST.ringAuto==="1") drawRings(); }
   const t=R.T; $("tDel").hidden=!(ST.customT||[]).some(c=>c.id===t.id);
-  $("turbNote").textContent=`${t.MW} MW · 허브 MSL+${t.hub} m · 인터페이스 MSL+${t.ifz} m · 총중량 ${fx(R.Wt,0)} kN · ${t.uls?"하중표 있음":"하중표 없음"}${t.fref>0?` · 기준 진동수 ${t.fref} Hz`:""}${t.twDb>0?` · 타워 ${t.twL||t.hub-t.ifz} m Ø${t.twDb}→${t.twDt}`:""}${t.scaled?" · 하중표는 기준 터빈 축척 추정":""}`;
+  $("turbNote").textContent=`${t.MW} MW · 허브 MSL+${t.hub} m · 인터페이스 MSL+${t.ifz} m · 총중량 ${fx(R.Wt,0)} kN · ${t.uls?"하중표 있음":"하중표 없음"}${t.fref>0?` · 기준 진동수 ${t.fref} Hz`:""}${t.twDb>0?` · 타워 ${t.twL||t.hub-t.ifz} m Ø${t.twDb}→${t.twDt}`:""}${t.scaled?" · 하중표는 기준 터빈 축척 추정":""}${t.power&&Array.isArray(t.power.curve)&&t.power.curve.length?` · 출력곡선 ${t.power.curve.length}점${t.power.estimated?"(추정)":""} 보관(발전량 계산 도구용, 이 도구 계산에는 안 씀)`:""}`;
   if(P.type==="cone"){ const s=Math.sqrt(1+((P.Dw-P.Dt)/2/P.hk)**2); $("tkNote").textContent=`원추 벽 법선두께 = ${fx(P.tkh/s,3)} m (수평 ${P.tkh} ÷ ${fx(s,3)}), 경사 1 : ${fx(P.hk/((P.Dw-P.Dt)/2),3)}`; }
   if(jack){ $("jacketNote").textContent=jacketNote(); $("soilNote").textContent=soilNote(); }
   else if(mono){ $("monoNote").textContent=monoNote(); $("soilNote").textContent=soilNote(); } else $("shpNote").textContent=R.S.hex?`육각: 맞변 ${fx(R.S.hex.flats,2)} m, 꼭짓점 ${fx(R.S.hex.corners,2)} m, 면적이 같은 원 외경 ${fx(2*R.rso,3)} m (부력·파랑에 사용). 높이는 저판 하면 기준.`:"높이는 모두 저판 하면 기준입니다.";
@@ -251,6 +259,8 @@ function warnInfo(w){
     fx_.push({label:"최적 제원 찾기 열기 (예인 조건 포함, 크기까지 조정)",act:()=>{ openOpt(); $("optTow").checked=true; $("optPanel").scrollIntoView({behavior:"smooth",block:"start"}); }});
     return {tip:"띄워서 예인할 때 수면이 좁은 원추·기둥에 걸리면 수선면이 작아 복원력(BM)이 거의 없어 GM이 기준에 못 미칩니다. 기둥 일부만 올려 가볍게 예인하거나(나머지는 해상에서 시공), 하부를 넓혀 수면이 넓은 구간에 걸리게 하세요. 해상크레인·플로팅도크로 운반한다면 이 경고는 무시해도 됩니다.",fixes:fx_}; }
   if(/축척해 추정한 값/.test(w)) return {tip:"로터 직경·허브 높이 비율로 기준 터빈 하중을 키운 값이라 개략 검토용입니다. 터빈 계약 후 제작사 인터페이스 하중(ULS·SLS)을 터빈 편집에 붙여넣으세요.",fixes:[{label:"선택 터빈 복제해서 하중표 입력",act:()=>$("tDup").click()}]};
+  if(/RNA·타워 중량이 없습니다/.test(w)) return {tip:"발전량 계산 도구는 출력곡선만 다뤄서, 그쪽에서 만든 터빈 파일에는 RNA·타워 중량과 하중표가 비어 있습니다. 같은 이름의 터빈이 이 도구에 이미 있으면 가져올 때 중량·하중표를 그대로 둡니다.",fixes:[{label:"선택 터빈 복제해서 중량 입력",act:()=>$("tDup").click()},{label:"중량·하중표가 든 터빈 파일 가져오기",act:()=>$("tImp").click()}]};
+  if(/인터페이스 높이 .* 가정값입니다/.test(w)) return {tip:"발전량 계산 도구에서 내보낸 터빈 파일은 인터페이스 높이를 몰라 15 m로 넣습니다. 제작사 자료의 타워 하단 플랜지 높이로 고치세요."};
   if(/하중표가 없습니다/.test(w)) return {tip:"하중표가 없으면 터빈의 수평력·모멘트가 빠져 안정검토가 실제보다 유리하게 나옵니다. 제작사 인터페이스 하중(ULS·SLS 12행)을 넣어야 합니다.",
     fixes:[{label:"하중표가 든 터빈 파일 가져오기",act:()=>$("tImp").click()},{label:"선택 터빈 복제해서 하중표 입력",act:()=>$("tDup").click()}]};
   if(/원추 상단 외경 .* 기둥 외경/.test(w)) return {tip:"원추 상단과 기둥이 만나는 곳의 바깥지름이 다르면 단차가 생깁니다.",

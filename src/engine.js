@@ -241,6 +241,8 @@ function compute(P){
   if(gfq.cal&&freq.ok===false) warns.push(`1차 고유진동수 ${freq.f.toFixed(3)} Hz가 ${freq.z.nm}에 있습니다${freq.r&&freq.r.est?" (회전수는 추정값)":""}.`);
   if(T.scaled) warns.push(`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`);
   if(!TL.gu) warns.push(`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 안정검토합니다. 제작사 하중표를 넣으세요.`);
+  if(!(Wt>0)) warns.push(`선택한 터빈(${T.name})에 RNA·타워 중량이 없습니다 (발전량 계산 도구에서 만든 터빈 파일 등). 터빈 자중 0으로 계산하므로 터빈 편집에서 중량을 넣으세요.`);
+  if(T.ifzNote) warns.push(`선택한 터빈(${T.name})의 인터페이스 높이 MSL+${T.ifz} m는 가정값입니다 — ${T.ifzNote}`);
 
   /* 설치 상태 */
   const dH=P.hwl-P.zbDL, dL=0-P.zbDL;
