@@ -936,7 +936,7 @@ $("btnDxf").addEventListener("click",async()=>{ try{
   const z=new JSZip(); z.file(`${baseName()}_일반도.dxf`,all); z.file(`${baseName()}_단면도.dxf`,primsDXF([{pr:sp,dx:0,dy:0}])); z.file(`${baseName()}_평면도.dxf`,primsDXF([{pr:pp,dx:0,dy:0}]));
   { const sh=sheetPrims(R); z.file(`${baseName()}_배근도_A3.dxf`,primsDXF([{pr:sh,dx:0,dy:0}])); }
   { const gs=genSheetPrims(R); z.file(`${baseName()}_일반도_A3.dxf`,primsDXF([{pr:gs,dx:0,dy:0}])); }
-  { const a=detailSheetPrims(R,false), b=detailSheetPrims(R,true); if(a.n){ z.file(`${baseName()}_상세도_A3.dxf`,primsDXF([{pr:a,dx:0,dy:0}])); z.file(`${baseName()}_배근상세도_A3.dxf`,primsDXF([{pr:b,dx:0,dy:0}])); } }
+  { const g0=genSheetPrims(R), b=detailSheetPrims(R,true); if(g0.dLeft){ const a=detailSheetPrims(R,false,g0.dN-g0.dLeft); z.file(`${baseName()}_상세도_A3.dxf`,primsDXF([{pr:a,dx:0,dy:0}])); } if(b.n) z.file(`${baseName()}_배근상세도_A3.dxf`,primsDXF([{pr:b,dx:0,dy:0}])); }
   z.file("읽어보기.txt",`단위: mm, 원점 = 기초 중심 · 저판 하면.\r\n레이어: REBAR 철근, SHEET 도면 테두리·표, CONC 콘크리트, FILL 속채움, WATER 해수·수위, SOIL 지반, GROUT 그라우팅, HIDDEN 숨은선(격벽 등), CENTER 중심선, DIM 치수, TEXT 문자.\r\n한글 문자는 \\U+ 형식으로 들어 있어 AutoCAD에서 그대로 보입니다. 글꼴이 깨지면 문자 스타일을 한글 글꼴(맑은 고딕 등)로 바꾸세요.\r\n`);
   saveFile(`${baseName()}_도면_${stamp()}.zip`,await z.generateAsync({type:"blob"}));
 }catch(e){ toast("도면을 만들지 못했습니다"); console.error(e); } });
@@ -1191,7 +1191,7 @@ function genNotes(R){
     `콘크리트 fck = ${P.fck} MPa(해양 노출), 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 상세는 배근도를 따른다.`,
     `속채움(단위중량 ${P.gf} kN/m³)은 ${cais?"격실":"원통·원추 내부"} 상단 높이 ${fx(P.zf1,1)} m, 기둥 내부 ${fx(P.zf2,1)} m까지 채운다.`,
     `저판 하부 그라우팅 두께 ${fx(P.tg*1000,0)} mm. 허용지지력 ${fx(P.qa,0)} kPa는 가정값이며 지반조사 결과로 확인한다.`,
-    rg.length?`보강 링 ${rg.length}개(${P.ringAuto==="1"?"자동 배치: 기둥 하단·벽체 접합부":"직접 입력"})는 강도 부재가 아니며 최소철근과 연결철근으로 저판·기둥·벽체에 일체화한다.`:`보강 링 없음.`,
+    rg.length?`보강 링 ${rg.length}개(${P.ringAuto==="1"?`자동 배치: 기둥 하단·벽체 접합부${cais?"·상판 접합부":""}`:"직접 입력"})는 강도 부재가 아니며 최소철근과 연결철근으로 저판·기둥·벽체에 일체화한다.`:`보강 링 없음.`,
     `터빈 ${T.name}: 하중 작용점(인터페이스) MSL+${T.ifz} m, 하중표 ${T.uls?(T.scaled?"축척 추정값(제작사 하중으로 교체 필요)":"제작사 값"):"없음(자중만 반영)"}.`,
     `상부 플랫폼·접안시설·J-tube·부속 강재는 이 도면에 표시하지 않는다.`,
   ];
@@ -1246,11 +1246,20 @@ function genSheetPrims(R){
   T(tx+2*k,ty+16*k,"도면명"); T(tx+42*k,ty+16*k,"해상풍력발전기 기초 일반도 (중력식)",3.6);
   T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (단면도), 1 : ${scP} (평면도)    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
   const over=z<ty+thh+3*k;
-  return {o,box:[0,0,W,H],sc,scP,bg:1,over,mono:1};
+  // 빈 곳에 상세(보강 링·격벽) 넣기: A = 단면도 아래 왼쪽, B = 수량표 아래 오른쪽(표제란 위)
+  const mks=detailMakers(R,false), secBot=(sz0+dz)/k, notesBot=z/k, regs=[];
+  { const h=secBot-8-16; if(h>=40) regs.push({x:14,top:secBot-8,w:232,h}); }
+  { const h=notesBot-6-(12+34+4); if(h>=40) regs.push({x:252,top:notesBot-6,w:156,h}); }
+  let left=[...mks], dsc=[];
+  regs.forEach(rg=>{ if(!left.length) return; const n=Math.min(left.length,Math.max(1,Math.floor(rg.w/40)));
+    const asp=left.slice(0,n).map(m=>{ const c=m(0.5), [a,b,c2,d]=c.box; return Math.max(0.5,Math.min(2.5,(c2-a)/Math.max(0.1,d-b))); }), sa=asp.reduce((x,y)=>x+y,0);
+    let x=rg.x; for(let i=0;i<n&&left.length;i++){ const cw=rg.w*asp[i]/sa; const sc2=placeCell(o,left[0],x,rg.top,cw-3,rg.h,k,2.0,2); if(sc2){ dsc.push(sc2); left.shift(); } else break; x+=cw; } });
+  return {o,box:[0,0,W,H],sc,scP,bg:1,over,mono:1,dLeft:left.length,dN:mks.length};
 }
-function drawGenSheet(){ const pr=genSheetPrims(R); $("svgGen").innerHTML=primsSVG(pr,"일반도"); $("genNote").textContent=`A3 도면, 단면도 1:${pr.sc}, 평면도 1:${pr.scP}${pr.over?" · 주기가 길어 표제란과 겹칩니다":""}`; }
+function drawGenSheet(){ const pr=genSheetPrims(R); $("svgGen").innerHTML=primsSVG(pr,"일반도"); $("genNote").textContent=`A3 도면, 단면도 1:${pr.sc}, 평면도 1:${pr.scP}${pr.dN?` · 상세 ${pr.dN-pr.dLeft}/${pr.dN}개 포함`:""}${pr.dLeft?" (자리가 없어 나머지는 아래 상세도에)":""}${pr.over?" · 주기가 길어 표제란과 겹칩니다":""}`;
+  $("genDBox").hidden=!pr.dLeft; }
 /* ---------- 상세도 (보강 링 · 방사형 격벽): 일반 상세 / 배근 상세 A3 ---------- */
-const DSCALES=[20,25,30,40,50,60,75,100,125,150,200,250,300];
+const DSCALES=[20,25,30,40,50,60,75,100,125,150,200,250,300,400,500];
 /* 국부 창(x0~x1, z0~z1) 안에 들어오는 사각형만 잘라서 그림 */
 function clipRect(o,x0,x1,z0,z1,ax0,ax1,az0,az1,L){ const a=Math.max(x0,ax0), b=Math.min(x1,ax1), c=Math.max(z0,az0), d=Math.min(z1,az1); if(b-a>1e-6&&d-c>1e-6) o.push({t:"poly",L:L||"CONC",pts:[[a,c],[b,c],[b,d],[a,d]]}); }
 function dimH(o,xa,xb,z,th,txt){ o.push({t:"line",L:"DIM",x1:xa,z1:z,x2:xb,z2:z}); [xa,xb].forEach(x=>{ o.push({t:"line",L:"DIM",x1:x-th*.35,z1:z-th*.35,x2:x+th*.35,z2:z+th*.35}); }); o.push({t:"text",L:"DIM",x:(xa+xb)/2,z:z+th*.35,h:th,s:txt,anchor:"middle",num:1}); }
@@ -1293,12 +1302,10 @@ function wallPlanCell(R,th){
   arc(cro); arc(cro-(R.rso-R.rsi),"HID"); arc(Rwi); arc(Rw);
   [-ph,ph].forEach(a=>{ const c=Math.cos(a),sn=Math.sin(a),nx=-sn*P.ctr/2,nz=c*P.ctr/2; o.push({t:"poly",L:"CONC",pts:[[cro*c+nx,cro*sn+nz],[Rwi*c+nx,Rwi*sn+nz],[Rwi*c-nx,Rwi*sn-nz],[cro*c-nx,cro*sn-nz]]}); });
   const Lr=Rwi-cro, La=2*PI*Rwi/n;
-  o.push({t:"text",L:"DIM",x:(cro+Rwi)/2,z:-th*1.2,h:th,s:`격실 길이 ${mm(Lr)}`,anchor:"middle",num:1});
-  o.push({t:"text",L:"DIM",x:Rwi-th*1,z:0,h:th,s:`외벽 쪽 간격 ${mm(La)}`,anchor:"end",num:1});
   o.push({t:"text",L:"DIM",x:cro+th,z:th*0.4,h:th,s:`θ = 360°/${n} = ${fx(360/n,1)}°`,num:1});
   o.push({t:"text",L:"DIM",x:(cro+Rwi)/2*Math.cos(ph),z:(cro+Rwi)/2*Math.sin(ph)+th*1.2,h:th,s:`격벽 두께 ${mm(P.ctr)}`,anchor:"middle",num:1});
   const ys=[a0,a1].map(a=>Rw*Math.sin(a)); 
-  return {o,box:[cro*Math.cos(a1)-th*2,Math.min(...ys)-th*2,Rw+th*2,Math.max(...ys)+th*2],lab:[`방사형 격벽 ${n}개, 두께 ${mm(P.ctr)}`,`기둥 외면 ~ 외벽 내면 ${mm(Lr)}`],title:"방사형 격벽 평면 상세"};
+  return {o,box:[cro*Math.cos(a1)-th*2,Math.min(...ys)-th*2,Rw+th*2,Math.max(...ys)+th*2],lab:[`방사형 격벽 ${n}개, 두께 ${mm(P.ctr)}, 격실 길이 ${mm(Lr)}, 외벽 쪽 간격 ${mm(La)}`],title:"방사형 격벽 평면 상세"};
 }
 /* 방사형 격벽 단면 (격벽을 따라 자른 A-A) */
 function wallSecCell(R,th,rebar){
@@ -1316,21 +1323,27 @@ function wallSecCell(R,th,rebar){
       lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·상판·기둥·외벽에 40d(부재 두께 이내)`]); } }
   return {o,box:[x0,-th*3,x1+th*2.4,z1],lab,title:`방사형 격벽 단면 A-A ${rebar?"배근 ":""}상세`};
 }
-function detailSheetPrims(R,rebar){
-  const P=R.P, cais=P.type==="caisson", rg=ringSupport(P,R).map(g=>({...g,no:String.fromCharCode(0x2460+Math.min(g.i,19))}));
-  const makers=rg.map(g=>th=>ringCell(R,g,th,rebar)); if(cais&&P.cnr>=2){ if(!rebar) makers.push(th=>wallPlanCell(R,th)); makers.push(th=>wallSecCell(R,th,rebar)); }
+/* 상세 그림 한 칸 배치: 칸(sx, sz 위끝, sw×sh, 종이 mm) 안에 맞는 가장 큰 축척으로. 넣었으면 축척, 못 넣으면 0 */
+function placeCell(o,mk,sx,sz,sw,sh,sheetK,tmm,maxLab){
+  const fit=cl=>Math.min(cl.lab.length,maxLab);
+  let sc=0, cell=null; for(const s2 of DSCALES){ const k=s2/1000, cl=mk(tmm*k), [a,b,c2,d]=cl.box; if((c2-a)/k<=sw-4&&(d-b)/k<=sh-8-fit(cl)*tmm*1.6-tmm*3.2){ sc=s2; cell=cl; break; } }
+  if(!cell) return 0;
+  const k=sc/1000, f=sheetK/k, [a]=cell.box, dx=sx*sheetK-a*f+2*sheetK, dz=(sz-tmm*3.9)*sheetK-cell.box[3]*f;
+  o.push(...mapPrims(cell.o,f,dx,dz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
+  wrapTxt(`${cell.title}  S = 1 : ${sc}`,tmm*1.2*sheetK,(sw-2)*sheetK).slice(0,2).forEach((ln,i)=>o.push({t:"text",L:"STX",x:sx*sheetK,z:(sz-tmm*0.9-i*tmm*1.5)*sheetK,h:tmm*1.2*sheetK,s:ln}));
+  let zl=(cell.box[1]*f+dz)-tmm*1.8*sheetK; cell.lab.slice(0,maxLab).forEach(t=>{ wrapTxt(t,tmm*sheetK,(sw-4)*sheetK).forEach(ln=>{ o.push({t:"text",L:"STX",x:sx*sheetK+1*sheetK,z:zl,h:tmm*sheetK,s:ln}); zl-=tmm*1.55*sheetK; }); });
+  return sc;
+}
+function detailMakers(R,rebar){ const P=R.P, cais=P.type==="caisson", rg=ringSupport(P,R).map(g=>({...g,no:String.fromCharCode(0x2460+Math.min(g.i,19))}));
+  const m=rg.map(g=>th=>ringCell(R,g,th,rebar)); if(cais&&P.cnr>=2){ if(!rebar) m.push(th=>wallPlanCell(R,th)); m.push(th=>wallSecCell(R,th,rebar)); } return m; }
+function detailSheetPrims(R,rebar,skip){
+  const P=R.P, cais=P.type==="caisson", makers=detailMakers(R,rebar).slice(skip||0);
   const k0=1/1000, Wp=420, Hp=297, o=[], cols=3, rows=Math.max(1,Math.ceil(makers.length/cols)), sw=(Wp-28)/cols, sh=(Hp-22-52)/Math.min(2,rows)-4;
   // 도면 좌표는 종이 mm(×0.001 m)로 두고 상세마다 축척을 따로 씀
   const sheetK=0.4; const W=Wp*sheetK, H=Hp*sheetK;  // 종이 1 mm = 0.4 (선 굵기 기본값이 1:400 도면과 같게)
   o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:.2*sheetK}); o.push({t:"poly",L:"SHT",pts:[[10*sheetK,10*sheetK],[W-10*sheetK,10*sheetK],[W-10*sheetK,H-10*sheetK],[10*sheetK,H-10*sheetK]],w:.5*sheetK});
   const scs=[];
-  makers.slice(0,6).forEach((mk,i)=>{ const c=i%cols, r=Math.floor(i/cols), sx=14+c*sw, sz=Hp-16-r*(sh+4);
-    let sc=DSCALES[DSCALES.length-1], cell=null; for(const s2 of DSCALES){ const k=s2/1000, cl=mk(2.2*k), [a,b,c2,d]=cl.box; if((c2-a)/k<=sw-8&&(d-b)/k<=sh-26-cl.lab.length*3.8){ sc=s2; cell=cl; break; } } if(!cell){ cell=mk(2.2*sc/1000); }
-    const k=sc/1000, f=sheetK/k, [a,b]=cell.box, dx=sx*sheetK-a*f+4*sheetK, dz=(sz-10)*sheetK-cell.box[3]*f;
-    o.push(...mapPrims(cell.o,f,dx,dz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
-    o.push({t:"text",L:"STX",x:sx*sheetK,z:(sz-3)*sheetK,h:3.0*sheetK,s:`${cell.title}   S = 1 : ${sc}`});
-    let zl=(cell.box[1]*f+dz)-5*sheetK; cell.lab.forEach(t=>{ wrapTxt(t,2.2*sheetK,(sw-8)*sheetK).forEach(ln=>{ o.push({t:"text",L:"STX",x:sx*sheetK+2*sheetK,z:zl,h:2.2*sheetK,s:ln}); zl-=3.6*sheetK; }); });
-    scs.push(sc); });
+  makers.slice(0,6).forEach((mk,i)=>{ const c=i%cols, r=Math.floor(i/cols), sc2=placeCell(o,mk,14+c*sw,Hp-16-r*(sh+4),sw-4,sh,sheetK,2.2,4); if(sc2) scs.push(sc2); });
   if(!makers.length) o.push({t:"text",L:"STX",x:20*sheetK,z:(Hp-40)*sheetK,h:4*sheetK,s:"보강 링·격벽이 없어 상세가 없습니다."});
   // 표제란
   const tx=250*sheetK, ty=12*sheetK, tw=158*sheetK, thh=34*sheetK;
@@ -1345,7 +1358,7 @@ function detailSheetPrims(R,rebar){
   return {o,box:[0,0,W,H],bg:1,mono:rebar?0:1,sc:scs[0]||0,n:makers.length};
 }
 function drawDetailSheets(which){
-  if(which!=="rb"){ const a=detailSheetPrims(R,false); $("svgGenD").innerHTML=primsSVG(a,"상세도"); $("genDNote").textContent=`A3 상세도 ${a.n}개`; }
+  if(which!=="rb"&&!$("genDBox").hidden){ const g0=genSheetPrims(R), a=detailSheetPrims(R,false,g0.dN-g0.dLeft); $("svgGenD").innerHTML=primsSVG(a,"상세도"); $("genDNote").textContent=`A3 상세도 ${a.n}개`; }
   if(which!=="gen"){ const b=detailSheetPrims(R,true); $("svgRbD").innerHTML=primsSVG(b,"배근 상세도"); $("rbDNote").textContent=`A3 배근 상세도 ${b.n}개`; }
 }
 function drawRebarSheet(){
