@@ -688,15 +688,16 @@ function htmlQty(){
 const LCS={LC1:["var(--l-cur)",""],LC2:["var(--l-wave)",""],LC3:["var(--l-wind)","5 3"],LC4:["#c2552e",""]};
 const niceTk=(a,b,n=5)=>{ const d=b-a||1, s=Math.pow(10,Math.floor(Math.log10(d/n))), m=[1,2,5,10].find(m=>d/(m*s)<=n)*s, r=[]; for(let v=Math.ceil(a/m)*m; v<=b+1e-9; v+=m) r.push(+v.toPrecision(6)); return r; };
 /* 높이(표고)에 따른 분포 그래프: series [{id,v:[...] }], z 배열(저판 하면 기준) → 표고 DL로 표시 */
-function heightSVG(series,z,xlab,unit,marks,zero){
-  const W=300,H=320,ml=46,mr=12,mt=12,mb=34, P=R.P, y=zz=>zz+P.zbDL, y0=y(z[0]), y1=y(z[z.length-1]);
-  let lo=Infinity,hi=-Infinity; series.forEach(s=>s.v.forEach(v=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); })); if(zero!==false){ lo=Math.min(lo,0); hi=Math.max(hi,0); } if(hi-lo<1e-9) hi=lo+1; const pd=(hi-lo)*0.06; lo-=pd; hi+=pd;
+function heightSVG(series,z,xlab,unit,marks,zero,yOff,refs){
+  const W=300,H=320,ml=46,mr=12,mt=12,mb=34, P=R.P, off=yOff!=null?yOff:P.zbDL, y=zz=>zz+off, zs=series.flatMap(s=>s.z||z), y0=y(Math.min(...zs)), y1=y(Math.max(...zs));
+  let lo=Infinity,hi=-Infinity; series.forEach(s=>s.v.forEach(v=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); })); (refs||[]).forEach(([v])=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); }); if(zero!==false){ lo=Math.min(lo,0); hi=Math.max(hi,0); } if(hi-lo<1e-9) hi=lo+1; const pd=(hi-lo)*0.06; lo-=pd; hi+=pd;
   const X=v=>ml+(W-ml-mr)*(v-lo)/(hi-lo), Y=v=>mt+(H-mt-mb)*(y1-v)/(y1-y0);
   let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${xlab} 높이 분포">`;
   niceTk(lo,hi,4).forEach(v=>g+=`<line x1="${X(v)}" y1="${mt}" x2="${X(v)}" y2="${H-mb}" stroke="var(--line)" stroke-width="${v===0?1.1:.5}"/><text x="${X(v)}" y="${H-mb+12}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--f-num)">${fx(v,Math.abs(hi-lo)<20?1:0)}</text>`);
   niceTk(y0,y1,6).forEach(v=>g+=`<text x="${ml-4}" y="${Y(v)+3}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="var(--f-num)">${v}</text>`);
   (marks||[]).forEach(([zz,lab,c])=>{ const yy=y(zz); if(yy<y0||yy>y1) return; g+=`<line x1="${ml}" y1="${Y(yy)}" x2="${W-mr}" y2="${Y(yy)}" stroke="${c}" stroke-width=".8" stroke-dasharray="3 2"/><text x="${W-mr-2}" y="${Y(yy)-3}" font-size="8.5" fill="${c}" text-anchor="end">${lab}</text>`; });
-  series.forEach(s=>{ const [c,d]=LCS[s.id]||["var(--ink)",""]; g+=`<polyline points="${s.v.map((v,i)=>`${X(v).toFixed(1)},${Y(y(z[i])).toFixed(1)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="1.6" ${d?`stroke-dasharray="${d}"`:""}/>`; });
+  (refs||[]).forEach(([v,lab,c])=>{ g+=`<line x1="${X(v)}" y1="${mt}" x2="${X(v)}" y2="${H-mb}" stroke="${c}" stroke-width=".9" stroke-dasharray="5 3"/><text x="${X(v)+(v>=0?-3:3)}" y="${mt+9}" font-size="8.5" fill="${c}" text-anchor="${v>=0?"end":"start"}">${lab}</text>`; });
+  series.forEach(s=>{ const [c,d]=s.c?[s.c,s.dash||""]:(LCS[s.id]||["var(--ink)",""]), zz=s.z||z; g+=`<polyline points="${s.v.map((v,i)=>`${X(v).toFixed(1)},${Y(y(zz[i])).toFixed(1)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="1.6" ${d?`stroke-dasharray="${d}"`:""}/>`; });
   g+=`<text x="${(ml+W-mr)/2}" y="${H-6}" font-size="10" fill="var(--ink)" text-anchor="middle">${xlab}${unit?` (${unit})`:""}</text>`;
   g+=`<text x="11" y="${(mt+H-mb)/2}" font-size="10" fill="var(--ink)" transform="rotate(-90 11 ${(mt+H-mb)/2})" text-anchor="middle">표고 (DL, m)</text></svg>`;
   return g;

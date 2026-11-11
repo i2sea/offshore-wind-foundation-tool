@@ -16,6 +16,7 @@ function renderMonoTab(t){
   else if(t==="qty") $("repQty").innerHTML=htmlMonoQty();
   else if(t==="mchk") $("repMchk").innerHTML=htmlMonoChk();
   else if(t==="mpy"){ if(!$("soilEd").innerHTML) drawSoil(); $("repMpy").innerHTML=htmlMonoPy(); }
+  else if(t==="strs") $("repStr").innerHTML=htmlMonoStress();
   else if(t==="calc") $("report").innerHTML=htmlMonoReport();
 }
 function renderMonoSummary(){
@@ -526,4 +527,34 @@ function makeXlsxMono(){
   add("수량",[["공종","수량","단위"],...W.segs.map(s=>["강관 "+s.nm,r2(s.W/G),"t"]),["강관 소계",r2(W.Wp/G),"t"],["트랜지션피스",r2(W.WTP/G),"t"],["2차 부재",r2(W.Wsec/G),"t"],["TP 그라우트",r2(W.Vg),"m³"],["천공 구간 그라우트",r2(q.Vann),"m³"],
     ["세굴방지공",r2(q.Vsc),"m³"],["외면 방식 면적",r2(q.Apaint),"m²"],[],["해역이용협의"],["점용 면적",r2(q.Aocc),"m²"],["굴착·천공 길이",r2(q.Ldr),"m"],["굴착·천공량",r2(q.Vexc),"m³"],["말뚝 안 토사 (존치)",r2(q.Vplug),"m³"]],[28,12,6]);
   return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+/* ---------- 응력분포도 (모노파일): 말뚝 끝 ~ 인터페이스 높이별 단면력·응력 ---------- */
+function htmlMonoStress(){
+  const P=R.P, g=R.g, C=R.colD, Y=R.py, ids=R.LC.map(l=>l.id), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm])), fd=R.sec.fd;
+  const secAt=yy=>{ const D=g.Dp(Math.min(yy,P.mtop)), t=Math.max(0.001,g.tAt(yy)-P.mca/1000), Di=D-2*t; return {A:PI/4*(D*D-Di*Di),Z:PI/32*(D**4-Di**4)/D,D,t}; };
+  // 해저면 아래: p-y 결과 (말뚝 머리 = 해저면(세굴면), 축력은 해저면 값 그대로 — 주면마찰 감소 무시, 보수적)
+  const all={}; ids.forEach((id,i)=>{ const r=Y.res[i], c=C.lc[id], sg=Math.sign(r.Mz[0]||1)===Math.sign(c.M[0]||1)?1:-1;
+    const zb=r.x.map(x=>R.yML-x).reverse(), Mb=r.Mz.map(v=>v*sg).reverse(), Vb=r.Vz.map(v=>v*sg).reverse(), Nb=zb.map(()=>c.N[0]);
+    const z=[...zb,...C.z], M=[...Mb,...c.M], V=[...Vb,...c.V], N=[...Nb,...c.N], sc=z.map((zz,j)=>{ const q=secAt(zz); return (N[j]/q.A+Math.abs(M[j])/q.Z)/1000; });
+    all[id]={z,M,V,N,sc}; });
+  const marks=[[P.hwl,"설계조위","var(--water-line)"],[R.yML,R.prot?"해저면":"세굴면","var(--soil-line,#8a6d3b)"],[g.yTP0,"TP 하단","var(--muted)"]];
+  if(!R.prot) marks.push([P.sbDL,"원지반","var(--muted)"]);
+  [[P.mz1,"두께 변화"],[P.mz2,"두께 변화"]].forEach(([zz,l])=>{ if(zz>g.yToe&&zz<R.yIf) marks.push([zz,l,"var(--dim)"]); });
+  const ser=k=>ids.map(id=>({id,v:all[id][k],z:all[id].z}));
+  const leg=`<div class="legend" style="margin:4px 0 0">${ids.map(id=>`<span><i style="background:${LCS[id][0]}"></i>${id} ${nm[id]}</span>`).join("")}</div>`;
+  let h=`<h2>1. 말뚝 높이별 단면력·응력 (말뚝 끝 ~ 인터페이스)</h2>
+  <p class="note">해저면 위는 단면마다 그 위쪽 하중을 모았습니다: N = 터빈 연직 + 강관·TP·그라우트·2차 부재 자중 − 잠긴 강재 부력, H·M = 터빈 + 풍하중 + 파랑(단면마다 최대 위상) + 조류 + 지진 관성력(분포). 해저면 아래는 말뚝 해석(p-y) 결과이고, 축력은 해저면 값을 그대로 썼습니다(주면마찰 감소 무시, 보수적). σ = N/A + |M|/Z, 단면은 말뚝 강관만(부식 여유 ${P.mca} mm 공제)이며 TP 겹침 구간도 말뚝만으로 봤습니다(보수적). 폭풍(LC2)은 환경하중 계수 ${P.mgE} 포함.</p>${leg}
+  <div class="plots"><div class="sheet">${heightSVG(ser("N"),C.z,"축력 N","kN",marks,true,0)}</div><div class="sheet">${heightSVG(ser("V"),C.z,"전단력 V","kN",marks,true,0)}</div>
+  <div class="sheet">${heightSVG(ser("M").map(s=>({...s,v:s.v.map(v=>v/1000)})),C.z,"휨모멘트 M","MN·m",marks,true,0)}</div>
+  <div class="sheet">${heightSVG(ser("sc"),C.z,"최대 응력 σ","MPa",marks,true,0,[[fd,`f<tspan font-size="7" dy="2">d</tspan><tspan dy="-2"> ${fx(fd,0)}</tspan>`,"#c23b2e"]])}</div></div>`;
+  // 주요 단면 표
+  const rowAt=(lab,zz)=>{ const tds=ids.map(id=>{ const a=all[id]; let j=0,bd=1e9; a.z.forEach((v,i)=>{ const d=Math.abs(v-zz); if(d<bd){bd=d;j=i;} }); return {M:a.M[j],sc:a.sc[j]}; }); const q=secAt(zz);
+    return `<tr><td class="l">${lab}</td><td class="n">${dlS(zz)}</td><td class="n">Ø${fx(q.D*1000,0)} × ${fx(g.tAt(zz)*1000,0)}</td>${tds.map(t=>`<td class="n">${fx(t.M,0)}</td><td class="n">${fx(t.sc,1)}</td>`).join("")}<td class="n">${fx(Math.max(...tds.map(t=>t.sc))/fd,2)}</td></tr>`; };
+  const rows=[["TP 하단",g.yTP0],[R.prot?"해저면":"세굴면",R.yML]]; [P.mz2,P.mz1].forEach(zz=>{ if(zz>g.yToe&&zz<g.yTP0) rows.push([`두께 변화 (${fx(zz,1)})`,zz]); });
+  { const r=Y.res.reduce((a,b)=>b.Mmax>a.Mmax?b:a); rows.push([`해저면 아래 최대 모멘트 (${r.id})`,R.yML-r.xM]); }
+  rows.sort((a,b)=>b[1]-a[1]);
+  h+=`<div class="tblwrap"><table class="t"><thead><tr><th rowspan="2">단면</th><th rowspan="2">표고</th><th rowspan="2">강관 (mm)</th>${ids.map(id=>`<th colspan="2">${id}</th>`).join("")}<th rowspan="2">σ<sub>max</sub>/f<sub>d</sub></th></tr><tr>${ids.map(()=>"<th>M (kN·m)</th><th>σ (MPa)</th>").join("")}</tr></thead><tbody>${rows.map(([l,zz])=>rowAt(l,zz)).join("")}</tbody></table></div>
+  <p class="note">f<sub>d</sub> = f<sub>y</sub>/γ<sub>M</sub> = ${P.mfy}/${P.mgM} = ${fx(fd,0)} MPa. 국부좌굴(DNV-RP-C202)을 포함한 단면 검토는 강관 검토 탭에 있습니다.</p>`;
+  return h;
 }

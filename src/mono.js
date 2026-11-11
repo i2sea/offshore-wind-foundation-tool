@@ -130,6 +130,30 @@ function computeMono(P){
     mk("LC3","지진 (운전)",TL.gs,{cur:"n",eq:1},1,"EQ"),
   ];
 
+  /* 높이별 단면력·응력 (응력분포도): 해저면 ~ 인터페이스, 단면 y 위쪽 하중만
+     N = 터빈 연직 + 강관·TP·그라우트·2차 부재 자중 − 잠긴 강재 부력, H·M = 터빈 + 풍·파랑(단면별 최대 위상)·조류·지진(분포 관성력)
+     σ = N/A + M/Z, 단면은 말뚝 강관만(부식 여유 공제). TP 겹침 구간은 말뚝 단면만으로 계산(보수적) */
+  const colD=(()=>{ const n=80, yb=yML, ytop=yIf, zsec=[]; for(let i=0;i<=n;i++) zsec.push(yb+(ytop-yb)*i/n);
+    const wTP=WTP/Math.max(1e-6,yTP1-yTP0), wG=Wg/Math.max(1e-6,P.mtop-yTP0), sl=[];
+    for(let y=yb+dy/2; y<ytop; y+=dy){ const D=Dp(y), t=tAt(y), a=ringA(D,t); let w=y<P.mtop?a*gs:0, b=0;
+      if(y>=yTP0&&y<=yTP1) w+=wTP; if(grout&&y>=yTP0&&y<=P.mtop) w+=wG;
+      if(y<P.hwl){ b=(y<P.mtop?a:0)+((y>=yTP0&&y<=yTP1)?ringA(DTP,tTP):0)+((grout&&y>=yTP0&&y<=P.mtop)?PI/4*((Dtop+2*P.mgap)**2-Dtop**2):0); b*=gw; }
+      const win=y<P.hwl&&y<P.mtop?PI/4*(D-2*t)**2*gw:0, wdis=P.hydro&&y<P.hwl?PI/4*Dout(y)**2*gw:0;
+      sl.push([y,w*dy,b*dy,(w+win+wdis)*dy]); }
+    const defs=[["LC1",TL.gs,{cur:"n"},1],["LC2",TL.gu,{wind:1,wave:1,cur:"e"},P.mgE],["LC3",TL.gs,{cur:"n",eq:1},1]], lc={};
+    defs.forEach(([id,tg,pt,gE])=>{ const t=tl(tg), N=[],V=[],M=[],sc=[],st=[];
+      zsec.forEach(yc=>{ let n_=t.V, h=t.H, m=t.M+t.H*(yIf-yc);
+        sl.forEach(([y,w,b])=>{ if(y>yc) n_+=w-b; }); if(yIf>yc) n_+=Wsec;
+        if(pt.wind) windArr.forEach(([y,f])=>{ if(y>yc){ h+=gE*f; m+=gE*f*(y-yc); } });
+        if(pt.wave){ let fi=0,mi=0,fd=0,md=0; ys.forEach((y,i)=>{ if(y>yc){ fi+=fI[i]*dy; mi+=fI[i]*dy*(y-yc); fd+=fD[i]*dy; md+=fD[i]*dy*(y-yc); } });
+          let bM=0,bF=0; for(let j=0;j<360;j++){ const th=j/360*2*PI, sn=Math.sin(th), c=Math.cos(th)*Math.abs(Math.cos(th)), mm=mi*sn+md*c; if(mm>bM){bM=mm;bF=fi*sn+fd*c;} } h+=gE*bF; m+=gE*bM; }
+        if(pt.cur){ const c=pt.cur==="e"?curE:curN; c.arr.forEach(([y,f])=>{ if(y>yc){ h+=gE*f; m+=gE*f*(y-yc); } }); }
+        if(pt.eq){ const k=P.kh; sl.forEach(([y,,,we])=>{ if(y>yc){ h+=k*we; m+=k*we*(y-yc); } }); if(yIf>yc){ h+=k*Wsec; m+=k*Wsec*(yIf-yc); } if(yt>yc){ h+=k*Wt; m+=k*Wt*(yt-yc); } }
+        const D=Dp(Math.min(yc,P.mtop)), tcr=Math.max(0.001,tAt(yc)-P.mca/1000), Di=D-2*tcr, A_=PI/4*(D*D-Di*Di), Z_=PI/32*(D**4-Di**4)/D;
+        N.push(n_); V.push(h); M.push(m); sc.push((n_/A_+m/Z_)/1000); st.push((n_/A_-m/Z_)/1000); });
+      lc[id]={N,V,M,sc,st}; });
+    return {z:zsec,lc}; })();
+
   /* 해저면 단면 (예비 응력, 부식 여유 공제) */
   const Dm=Dp(yML), tn=tAt(yML), tc=Math.max(0.001,tn-P.mca/1000);
   const Di=Dm-2*tc, A=PI/4*(Dm*Dm-Di*Di), I=PI/64*(Dm**4-Di**4), Z=2*I/Dm;
@@ -163,6 +187,6 @@ function computeMono(P){
   segs.forEach((s,i)=>{ if(s.DtMax>120) warns.push({k:"Dt",zone:i,msg:`${s.nm} 구간 D/t = ${s.DtMax.toFixed(0)}로 120을 넘습니다 (국부좌굴 우려).`}); });
   if(govLC.ratio>1) warns.push({k:"sig",msg:`해저면 단면 응력비 ${govLC.ratio.toFixed(2)} (${govLC.id})로 1을 넘습니다.`});
 
-  return {P,cat:"mono",g,T,TL,Wt,yIf,yt,yML,S,prot,wt,wind,wave,cur,cdTbl,freq,eq,LC,sec,govLC,qty,warns,dy,armIf,crestDL};
+  return {P,cat:"mono",g,T,TL,Wt,yIf,yt,yML,S,prot,wt,wind,wave,cur,cdTbl,freq,eq,LC,sec,govLC,qty,warns,dy,armIf,crestDL,colD};
 }
 function dlS(v){ return `DL(${v>=0?"+":"−"})${Math.abs(v).toFixed(3)}`; }

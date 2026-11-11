@@ -523,7 +523,7 @@ svg [data-k]:hover{fill:var(--bad)}
       <button class="tab" role="tab" data-cat="mono jacket" data-t="mchk" aria-selected="false" hidden>강관 단면</button>
       <button class="tab" role="tab" data-cat="mono jacket" data-t="mpy" aria-selected="false" hidden>말뚝 해석</button>
       <button class="tab" role="tab" data-t="qty" aria-selected="false">수량</button>
-      <button class="tab" role="tab" data-cat="grav" data-t="strs" aria-selected="false">응력분포도</button>
+      <button class="tab" role="tab" data-t="strs" aria-selected="false">응력분포도</button>
       <button class="tab" role="tab" data-t="calc" aria-selected="false">구조계산서</button>
     </div>
     <div class="pane" data-p="gen">
@@ -1435,6 +1435,30 @@ function computeMono(P){
     mk("LC3","지진 (운전)",TL.gs,{cur:"n",eq:1},1,"EQ"),
   ];
 
+  /* 높이별 단면력·응력 (응력분포도): 해저면 ~ 인터페이스, 단면 y 위쪽 하중만
+     N = 터빈 연직 + 강관·TP·그라우트·2차 부재 자중 − 잠긴 강재 부력, H·M = 터빈 + 풍·파랑(단면별 최대 위상)·조류·지진(분포 관성력)
+     σ = N/A + M/Z, 단면은 말뚝 강관만(부식 여유 공제). TP 겹침 구간은 말뚝 단면만으로 계산(보수적) */
+  const colD=(()=>{ const n=80, yb=yML, ytop=yIf, zsec=[]; for(let i=0;i<=n;i++) zsec.push(yb+(ytop-yb)*i/n);
+    const wTP=WTP/Math.max(1e-6,yTP1-yTP0), wG=Wg/Math.max(1e-6,P.mtop-yTP0), sl=[];
+    for(let y=yb+dy/2; y<ytop; y+=dy){ const D=Dp(y), t=tAt(y), a=ringA(D,t); let w=y<P.mtop?a*gs:0, b=0;
+      if(y>=yTP0&&y<=yTP1) w+=wTP; if(grout&&y>=yTP0&&y<=P.mtop) w+=wG;
+      if(y<P.hwl){ b=(y<P.mtop?a:0)+((y>=yTP0&&y<=yTP1)?ringA(DTP,tTP):0)+((grout&&y>=yTP0&&y<=P.mtop)?PI/4*((Dtop+2*P.mgap)**2-Dtop**2):0); b*=gw; }
+      const win=y<P.hwl&&y<P.mtop?PI/4*(D-2*t)**2*gw:0, wdis=P.hydro&&y<P.hwl?PI/4*Dout(y)**2*gw:0;
+      sl.push([y,w*dy,b*dy,(w+win+wdis)*dy]); }
+    const defs=[["LC1",TL.gs,{cur:"n"},1],["LC2",TL.gu,{wind:1,wave:1,cur:"e"},P.mgE],["LC3",TL.gs,{cur:"n",eq:1},1]], lc={};
+    defs.forEach(([id,tg,pt,gE])=>{ const t=tl(tg), N=[],V=[],M=[],sc=[],st=[];
+      zsec.forEach(yc=>{ let n_=t.V, h=t.H, m=t.M+t.H*(yIf-yc);
+        sl.forEach(([y,w,b])=>{ if(y>yc) n_+=w-b; }); if(yIf>yc) n_+=Wsec;
+        if(pt.wind) windArr.forEach(([y,f])=>{ if(y>yc){ h+=gE*f; m+=gE*f*(y-yc); } });
+        if(pt.wave){ let fi=0,mi=0,fd=0,md=0; ys.forEach((y,i)=>{ if(y>yc){ fi+=fI[i]*dy; mi+=fI[i]*dy*(y-yc); fd+=fD[i]*dy; md+=fD[i]*dy*(y-yc); } });
+          let bM=0,bF=0; for(let j=0;j<360;j++){ const th=j/360*2*PI, sn=Math.sin(th), c=Math.cos(th)*Math.abs(Math.cos(th)), mm=mi*sn+md*c; if(mm>bM){bM=mm;bF=fi*sn+fd*c;} } h+=gE*bF; m+=gE*bM; }
+        if(pt.cur){ const c=pt.cur==="e"?curE:curN; c.arr.forEach(([y,f])=>{ if(y>yc){ h+=gE*f; m+=gE*f*(y-yc); } }); }
+        if(pt.eq){ const k=P.kh; sl.forEach(([y,,,we])=>{ if(y>yc){ h+=k*we; m+=k*we*(y-yc); } }); if(yIf>yc){ h+=k*Wsec; m+=k*Wsec*(yIf-yc); } if(yt>yc){ h+=k*Wt; m+=k*Wt*(yt-yc); } }
+        const D=Dp(Math.min(yc,P.mtop)), tcr=Math.max(0.001,tAt(yc)-P.mca/1000), Di=D-2*tcr, A_=PI/4*(D*D-Di*Di), Z_=PI/32*(D**4-Di**4)/D;
+        N.push(n_); V.push(h); M.push(m); sc.push((n_/A_+m/Z_)/1000); st.push((n_/A_-m/Z_)/1000); });
+      lc[id]={N,V,M,sc,st}; });
+    return {z:zsec,lc}; })();
+
   /* 해저면 단면 (예비 응력, 부식 여유 공제) */
   const Dm=Dp(yML), tn=tAt(yML), tc=Math.max(0.001,tn-P.mca/1000);
   const Di=Dm-2*tc, A=PI/4*(Dm*Dm-Di*Di), I=PI/64*(Dm**4-Di**4), Z=2*I/Dm;
@@ -1468,7 +1492,7 @@ function computeMono(P){
   segs.forEach((s,i)=>{ if(s.DtMax>120) warns.push({k:"Dt",zone:i,msg:`${s.nm} 구간 D/t = ${s.DtMax.toFixed(0)}로 120을 넘습니다 (국부좌굴 우려).`}); });
   if(govLC.ratio>1) warns.push({k:"sig",msg:`해저면 단면 응력비 ${govLC.ratio.toFixed(2)} (${govLC.id})로 1을 넘습니다.`});
 
-  return {P,cat:"mono",g,T,TL,Wt,yIf,yt,yML,S,prot,wt,wind,wave,cur,cdTbl,freq,eq,LC,sec,govLC,qty,warns,dy,armIf,crestDL};
+  return {P,cat:"mono",g,T,TL,Wt,yIf,yt,yML,S,prot,wt,wind,wave,cur,cdTbl,freq,eq,LC,sec,govLC,qty,warns,dy,armIf,crestDL,colD};
 }
 function dlS(v){ return `DL(${v>=0?"+":"−"})${Math.abs(v).toFixed(3)}`; }
 
@@ -2728,15 +2752,16 @@ function htmlQty(){
 const LCS={LC1:["var(--l-cur)",""],LC2:["var(--l-wave)",""],LC3:["var(--l-wind)","5 3"],LC4:["#c2552e",""]};
 const niceTk=(a,b,n=5)=>{ const d=b-a||1, s=Math.pow(10,Math.floor(Math.log10(d/n))), m=[1,2,5,10].find(m=>d/(m*s)<=n)*s, r=[]; for(let v=Math.ceil(a/m)*m; v<=b+1e-9; v+=m) r.push(+v.toPrecision(6)); return r; };
 /* 높이(표고)에 따른 분포 그래프: series [{id,v:[...] }], z 배열(저판 하면 기준) → 표고 DL로 표시 */
-function heightSVG(series,z,xlab,unit,marks,zero){
-  const W=300,H=320,ml=46,mr=12,mt=12,mb=34, P=R.P, y=zz=>zz+P.zbDL, y0=y(z[0]), y1=y(z[z.length-1]);
-  let lo=Infinity,hi=-Infinity; series.forEach(s=>s.v.forEach(v=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); })); if(zero!==false){ lo=Math.min(lo,0); hi=Math.max(hi,0); } if(hi-lo<1e-9) hi=lo+1; const pd=(hi-lo)*0.06; lo-=pd; hi+=pd;
+function heightSVG(series,z,xlab,unit,marks,zero,yOff,refs){
+  const W=300,H=320,ml=46,mr=12,mt=12,mb=34, P=R.P, off=yOff!=null?yOff:P.zbDL, y=zz=>zz+off, zs=series.flatMap(s=>s.z||z), y0=y(Math.min(...zs)), y1=y(Math.max(...zs));
+  let lo=Infinity,hi=-Infinity; series.forEach(s=>s.v.forEach(v=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); })); (refs||[]).forEach(([v])=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); }); if(zero!==false){ lo=Math.min(lo,0); hi=Math.max(hi,0); } if(hi-lo<1e-9) hi=lo+1; const pd=(hi-lo)*0.06; lo-=pd; hi+=pd;
   const X=v=>ml+(W-ml-mr)*(v-lo)/(hi-lo), Y=v=>mt+(H-mt-mb)*(y1-v)/(y1-y0);
   let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${xlab} 높이 분포">`;
   niceTk(lo,hi,4).forEach(v=>g+=`<line x1="${X(v)}" y1="${mt}" x2="${X(v)}" y2="${H-mb}" stroke="var(--line)" stroke-width="${v===0?1.1:.5}"/><text x="${X(v)}" y="${H-mb+12}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--f-num)">${fx(v,Math.abs(hi-lo)<20?1:0)}</text>`);
   niceTk(y0,y1,6).forEach(v=>g+=`<text x="${ml-4}" y="${Y(v)+3}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="var(--f-num)">${v}</text>`);
   (marks||[]).forEach(([zz,lab,c])=>{ const yy=y(zz); if(yy<y0||yy>y1) return; g+=`<line x1="${ml}" y1="${Y(yy)}" x2="${W-mr}" y2="${Y(yy)}" stroke="${c}" stroke-width=".8" stroke-dasharray="3 2"/><text x="${W-mr-2}" y="${Y(yy)-3}" font-size="8.5" fill="${c}" text-anchor="end">${lab}</text>`; });
-  series.forEach(s=>{ const [c,d]=LCS[s.id]||["var(--ink)",""]; g+=`<polyline points="${s.v.map((v,i)=>`${X(v).toFixed(1)},${Y(y(z[i])).toFixed(1)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="1.6" ${d?`stroke-dasharray="${d}"`:""}/>`; });
+  (refs||[]).forEach(([v,lab,c])=>{ g+=`<line x1="${X(v)}" y1="${mt}" x2="${X(v)}" y2="${H-mb}" stroke="${c}" stroke-width=".9" stroke-dasharray="5 3"/><text x="${X(v)+(v>=0?-3:3)}" y="${mt+9}" font-size="8.5" fill="${c}" text-anchor="${v>=0?"end":"start"}">${lab}</text>`; });
+  series.forEach(s=>{ const [c,d]=s.c?[s.c,s.dash||""]:(LCS[s.id]||["var(--ink)",""]), zz=s.z||z; g+=`<polyline points="${s.v.map((v,i)=>`${X(v).toFixed(1)},${Y(y(zz[i])).toFixed(1)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="1.6" ${d?`stroke-dasharray="${d}"`:""}/>`; });
   g+=`<text x="${(ml+W-mr)/2}" y="${H-6}" font-size="10" fill="var(--ink)" text-anchor="middle">${xlab}${unit?` (${unit})`:""}</text>`;
   g+=`<text x="11" y="${(mt+H-mb)/2}" font-size="10" fill="var(--ink)" transform="rotate(-90 11 ${(mt+H-mb)/2})" text-anchor="middle">표고 (DL, m)</text></svg>`;
   return g;
@@ -3566,6 +3591,7 @@ function renderMonoTab(t){
   else if(t==="qty") $("repQty").innerHTML=htmlMonoQty();
   else if(t==="mchk") $("repMchk").innerHTML=htmlMonoChk();
   else if(t==="mpy"){ if(!$("soilEd").innerHTML) drawSoil(); $("repMpy").innerHTML=htmlMonoPy(); }
+  else if(t==="strs") $("repStr").innerHTML=htmlMonoStress();
   else if(t==="calc") $("report").innerHTML=htmlMonoReport();
 }
 function renderMonoSummary(){
@@ -4078,6 +4104,36 @@ function makeXlsxMono(){
   return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
 
+/* ---------- 응력분포도 (모노파일): 말뚝 끝 ~ 인터페이스 높이별 단면력·응력 ---------- */
+function htmlMonoStress(){
+  const P=R.P, g=R.g, C=R.colD, Y=R.py, ids=R.LC.map(l=>l.id), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm])), fd=R.sec.fd;
+  const secAt=yy=>{ const D=g.Dp(Math.min(yy,P.mtop)), t=Math.max(0.001,g.tAt(yy)-P.mca/1000), Di=D-2*t; return {A:PI/4*(D*D-Di*Di),Z:PI/32*(D**4-Di**4)/D,D,t}; };
+  // 해저면 아래: p-y 결과 (말뚝 머리 = 해저면(세굴면), 축력은 해저면 값 그대로 — 주면마찰 감소 무시, 보수적)
+  const all={}; ids.forEach((id,i)=>{ const r=Y.res[i], c=C.lc[id], sg=Math.sign(r.Mz[0]||1)===Math.sign(c.M[0]||1)?1:-1;
+    const zb=r.x.map(x=>R.yML-x).reverse(), Mb=r.Mz.map(v=>v*sg).reverse(), Vb=r.Vz.map(v=>v*sg).reverse(), Nb=zb.map(()=>c.N[0]);
+    const z=[...zb,...C.z], M=[...Mb,...c.M], V=[...Vb,...c.V], N=[...Nb,...c.N], sc=z.map((zz,j)=>{ const q=secAt(zz); return (N[j]/q.A+Math.abs(M[j])/q.Z)/1000; });
+    all[id]={z,M,V,N,sc}; });
+  const marks=[[P.hwl,"설계조위","var(--water-line)"],[R.yML,R.prot?"해저면":"세굴면","var(--soil-line,#8a6d3b)"],[g.yTP0,"TP 하단","var(--muted)"]];
+  if(!R.prot) marks.push([P.sbDL,"원지반","var(--muted)"]);
+  [[P.mz1,"두께 변화"],[P.mz2,"두께 변화"]].forEach(([zz,l])=>{ if(zz>g.yToe&&zz<R.yIf) marks.push([zz,l,"var(--dim)"]); });
+  const ser=k=>ids.map(id=>({id,v:all[id][k],z:all[id].z}));
+  const leg=`<div class="legend" style="margin:4px 0 0">${ids.map(id=>`<span><i style="background:${LCS[id][0]}"></i>${id} ${nm[id]}</span>`).join("")}</div>`;
+  let h=`<h2>1. 말뚝 높이별 단면력·응력 (말뚝 끝 ~ 인터페이스)</h2>
+  <p class="note">해저면 위는 단면마다 그 위쪽 하중을 모았습니다: N = 터빈 연직 + 강관·TP·그라우트·2차 부재 자중 − 잠긴 강재 부력, H·M = 터빈 + 풍하중 + 파랑(단면마다 최대 위상) + 조류 + 지진 관성력(분포). 해저면 아래는 말뚝 해석(p-y) 결과이고, 축력은 해저면 값을 그대로 썼습니다(주면마찰 감소 무시, 보수적). σ = N/A + |M|/Z, 단면은 말뚝 강관만(부식 여유 ${P.mca} mm 공제)이며 TP 겹침 구간도 말뚝만으로 봤습니다(보수적). 폭풍(LC2)은 환경하중 계수 ${P.mgE} 포함.</p>${leg}
+  <div class="plots"><div class="sheet">${heightSVG(ser("N"),C.z,"축력 N","kN",marks,true,0)}</div><div class="sheet">${heightSVG(ser("V"),C.z,"전단력 V","kN",marks,true,0)}</div>
+  <div class="sheet">${heightSVG(ser("M").map(s=>({...s,v:s.v.map(v=>v/1000)})),C.z,"휨모멘트 M","MN·m",marks,true,0)}</div>
+  <div class="sheet">${heightSVG(ser("sc"),C.z,"최대 응력 σ","MPa",marks,true,0,[[fd,`f<tspan font-size="7" dy="2">d</tspan><tspan dy="-2"> ${fx(fd,0)}</tspan>`,"#c23b2e"]])}</div></div>`;
+  // 주요 단면 표
+  const rowAt=(lab,zz)=>{ const tds=ids.map(id=>{ const a=all[id]; let j=0,bd=1e9; a.z.forEach((v,i)=>{ const d=Math.abs(v-zz); if(d<bd){bd=d;j=i;} }); return {M:a.M[j],sc:a.sc[j]}; }); const q=secAt(zz);
+    return `<tr><td class="l">${lab}</td><td class="n">${dlS(zz)}</td><td class="n">Ø${fx(q.D*1000,0)} × ${fx(g.tAt(zz)*1000,0)}</td>${tds.map(t=>`<td class="n">${fx(t.M,0)}</td><td class="n">${fx(t.sc,1)}</td>`).join("")}<td class="n">${fx(Math.max(...tds.map(t=>t.sc))/fd,2)}</td></tr>`; };
+  const rows=[["TP 하단",g.yTP0],[R.prot?"해저면":"세굴면",R.yML]]; [P.mz2,P.mz1].forEach(zz=>{ if(zz>g.yToe&&zz<g.yTP0) rows.push([`두께 변화 (${fx(zz,1)})`,zz]); });
+  { const r=Y.res.reduce((a,b)=>b.Mmax>a.Mmax?b:a); rows.push([`해저면 아래 최대 모멘트 (${r.id})`,R.yML-r.xM]); }
+  rows.sort((a,b)=>b[1]-a[1]);
+  h+=`<div class="tblwrap"><table class="t"><thead><tr><th rowspan="2">단면</th><th rowspan="2">표고</th><th rowspan="2">강관 (mm)</th>${ids.map(id=>`<th colspan="2">${id}</th>`).join("")}<th rowspan="2">σ<sub>max</sub>/f<sub>d</sub></th></tr><tr>${ids.map(()=>"<th>M (kN·m)</th><th>σ (MPa)</th>").join("")}</tr></thead><tbody>${rows.map(([l,zz])=>rowAt(l,zz)).join("")}</tbody></table></div>
+  <p class="note">f<sub>d</sub> = f<sub>y</sub>/γ<sub>M</sub> = ${P.mfy}/${P.mgM} = ${fx(fd,0)} MPa. 국부좌굴(DNV-RP-C202)을 포함한 단면 검토는 강관 검토 탭에 있습니다.</p>`;
+  return h;
+}
+
 /* ---------- 자켓 화면 ---------- */
 const GRPN={leg:"다리",brace:"X 브레이스",mud:"하단 수평재",hz:"수평재"};
 $("btnSampleJk").addEventListener("click",()=>{ const P=readInputs(); setInputs({...P,...JACKET_DEF,type:P.type}); run(); toast("자켓 기본 제원을 불러왔습니다 (4각, 하단 14 m · 상단 9 m, 4칸)"); });
@@ -4091,6 +4147,7 @@ function renderJacketTab(t){
   else if(t==="qty") $("repQty").innerHTML=htmlJkQty();
   else if(t==="mchk") $("repMchk").innerHTML=htmlJkChk();
   else if(t==="mpy"){ if(!$("soilEd").innerHTML) drawSoil(); $("repMpy").innerHTML=htmlJkPile(); }
+  else if(t==="strs") $("repStr").innerHTML=htmlJkStress();
   else if(t==="calc") $("report").innerHTML=htmlJkReport();
 }
 function renderJacketSummary(){
@@ -4358,6 +4415,53 @@ function makeXlsxJacket(){
   add("말뚝",[["조합","최대 압축","최대 인발","수평","모멘트"],...R.pile.rows.map(r=>[r.id,r2(r.comp),r2(r.ten),r2(r.H),r2(r.M)]),[],["압축 Q (kN)",r2(R.pile.ax.Q)],["인발 Qt (kN)",r2(R.pile.Qt)],["수평 해저면 변위 (mm)",r2(R.pile.lat.w0*1000)]]);
   add("수량",[["공종","수량","단위"],...Object.entries(q.grpW).map(([k,v])=>["강관 "+(GRPN[k]||k),r2(v/G),"t"]),["자켓 강재 소계",r2(q.Wst/G),"t"],["TP",r2(P.jWtp/G),"t"],["2차 부재",r2(P.jWsec/G),"t"],["말뚝",r2(q.Wpile/G),"t"],["세굴방지공",r2(q.Vsc),"m³"],[],["점용 면적",r2(q.Aocc),"m²"],["굴착·천공량",0,"m³"]],[24,12,6]);
   return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+/* ---------- 응력분포도 (자켓): 부재 이용률 분포, 다리 높이별 축력·휨모멘트, 브레이스 축력, 말뚝 ---------- */
+const UCAT=[[0.5,"#2f8f6b","≤ 0.5"],[0.8,"#b8a200","0.5 ~ 0.8"],[1.0,"#d9822b","0.8 ~ 1.0"],[1e9,"#c23b2e","> 1.0 (N.G)"]];
+const ucol=u=>UCAT.find(c=>u<=c[0])[1];
+function jkUtilSVG(view){
+  const g=R.g, W=330,H=360, ax=view==="x"?"x":"y", ns=g.nodes, xs=ns.map(n=>n[ax]), zs=ns.map(n=>n.z), x0=Math.min(...xs), x1=Math.max(...xs), z0=Math.min(...zs), z1=Math.max(...zs);
+  const sc=Math.min((W-40)/(x1-x0||1),(H-40)/(z1-z0||1)), X=v=>W/2+(v-(x0+x1)/2)*sc, Y=v=>H-20-(v-z0)*sc;
+  const um=new Map(R.chk.map(c=>[c.mi,c]));
+  const ord=g.mem.map((m,i)=>({m,i,d:view==="x"?(ns[m.a].y+ns[m.b].y):(ns[m.a].x+ns[m.b].x)})).sort((a,b)=>a.d-b.d);  // 뒤쪽 먼저
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="부재 이용률 (${view==="x"?"정면":"측면"})">`;
+  s+=`<line x1="10" y1="${Y(R.P.sbDL)}" x2="${W-10}" y2="${Y(R.P.sbDL)}" stroke="var(--soil-line,#8a6d3b)" stroke-width="1"/><line x1="10" y1="${Y(R.P.hwl)}" x2="${W-10}" y2="${Y(R.P.hwl)}" stroke="var(--water-line)" stroke-width=".8" stroke-dasharray="4 3"/>`;
+  ord.forEach(({m,i})=>{ const A=ns[m.a],B=ns[m.b], c=um.get(i);
+    if(m.rigid) s+=`<line x1="${X(A[ax])}" y1="${Y(A.z)}" x2="${X(B[ax])}" y2="${Y(B.z)}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 2"/>`;
+    else s+=`<line x1="${X(A[ax])}" y1="${Y(A.z)}" x2="${X(B[ax])}" y2="${Y(B.z)}" stroke="${c?ucol(c.u):"var(--muted)"}" stroke-width="${Math.max(1.6,m.D*sc*0.55)}" stroke-linecap="round"><title>${c?`${({leg:"다리",brace:"X 브레이스",mud:"하단 수평재",hz:"수평재"})[m.grp]||m.grp} ${ns[m.a].tag}→${ns[m.b].tag} 이용률 ${isFinite(c.u)?c.u.toFixed(2):"∞"} (${c.lc})`:""}</title></line>`; });
+  const w=R.chk.reduce((a,b)=>b.u>a.u?b:a), A=ns[w.a],B=ns[w.b], mx=(X(A[ax])+X(B[ax]))/2, my=(Y(A.z)+Y(B.z))/2;
+  s+=`<circle cx="${mx}" cy="${my}" r="6" fill="none" stroke="var(--ink)" stroke-width="1.2"/><text x="${mx+8}" y="${my-6}" font-size="9.5" fill="var(--ink)" font-family="var(--f-num)">최대 ${isFinite(w.u)?w.u.toFixed(2):"∞"}</text>`;
+  return s+`<text x="${W/2}" y="${H-5}" font-size="9.5" fill="var(--muted)" text-anchor="middle">${view==="x"?"정면 (x–z)":"측면 (y–z)"} · 앞쪽 부재가 위에 그려짐</text></svg>`;
+}
+function htmlJkStress(){
+  const P=R.P, g=R.g, lcs=R.LC.filter(l=>l.kind!=="SLS"), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm]));
+  let h=`<h2>1. 부재 이용률 분포 (NORSOK N-004, 폭풍·지진 중 큰 값)</h2>
+  <div class="legend" style="margin:4px 0 0">${UCAT.map(c=>`<span><i style="background:${c[1]}"></i>${c[2]}</span>`).join("")}<span><i style="background:var(--muted)"></i>TP 강체 연결</span></div>
+  <div class="plots"><div class="sheet">${jkUtilSVG("x")}</div><div class="sheet">${jkUtilSVG("y")}</div></div>
+  <p class="note">선 굵기는 부재 직경에 비례합니다. 부재에 마우스를 올리면 이용률과 지배 조합이 보입니다. 접합부 펀칭 전단·피로는 포함하지 않았습니다.</p>`;
+  // 다리 높이별
+  const LEGC=["#1f7fb8","#c2552e","#2f8f6b","#7b4fb0"];
+  const legSeries=(l,key)=>{ const out=[]; for(let k=0;k<g.nL;k++){ const z=[],v=[]; for(let i=0;i<g.n;i++){ const a=g.legNode[k][i], b=g.legNode[k][i+1], mi=g.mem.findIndex(m=>m.a===a&&m.b===b&&m.grp==="leg"), f=l.mf[mi];
+        z.push(g.nodes[a].z,g.nodes[b].z); if(key==="N") v.push(f.N,f.N); else v.push(f.Ma,f.Mb); }
+      out.push({c:LEGC[k],v,z}); } return out; };
+  const gov=lcs.reduce((a,b)=>Math.max(...b.R.map(r=>Math.abs(r.Vc)))>Math.max(...a.R.map(r=>Math.abs(r.Vc)))?b:a,lcs[0]);
+  const marks=[[P.hwl,"설계조위","var(--water-line)"],[P.sbDL,"해저면","var(--soil-line,#8a6d3b)"]];
+  h+=`<h2>2. 다리 높이별 축력·휨모멘트 (${gov.id} ${nm[gov.id]})</h2>
+  <div class="legend" style="margin:4px 0 0">${[...Array(g.nL)].map((_,k)=>`<span><i style="background:${LEGC[k]}"></i>다리 L${k+1}</span>`).join("")}</div>
+  <div class="plots"><div class="sheet">${heightSVG(legSeries(gov,"N"),[0],"축력 N (인장 +)","kN",marks,true,0)}</div><div class="sheet">${heightSVG(legSeries(gov,"M"),[0],"휨모멘트 M","kN·m",marks,true,0)}</div></div>
+  <p class="note">지배 조합은 다리 반력이 가장 큰 조합입니다. 축력은 칸(부재)마다 일정하게, 휨모멘트는 부재 양 끝 값을 이어 그렸습니다. 값이 같은 다리는 선이 겹쳐 하나로 보입니다(하중 방향에 대칭인 다리).</p>`;
+  // 브레이스 칸별
+  h+=`<h2>3. X 브레이스 칸별 최대 축력</h2><div class="tblwrap"><table class="t"><thead><tr><th>칸</th><th>표고</th>${lcs.map(l=>`<th>${l.id} 압축 최대 (kN)</th><th>${l.id} 인장 최대 (kN)</th>`).join("")}<th>이용률 최대</th></tr></thead><tbody>`;
+  for(let i=0;i<g.n;i++){ const z0=g.lev[i], z1=g.lev[i+1], mis=g.mem.map((m,mi)=>({m,mi})).filter(({m})=>m.grp==="brace"&&Math.min(g.nodes[m.a].z,g.nodes[m.b].z)>=z0-1e-6&&Math.max(g.nodes[m.a].z,g.nodes[m.b].z)<=z1+1e-6);
+    const um=Math.max(...mis.map(({mi})=>{ const c=R.chk.find(c=>c.mi===mi); return c?c.u:0; }));
+    h+=`<tr><td class="n">${i+1}</td><td class="n">${dlS(z0)} ~ ${dlS(z1)}</td>${lcs.map(l=>{ const Ns=mis.map(({mi})=>l.mf[mi].N); return `<td class="n">${fx(Math.min(0,...Ns),0)}</td><td class="n">${fx(Math.max(0,...Ns),0)}</td>`; }).join("")}<td class="n" style="color:${ucol(um)}">${isFinite(um)?um.toFixed(2):"∞"}</td></tr>`; }
+  h+=`</tbody></table></div>`;
+  // 말뚝
+  const Y=R.pile, L=Y.lat, sp=Y.sp;
+  h+=`<h2>4. 말뚝 깊이별 분포 (${Y.gov.id}, 말뚝 머리 = ${Y.prot?"해저면":"세굴면"})</h2>
+  <div class="plots"><div class="sheet">${depthSVG([{x:L.x,v:L.w.map(v=>v*1000),c:LCC[1]}],sp.Le,"변위","mm")}</div><div class="sheet">${depthSVG([{x:L.x,v:L.Mz,c:LCC[1]}],sp.Le,"휨모멘트","kN·m")}</div><div class="sheet">${depthSVG([{x:L.x,v:L.p,c:LCC[1]}],sp.Le,"지반반력 p","kN/m")}</div></div>`;
+  return h;
 }
 
 /* ---------- 시작 ---------- */

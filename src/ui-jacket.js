@@ -11,6 +11,7 @@ function renderJacketTab(t){
   else if(t==="qty") $("repQty").innerHTML=htmlJkQty();
   else if(t==="mchk") $("repMchk").innerHTML=htmlJkChk();
   else if(t==="mpy"){ if(!$("soilEd").innerHTML) drawSoil(); $("repMpy").innerHTML=htmlJkPile(); }
+  else if(t==="strs") $("repStr").innerHTML=htmlJkStress();
   else if(t==="calc") $("report").innerHTML=htmlJkReport();
 }
 function renderJacketSummary(){
@@ -278,4 +279,51 @@ function makeXlsxJacket(){
   add("말뚝",[["조합","최대 압축","최대 인발","수평","모멘트"],...R.pile.rows.map(r=>[r.id,r2(r.comp),r2(r.ten),r2(r.H),r2(r.M)]),[],["압축 Q (kN)",r2(R.pile.ax.Q)],["인발 Qt (kN)",r2(R.pile.Qt)],["수평 해저면 변위 (mm)",r2(R.pile.lat.w0*1000)]]);
   add("수량",[["공종","수량","단위"],...Object.entries(q.grpW).map(([k,v])=>["강관 "+(GRPN[k]||k),r2(v/G),"t"]),["자켓 강재 소계",r2(q.Wst/G),"t"],["TP",r2(P.jWtp/G),"t"],["2차 부재",r2(P.jWsec/G),"t"],["말뚝",r2(q.Wpile/G),"t"],["세굴방지공",r2(q.Vsc),"m³"],[],["점용 면적",r2(q.Aocc),"m²"],["굴착·천공량",0,"m³"]],[24,12,6]);
   return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+/* ---------- 응력분포도 (자켓): 부재 이용률 분포, 다리 높이별 축력·휨모멘트, 브레이스 축력, 말뚝 ---------- */
+const UCAT=[[0.5,"#2f8f6b","≤ 0.5"],[0.8,"#b8a200","0.5 ~ 0.8"],[1.0,"#d9822b","0.8 ~ 1.0"],[1e9,"#c23b2e","> 1.0 (N.G)"]];
+const ucol=u=>UCAT.find(c=>u<=c[0])[1];
+function jkUtilSVG(view){
+  const g=R.g, W=330,H=360, ax=view==="x"?"x":"y", ns=g.nodes, xs=ns.map(n=>n[ax]), zs=ns.map(n=>n.z), x0=Math.min(...xs), x1=Math.max(...xs), z0=Math.min(...zs), z1=Math.max(...zs);
+  const sc=Math.min((W-40)/(x1-x0||1),(H-40)/(z1-z0||1)), X=v=>W/2+(v-(x0+x1)/2)*sc, Y=v=>H-20-(v-z0)*sc;
+  const um=new Map(R.chk.map(c=>[c.mi,c]));
+  const ord=g.mem.map((m,i)=>({m,i,d:view==="x"?(ns[m.a].y+ns[m.b].y):(ns[m.a].x+ns[m.b].x)})).sort((a,b)=>a.d-b.d);  // 뒤쪽 먼저
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="부재 이용률 (${view==="x"?"정면":"측면"})">`;
+  s+=`<line x1="10" y1="${Y(R.P.sbDL)}" x2="${W-10}" y2="${Y(R.P.sbDL)}" stroke="var(--soil-line,#8a6d3b)" stroke-width="1"/><line x1="10" y1="${Y(R.P.hwl)}" x2="${W-10}" y2="${Y(R.P.hwl)}" stroke="var(--water-line)" stroke-width=".8" stroke-dasharray="4 3"/>`;
+  ord.forEach(({m,i})=>{ const A=ns[m.a],B=ns[m.b], c=um.get(i);
+    if(m.rigid) s+=`<line x1="${X(A[ax])}" y1="${Y(A.z)}" x2="${X(B[ax])}" y2="${Y(B.z)}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 2"/>`;
+    else s+=`<line x1="${X(A[ax])}" y1="${Y(A.z)}" x2="${X(B[ax])}" y2="${Y(B.z)}" stroke="${c?ucol(c.u):"var(--muted)"}" stroke-width="${Math.max(1.6,m.D*sc*0.55)}" stroke-linecap="round"><title>${c?`${({leg:"다리",brace:"X 브레이스",mud:"하단 수평재",hz:"수평재"})[m.grp]||m.grp} ${ns[m.a].tag}→${ns[m.b].tag} 이용률 ${isFinite(c.u)?c.u.toFixed(2):"∞"} (${c.lc})`:""}</title></line>`; });
+  const w=R.chk.reduce((a,b)=>b.u>a.u?b:a), A=ns[w.a],B=ns[w.b], mx=(X(A[ax])+X(B[ax]))/2, my=(Y(A.z)+Y(B.z))/2;
+  s+=`<circle cx="${mx}" cy="${my}" r="6" fill="none" stroke="var(--ink)" stroke-width="1.2"/><text x="${mx+8}" y="${my-6}" font-size="9.5" fill="var(--ink)" font-family="var(--f-num)">최대 ${isFinite(w.u)?w.u.toFixed(2):"∞"}</text>`;
+  return s+`<text x="${W/2}" y="${H-5}" font-size="9.5" fill="var(--muted)" text-anchor="middle">${view==="x"?"정면 (x–z)":"측면 (y–z)"} · 앞쪽 부재가 위에 그려짐</text></svg>`;
+}
+function htmlJkStress(){
+  const P=R.P, g=R.g, lcs=R.LC.filter(l=>l.kind!=="SLS"), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm]));
+  let h=`<h2>1. 부재 이용률 분포 (NORSOK N-004, 폭풍·지진 중 큰 값)</h2>
+  <div class="legend" style="margin:4px 0 0">${UCAT.map(c=>`<span><i style="background:${c[1]}"></i>${c[2]}</span>`).join("")}<span><i style="background:var(--muted)"></i>TP 강체 연결</span></div>
+  <div class="plots"><div class="sheet">${jkUtilSVG("x")}</div><div class="sheet">${jkUtilSVG("y")}</div></div>
+  <p class="note">선 굵기는 부재 직경에 비례합니다. 부재에 마우스를 올리면 이용률과 지배 조합이 보입니다. 접합부 펀칭 전단·피로는 포함하지 않았습니다.</p>`;
+  // 다리 높이별
+  const LEGC=["#1f7fb8","#c2552e","#2f8f6b","#7b4fb0"];
+  const legSeries=(l,key)=>{ const out=[]; for(let k=0;k<g.nL;k++){ const z=[],v=[]; for(let i=0;i<g.n;i++){ const a=g.legNode[k][i], b=g.legNode[k][i+1], mi=g.mem.findIndex(m=>m.a===a&&m.b===b&&m.grp==="leg"), f=l.mf[mi];
+        z.push(g.nodes[a].z,g.nodes[b].z); if(key==="N") v.push(f.N,f.N); else v.push(f.Ma,f.Mb); }
+      out.push({c:LEGC[k],v,z}); } return out; };
+  const gov=lcs.reduce((a,b)=>Math.max(...b.R.map(r=>Math.abs(r.Vc)))>Math.max(...a.R.map(r=>Math.abs(r.Vc)))?b:a,lcs[0]);
+  const marks=[[P.hwl,"설계조위","var(--water-line)"],[P.sbDL,"해저면","var(--soil-line,#8a6d3b)"]];
+  h+=`<h2>2. 다리 높이별 축력·휨모멘트 (${gov.id} ${nm[gov.id]})</h2>
+  <div class="legend" style="margin:4px 0 0">${[...Array(g.nL)].map((_,k)=>`<span><i style="background:${LEGC[k]}"></i>다리 L${k+1}</span>`).join("")}</div>
+  <div class="plots"><div class="sheet">${heightSVG(legSeries(gov,"N"),[0],"축력 N (인장 +)","kN",marks,true,0)}</div><div class="sheet">${heightSVG(legSeries(gov,"M"),[0],"휨모멘트 M","kN·m",marks,true,0)}</div></div>
+  <p class="note">지배 조합은 다리 반력이 가장 큰 조합입니다. 축력은 칸(부재)마다 일정하게, 휨모멘트는 부재 양 끝 값을 이어 그렸습니다. 값이 같은 다리는 선이 겹쳐 하나로 보입니다(하중 방향에 대칭인 다리).</p>`;
+  // 브레이스 칸별
+  h+=`<h2>3. X 브레이스 칸별 최대 축력</h2><div class="tblwrap"><table class="t"><thead><tr><th>칸</th><th>표고</th>${lcs.map(l=>`<th>${l.id} 압축 최대 (kN)</th><th>${l.id} 인장 최대 (kN)</th>`).join("")}<th>이용률 최대</th></tr></thead><tbody>`;
+  for(let i=0;i<g.n;i++){ const z0=g.lev[i], z1=g.lev[i+1], mis=g.mem.map((m,mi)=>({m,mi})).filter(({m})=>m.grp==="brace"&&Math.min(g.nodes[m.a].z,g.nodes[m.b].z)>=z0-1e-6&&Math.max(g.nodes[m.a].z,g.nodes[m.b].z)<=z1+1e-6);
+    const um=Math.max(...mis.map(({mi})=>{ const c=R.chk.find(c=>c.mi===mi); return c?c.u:0; }));
+    h+=`<tr><td class="n">${i+1}</td><td class="n">${dlS(z0)} ~ ${dlS(z1)}</td>${lcs.map(l=>{ const Ns=mis.map(({mi})=>l.mf[mi].N); return `<td class="n">${fx(Math.min(0,...Ns),0)}</td><td class="n">${fx(Math.max(0,...Ns),0)}</td>`; }).join("")}<td class="n" style="color:${ucol(um)}">${isFinite(um)?um.toFixed(2):"∞"}</td></tr>`; }
+  h+=`</tbody></table></div>`;
+  // 말뚝
+  const Y=R.pile, L=Y.lat, sp=Y.sp;
+  h+=`<h2>4. 말뚝 깊이별 분포 (${Y.gov.id}, 말뚝 머리 = ${Y.prot?"해저면":"세굴면"})</h2>
+  <div class="plots"><div class="sheet">${depthSVG([{x:L.x,v:L.w.map(v=>v*1000),c:LCC[1]}],sp.Le,"변위","mm")}</div><div class="sheet">${depthSVG([{x:L.x,v:L.Mz,c:LCC[1]}],sp.Le,"휨모멘트","kN·m")}</div><div class="sheet">${depthSVG([{x:L.x,v:L.p,c:LCC[1]}],sp.Le,"지반반력 p","kN/m")}</div></div>`;
+  return h;
 }
