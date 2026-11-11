@@ -2424,15 +2424,19 @@ const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" 
   LINE:`fill="none" stroke="var(--conc-line)" stroke-width=".08"`,HID:`fill="none" stroke="var(--conc-line)" stroke-width=".06" stroke-dasharray=".7 .35"`,
   SHT:`fill="none" stroke="#222" stroke-width=".1"`,STEEL:`fill="var(--steel)" stroke="var(--conc-line)" stroke-width=".05" stroke-linejoin="round"`,ROCK:`fill="var(--rock)" opacity=".7"`,PLUG:`fill="var(--soil)" opacity=".3"`,SHC:`fill="#f4f6f6" stroke="#999" stroke-width=".05"`};
 const SC={RB:"#c23b2e",RBD:"#c23b2e",SHT:"#222",STX:"#222",SDM:"#1d5e88",SMU:"#5b6970",WL:"var(--water-line)",TXT:"var(--ink)",DIM:"var(--dim)",MUT:"var(--muted)",CEN:"var(--muted)",LINE:"var(--conc-line)",HID:"var(--conc-line)",CONC:"var(--conc-line)"};
+/* 흑백 도면용 (일반도 A3): 채움 없이 검은 선·글자 */
+const K="#222", SVM={CONC:`fill="#fff" stroke="${K}" stroke-width=".07" stroke-linejoin="round"`,GROUT:`fill="#fff" stroke="${K}" stroke-width=".06"`,RAD:`fill="none" stroke="${K}" stroke-width=".06" stroke-dasharray=".6 .35"`,
+  LINE:`fill="none" stroke="${K}" stroke-width=".08"`,HID:`fill="none" stroke="${K}" stroke-width=".06" stroke-dasharray=".7 .35"`,SHT:`fill="none" stroke="${K}" stroke-width=".1"`};
+const SCM=new Proxy({},{get:()=>K});
 function primsSVG(pr,label){
-  const Y=z=>-z, [x0,z0,x1,z1]=pr.box, out=[];
+  const Y=z=>-z, [x0,z0,x1,z1]=pr.box, out=[], sv=pr.mono?SVM:SV, sc=pr.mono?SCM:SC;
   pr.o.forEach(p=>{
-    if(p.t==="poly") out.push(`<${p.open?"polyline":"polygon"} points="${p.pts.map(q=>`${q[0].toFixed(3)},${Y(q[1]).toFixed(3)}`).join(" ")}" ${p.open?`fill="none" stroke="${SC[p.L]||"#222"}" stroke-width="${p.w||.07}" stroke-linejoin="round"`:(SV[p.L]||SV.LINE)}${p.w&&!p.open?` stroke-width="${p.w}"`:""}/>`);
-    else if(p.t==="circle") out.push(`<circle cx="${p.x}" cy="${Y(p.z)}" r="${p.r}" ${p.fill?`fill="var(--${p.fc||"conc"})" opacity="${p.op||.5}"`:'fill="none"'} ${p.fill?"":(SV[p.L]||SV.LINE).replace('fill="none"',"")}/>`);
-    else if(p.t==="line") out.push(`<line x1="${p.x1}" y1="${Y(p.z1)}" x2="${p.x2}" y2="${Y(p.z2)}" stroke="${SC[p.L]||"var(--ink)"}" stroke-width="${p.w||(p.L==="DIM"?.06:p.L==="CEN"?.05:.07)}" ${p.L==="CEN"?'stroke-dasharray="1.6 .5 .3 .5"':p.dash||p.L==="HID"?'stroke-dasharray=".8 .4"':""}/>`);
-    else if(p.t==="dot") out.push(`<circle cx="${p.x.toFixed(3)}" cy="${Y(p.z).toFixed(3)}" r="${p.r}" fill="${SC[p.L]||"#c23b2e"}"/>`);
-    else if(p.t==="tri") out.push(`<path d="M${p.x} ${Y(p.z)} l${-p.s*.7} ${-p.s} h${p.s*1.4}z" fill="${SC[p.L]}"/>`);
-    else if(p.t==="text"){ const y=Y(p.z); out.push(`<text x="${p.x}" y="${y}" font-size="${p.h}" fill="${SC[p.L]||"var(--ink)"}" ${p.num?'font-family="var(--f-num)"':""} ${p.anchor?`text-anchor="${p.anchor}"`:""} ${p.rot?`transform="rotate(-90 ${p.x} ${y})"`:""} ${p.key?`data-k="${p.key}" tabindex="0"`:""}>${esc(p.s)}</text>`); }
+    if(p.t==="poly") out.push(`<${p.open?"polyline":"polygon"} points="${p.pts.map(q=>`${q[0].toFixed(3)},${Y(q[1]).toFixed(3)}`).join(" ")}" ${p.open?`fill="none" stroke="${sc[p.L]||"#222"}" stroke-width="${p.w||.07}" stroke-linejoin="round"`:(sv[p.L]||sv.LINE)}${p.w&&!p.open?` stroke-width="${p.w}"`:""}/>`);
+    else if(p.t==="circle") out.push(`<circle cx="${p.x}" cy="${Y(p.z)}" r="${p.r}" ${p.fill?(pr.mono?`fill="none" stroke="${K}" stroke-width=".08"`:`fill="var(--${p.fc||"conc"})" opacity="${p.op||.5}"`):'fill="none"'} ${p.fill?"":(sv[p.L]||sv.LINE).replace('fill="none"',"")}/>`);
+    else if(p.t==="line") out.push(`<line x1="${p.x1}" y1="${Y(p.z1)}" x2="${p.x2}" y2="${Y(p.z2)}" stroke="${sc[p.L]||"var(--ink)"}" stroke-width="${p.w||(p.L==="DIM"?.06:p.L==="CEN"?.05:.07)}" ${p.L==="CEN"?'stroke-dasharray="1.6 .5 .3 .5"':p.dash||p.L==="HID"?'stroke-dasharray=".8 .4"':""}/>`);
+    else if(p.t==="dot") out.push(`<circle cx="${p.x.toFixed(3)}" cy="${Y(p.z).toFixed(3)}" r="${p.r}" fill="${sc[p.L]||"#c23b2e"}"/>`);
+    else if(p.t==="tri") out.push(`<path d="M${p.x} ${Y(p.z)} l${-p.s*.7} ${-p.s} h${p.s*1.4}z" fill="${sc[p.L]}"/>`);
+    else if(p.t==="text"){ const y=Y(p.z); out.push(`<text x="${p.x}" y="${y}" font-size="${p.h}" fill="${sc[p.L]||"var(--ink)"}" ${p.num?'font-family="var(--f-num)"':""} ${p.anchor?`text-anchor="${p.anchor}"`:""} ${p.rot?`transform="rotate(-90 ${p.x} ${y})"`:""} ${p.key?`data-k="${p.key}" tabindex="0"`:""}>${esc(p.s)}</text>`); }
   });
   return `<svg viewBox="${x0} ${-z1} ${x1-x0} ${z1-z0}" role="img" aria-label="${label}" style="font-family:var(--f-ui)">${pr.bg?`<rect x="${x0}" y="${-z1}" width="${x1-x0}" height="${z1-z0}" fill="#fff"/>`:""}${out.join("")}</svg>`;
 }
@@ -3190,7 +3194,8 @@ function genSheetPrims(R){
   o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:k*.2}); o.push({t:"poly",L:"SHT",pts:[[10*k,10*k],[W-10*k,10*k],[W-10*k,H-10*k],[10*k,H-10*k]],w:k*.5});
   // 정면 단면도 (왼쪽)
   const dx=14*k-sx0, dz=H-22*k-sz1;
-  o.push(...mapPrims(sp.o,1,dx,dz));
+  const mono=sp.o.filter(p=>!(p.t==="poly"&&(p.L==="WATER"||p.L==="FILL"))).map(p=>p.t==="poly"&&p.L==="SOIL"?{t:"poly",open:1,L:"SHT",pts:p.pts.slice(1,-1),w:.12}:p);
+  o.push(...mapPrims(mono,1,dx,dz));
   o.push({t:"text",L:"STX",x:14*k,z:H-15*k,h:3.4*k,s:`정면 단면도   S = 1 : ${sc}`});
   // 평면도 (오른쪽 위)
   const pp=planPrims(R), [px0,pz0,px1,pz1]=pp.box;
@@ -3221,7 +3226,7 @@ function genSheetPrims(R){
   T(tx+2*k,ty+16*k,"도면명"); T(tx+42*k,ty+16*k,"해상풍력발전기 기초 일반도 (중력식)",3.6);
   T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (단면도), 1 : ${scP} (평면도)    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
   const over=z<ty+thh+3*k;
-  return {o,box:[0,0,W,H],sc,scP,bg:1,over};
+  return {o,box:[0,0,W,H],sc,scP,bg:1,over,mono:1};
 }
 function drawGenSheet(){ const pr=genSheetPrims(R); $("svgGen").innerHTML=primsSVG(pr,"일반도"); $("genNote").textContent=`A3 도면, 단면도 1:${pr.sc}, 평면도 1:${pr.scP}${pr.over?" · 주기가 길어 표제란과 겹칩니다":""}`; }
 function drawRebarSheet(){
