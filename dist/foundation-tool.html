@@ -2746,15 +2746,45 @@ function pressSVG(l){
   return g+`<text x="${W/2}" y="${H-6}" font-size="9" fill="var(--muted)" text-anchor="middle">단위 kPa · 실선 = 검토에 쓴 분포${l.noGap?"":", 점선 = 선형 분포(참고)"}</text></svg>`;
 }
 /* 보 모멘트 분포 (x: 0~L, 값 배열) */
-function beamSVG(xs,ms,xlab,lab,marks){
-  const W=300,H=180,ml=46,mr=12,mt=14,mb=34; let lo=Math.min(0,...ms),hi=Math.max(0,...ms); const pd=(hi-lo)*0.08||1; lo-=pd; hi+=pd;
+function beamSVG(xs,ms,xlab,lab,marks,ends){
+  const W=300,H=190,ml=46,mr=12,mt=14,mb=44; let lo=Math.min(0,...ms),hi=Math.max(0,...ms); const pd=(hi-lo)*0.08||1; lo-=pd; hi+=pd;
   const L=xs[xs.length-1], X=x=>ml+(W-ml-mr)*x/L, Y=v=>mt+(H-mt-mb)*(hi-v)/(hi-lo);
   let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lab}">`;
   niceTk(lo,hi,4).forEach(v=>g+=`<line x1="${ml}" y1="${Y(v)}" x2="${W-mr}" y2="${Y(v)}" stroke="var(--line)" stroke-width="${v===0?1.1:.5}"/><text x="${ml-4}" y="${Y(v)+3}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="var(--f-num)">${fx(v,0)}</text>`);
   niceTk(0,L,5).forEach(v=>g+=`<text x="${X(v)}" y="${H-mb+12}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--f-num)">${v}</text>`);
   g+=`<polygon points="${X(0)},${Y(0)} ${xs.map((x,i)=>`${X(x).toFixed(1)},${Y(ms[i]).toFixed(1)}`).join(" ")} ${X(L)},${Y(0)}" fill="var(--l-wave)" fill-opacity=".15" stroke="var(--l-wave)" stroke-width="1.5"/>`;
   (marks||[]).forEach(([x,v,t])=>g+=`<circle cx="${X(x)}" cy="${Y(v)}" r="2.2" fill="var(--ink)"/><text x="${Math.min(X(x)+4,W-mr-60)}" y="${Y(v)+(v>=0?-4:11)}" font-size="9" fill="var(--ink)" font-family="var(--f-num)">${t}</text>`);
-  return g+`<text x="${(ml+W-mr)/2}" y="${H-6}" font-size="10" fill="var(--ink)" text-anchor="middle">${xlab}</text><text x="11" y="${(mt+H-mb)/2}" font-size="10" fill="var(--ink)" transform="rotate(-90 11 ${(mt+H-mb)/2})" text-anchor="middle">M (kN·m/m)</text></svg>`;
+  if(ends) g+=`<text x="${X(0)}" y="${H-mb+22}" font-size="8.5" fill="var(--accent,#1f7fb8)" text-anchor="start">◀ ${ends[0]}</text><text x="${X(L)}" y="${H-mb+22}" font-size="8.5" fill="var(--accent,#1f7fb8)" text-anchor="end">${ends[1]} ▶</text>`;
+  return g+`<text x="${(ml+W-mr)/2}" y="${H-4}" font-size="10" fill="var(--ink)" text-anchor="middle">${xlab}</text><text x="11" y="${(mt+H-mb)/2}" font-size="10" fill="var(--ink)" transform="rotate(-90 11 ${(mt+H-mb)/2})" text-anchor="middle">M (kN·m/m)</text></svg>`;
+}
+/* 위치 안내 그림: 오른쪽 반단면에 해당 부재를 칠하고 x 방향 화살표 (kind: slab | wall | cone | plan) */
+function keySVG(kind){
+  const P=R.P, cais=P.type==="caisson", Rb=R.Rbase, S=R.S, ro=S.hex?S.hex.flats/2:R.rso, ri=S.hex?S.hex.flats/2-P.hth:R.rsi, A="var(--l-wave)";
+  const tb=cais?P.cts:P.tb, Rw=cais?P.cDw/2:P.Dw/2, tw=cais?P.ctw:P.tw, Rwi=Rw-tw, z1=cais?P.cH:P.tb+P.hw, z2=R.z2;
+  if(kind==="plan"){ const n=Math.round(P.cnr), W=300,H=150, sc=(H-24)/(2*Rw), cx=W/2, cy=H/2, X=x=>cx+x*sc, Y=y=>cy-y*sc, ph=PI/n;
+    let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="저판 경간 위치 (평면)"><circle cx="${cx}" cy="${cy}" r="${Rw*sc}" fill="none" stroke="var(--muted)"/><circle cx="${cx}" cy="${cy}" r="${Rwi*sc}" fill="none" stroke="var(--muted)" stroke-width=".6"/><circle cx="${cx}" cy="${cy}" r="${ro*sc}" fill="none" stroke="var(--muted)"/>`;
+    for(let i=0;i<n;i++){ const a=2*PI*i/n+ph; g+=`<line x1="${X(ro*Math.cos(a))}" y1="${Y(ro*Math.sin(a))}" x2="${X(Rwi*Math.cos(a))}" y2="${Y(Rwi*Math.sin(a))}" stroke="var(--muted)" stroke-width="${P.ctr*sc}"/>`; }
+    const a0=-ph, a1=ph, arc=(r,a,b)=>`M${X(r*Math.cos(a))} ${Y(r*Math.sin(a))} A${r*sc} ${r*sc} 0 0 0 ${X(r*Math.cos(b))} ${Y(r*Math.sin(b))}`;
+    g+=`<path d="${arc(Rwi,a0,a1)} L${X(ro*Math.cos(a1))} ${Y(ro*Math.sin(a1))} A${ro*sc} ${ro*sc} 0 0 1 ${X(ro*Math.cos(a0))} ${Y(ro*Math.sin(a0))} Z" fill="${A}" fill-opacity=".3" stroke="${A}"/>`;
+    const r2=Rwi-0.8; g+=`<path d="${arc(r2,a0,a1)}" fill="none" stroke="${A}" stroke-width="1.6" marker-end="url(#ah)"/><defs><marker id="ah" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${A}"/></marker></defs>`;
+    g+=`<text x="${X(Rwi)+6}" y="${cy+3}" font-size="9" fill="var(--ink)">격벽 사이 (외벽 쪽)</text><text x="6" y="${H-6}" font-size="9" fill="var(--muted)">평면 · 칠한 칸 = 저판 한 칸, 화살표 = x 방향</text></svg>`;
+    return g; }
+  const zTop=kind==="cone"?z2+2:Math.max(z1+1.5,tb+Rb*0.32), W=300, H=130, sc=Math.min((W-20)/Rb,(H-22)/zTop), X=x=>10+x*sc, Y=z=>H-14-z*sc;
+  const poly=(pts,hl)=>`<polygon points="${pts.map(([x,z])=>`${X(x).toFixed(1)},${Y(z).toFixed(1)}`).join(" ")}" fill="${hl?A:"var(--conc)"}" fill-opacity="${hl?.55:.6}" stroke="${hl?A:"var(--conc-line)"}" stroke-width="${hl?1.4:.7}"/>`;
+  let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${kind} 위치"><defs><marker id="ah2" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${A}"/></marker></defs>`;
+  const slabHL=kind==="slab";
+  g+=poly([[0,0],[Rb,0],[Rb,tb],[0,tb]],false);
+  if(slabHL) g+=poly([[ro,0],[Rwi,0],[Rwi,tb],[ro,tb]],true);
+  g+=poly([[Rwi,tb],[Rw,tb],[Rw,z1],[Rwi,z1]],kind==="wall");
+  if(!cais) g+=poly([[Rw-P.tkh,z1],[Rw,z1],[P.Dt/2,z2],[P.Dt/2-P.tkh,z2]],kind==="cone"); else g+=poly([[ro,P.cH-P.ctt],[Rwi,P.cH-P.ctt],[Rwi,P.cH],[ro,P.cH]],false);
+  g+=poly([[ri,P.zc0],[ro,P.zc0],[ro,zTop],[ri,zTop]],false);
+  g+=`<line x1="${X(0)}" y1="${Y(-0.5)}" x2="${X(0)}" y2="${Y(zTop)}" stroke="var(--muted)" stroke-dasharray="4 2 1 2" stroke-width=".7"/>`;
+  const arr=(x1,z1_,x2,z2_)=>`<line x1="${X(x1)}" y1="${Y(z1_)}" x2="${X(x2)}" y2="${Y(z2_)}" stroke="${A}" stroke-width="1.6" marker-end="url(#ah2)"/>`;
+  const za=tb+8/sc;
+  if(kind==="slab"){ g+=arr(ro,za,Rwi,za); g+=`<text x="${X(ro)}" y="${Y(0)+10}" font-size="8.5" fill="var(--ink)">▲ x = 0 (기둥 외면)</text><text x="${X(Rwi)-2}" y="${Y(za)-5}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = L (벽체 내면)</text>`; }
+  if(kind==="wall"){ const xx=Rwi-8/sc, zw=cais?P.cH-P.ctt:z1; g+=arr(xx,tb,xx,zw); g+=`<text x="${X(xx)-5}" y="${Y(tb)-4}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = 0 (저판 상면)</text><text x="${X(xx)-5}" y="${Y(zw)+11}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = ${fx(zw-tb,2)} m (${cais?"상판 하면":"벽 상단"})</text>`; }
+  if(kind==="cone"){ const dxn=-8/sc; g+=arr(Rw-P.tkh+dxn,z1,P.Dt/2-P.tkh+dxn,z2); g+=`<text x="${X(Rw)+4}" y="${Y(z1)+3}" font-size="8.5" fill="var(--ink)">x = 0 (원추 하단)</text><text x="${X(P.Dt/2)+6}" y="${Y(z2)+3}" font-size="8.5" fill="var(--ink)">x = 끝 (원추 상단)</text>`; }
+  return g+`<text x="${W-6}" y="10" font-size="8.5" fill="var(--muted)" text-anchor="end">오른쪽 반단면 · 칠한 부재, 화살표 = x 방향</text></svg>`;
 }
 function htmlStress(){
   const P=R.P, C=R.colD, ids=["LC1","LC2","LC3","LC4"], F=memberForces(R), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm]));
@@ -2772,14 +2802,18 @@ function htmlStress(){
   h+=`<h2>2. 지반반력 분포 (저판 하면)</h2><p class="note">e = M/V. e ≤ R/4(핵 안)이면 q = V/A ± M/Z 사다리꼴, 핵 밖이면 들림이 생겨 유효 면적 A' 위 균등 q<sub>eff</sub> = V/A' (DNV-ST-0126)로 검토합니다. 빨간 점선은 허용지지력(가정값).</p>
   <div class="plots">${R.LC.map(l=>`<div class="sheet"><div class="cap">${l.id} ${l.nm}</div>${pressSVG(l)}</div>`).join("")}</div>`;
   // 저판: 1방향 양단고정 (지점 −qL²/12, 중앙 qL²/24), 뒷굽 캔틸레버
-  const sl=F.slab, nx=40, xs=[...Array(nx+1)].map((_,i)=>sl.L*i/nx);
+  const sl=F.slab, nx=40, xs=[...Array(nx+1)].map((_,i)=>sl.L*i/nx), cais=P.type==="caisson", byRad=!(sl.La<sl.Lr);
   const msl=xs.map(x=>sl.qu*(6*sl.L*x-6*x*x-sl.L*sl.L)/12);
-  h+=`<h2>3. 하부 부재 휨모멘트 분포 (계수하중)</h2><p class="note">저판은 기둥과 벽체 사이 1방향 양단고정 보, 벽체·원추는 하단 고정 원통 쉘의 경계 휨(보 이론 근사, 가정)으로 봤습니다. 값은 부재설계 탭과 같습니다.</p><div class="plots">
-  <div class="sheet"><div class="cap">저판 (경간 L = ${fx(sl.L,2)} m, q<sub>u</sub> = ${fx(sl.qu,1)} kPa, ${sl.gov})</div>${beamSVG(xs,msl,"기둥 면에서 거리 (m)","저판 휨모멘트",[[0,-sl.Msup,`지점 −${fx(sl.Msup,0)}`],[sl.L/2,sl.Mmid,`중앙 +${fx(sl.Mmid,0)}`]])}</div>`;
-  const shell=(o,t)=>{ if(!o) return ""; const Lx=Math.min(o.h||4,Math.max(3,4/o.beta)), xs2=[...Array(41)].map((_,i)=>Lx*i/40), m2=xs2.map(x=>o.Mu*Math.exp(-o.beta*x)*(Math.cos(o.beta*x)-Math.sin(o.beta*x)));
-    return `<div class="sheet"><div class="cap">${t} (β = ${fx(o.beta,3)} 1/m, M<sub>u</sub> = ${fx(o.Mu,0)} kN·m/m)</div>${beamSVG(xs2,m2,"하단에서 높이 (m)",t+" 휨모멘트",[[0,o.Mu,`하단 ${fx(o.Mu,0)}`]])}</div>`; };
-  h+=shell(F.wall,P.type==="caisson"?"외벽 연직 방향":"하부 원통 연직 방향")+shell(F.cone,"원추 자오선 방향")+`</div>
-  <p class="note">원통 쉘 경계 휨: M(x) = M<sub>u</sub>·e<sup>−βx</sup>(cos βx − sin βx), β = ⁴√(3(1−ν²)/(r²t²)). 하단에서 멀어질수록 빠르게 줄어 약 π/β 안에서 거의 사라집니다.</p>`;
+  h+=`<h2>3. 하부 부재 휨모멘트 분포 (계수하중)</h2><p class="note">각 그래프 위 그림의 칠한 부재가 그 그래프의 위치이고, 화살표가 가로축(x) 방향입니다. 저판은 양 끝 고정 보, 벽체·원추는 하단 고정 원통 쉘의 경계 휨(근사, 가정)으로 봤습니다. 값은 부재설계 탭과 같습니다.</p><div class="plots">
+  <div class="sheet"><div class="cap">저판 — 경간 L = ${cais?`min(반경 방향 ${fx(sl.Lr,2)}, 격벽 간격 ${fx(sl.La,2)}) = `:""}${fx(sl.L,2)} m${cais?(byRad?" (반경 방향 지배)":" (격벽 간격 지배)"):""}, q<sub>u</sub> = ${fx(sl.qu,1)} kPa (${sl.gov})</div>
+  ${keySVG(byRad?"slab":"plan")}
+  ${beamSVG(xs,msl,byRad?"기둥 외면에서 반경 방향 거리 (m)":"격벽 면에서 원주 방향 거리 (m, 외벽 쪽)","저판 휨모멘트",[[0,-sl.Msup,`지점 −${fx(sl.Msup,0)}`],[sl.L/2,sl.Mmid,`중앙 +${fx(sl.Mmid,0)}`]],byRad?["기둥 외면",cais?"외벽 내면":"원통 내면"]:["격벽","격벽"])}</div>`;
+  const wallH=cais?P.cH-P.cts-P.ctt:P.hw, sl2=(P.Dw-P.Dt)/2/P.hk, coneL=cais?0:P.hk*Math.sqrt(1+sl2*sl2);
+  const shell=(o,t,kind,Lm,xlab,ends)=>{ if(!o) return ""; const xs2=[...Array(41)].map((_,i)=>Lm*i/40), m2=xs2.map(x=>o.Mu*Math.exp(-o.beta*x)*(Math.cos(o.beta*x)-Math.sin(o.beta*x)));
+    return `<div class="sheet"><div class="cap">${t} — 길이 ${fx(Lm,2)} m, β = ${fx(o.beta,3)} 1/m, M<sub>u</sub> = ${fx(o.Mu,0)} kN·m/m</div>${keySVG(kind)}${beamSVG(xs2,m2,xlab,t+" 휨모멘트",[[0,o.Mu,`하단 ${fx(o.Mu,0)}`]],ends)}</div>`; };
+  h+=shell(F.wall,cais?"외벽 (연직 방향)":"하부 원통 벽 (연직 방향)","wall",wallH,"저판 상면에서 높이 (m)",["저판 상면",cais?"외벽 상단(상판)":"원통 상단(원추 시작)"])
+    +shell(F.cone,"원추 벽 (경사 방향)","cone",coneL,"원추 하단에서 경사 길이 (m)",["원추 하단","원추 상단(기둥)"])+`</div>
+  <p class="note">벽체 경계 휨: M(x) = M<sub>u</sub>·e<sup>−βx</sup>(cos βx − sin βx), β = ⁴√(3(1−ν²)/(r²t²)). 하단(저판·원통과 만나는 곳)에서 가장 크고 π/β(= ${fx(PI/F.wall.beta,1)} m) 안에서 거의 사라집니다. 가로축은 실제 부재 길이까지만 그렸습니다.</p>`;
   return h;
 }
 function htmlReport(){
