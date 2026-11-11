@@ -290,6 +290,8 @@ function renderWarns(){
 
 /* ---------- 도면 (SVG·DXF 공용 원시도형) ---------- */
 function wallIn(P,z){ if(P.type==="caisson") return P.cDw/2-P.ctw; const z1=P.tb+P.hw; return z<=z1?P.Dw/2-P.tw:(P.Dw/2+(P.Dt/2-P.Dw/2)*(z-z1)/P.hk-P.tkh); }
+/* 보강 링 목록 (유효한 것만, 번호 ①②…) */
+function ringList(P){ return (P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0).map((r,i)=>({...r,no:String.fromCharCode(0x2460+Math.min(i,19))})); }
 function secPrims(R){
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
@@ -324,7 +326,13 @@ function secPrims(R){
   // 기둥: 육각은 맞변 폭으로 표시
   both([[ci,P.zc0],[cw,P.zc0],[cw,P.ztop],[ci,P.ztop]],"CONC");
   if(P.Dp>0&&P.tp>0) both([[cw,P.ztop-P.tp],[Math.max(P.Dp/2,cw),P.ztop-P.tp],[Math.max(P.Dp/2,cw),P.ztop],[cw,P.ztop]],"CONC");
-  (P.rings||[]).forEach(r=>{ if(r.D>0&&r.t>0&&r.h>0) both([[r.D/2-r.t,r.z],[r.D/2,r.z],[r.D/2,r.z+r.h],[r.D/2-r.t,r.z+r.h]],"CONC"); });
+  const RG=ringList(P);
+  RG.forEach(r=>{ both([[r.D/2-r.t,r.z],[r.D/2,r.z],[r.D/2,r.z+r.h],[r.D/2-r.t,r.z+r.h]],"CONC");
+    o.push({t:"line",L:"DIM",x1:r.D/2,z1:r.z+r.h,x2:r.D/2+1.2,z2:r.z+r.h+1.0});
+    o.push({t:"text",L:"DIM",x:r.D/2+1.3,z:r.z+r.h+1.0,h:fs*.72,s:r.no}); });
+  if(RG.length){ const zl=zHW+fs*(2.6+1.05*RG.length);  // 설계조위 표기 위 빈 곳
+    o.push({t:"text",L:"TXT",x:xL+.3,z:zl,h:fs*.78,s:"보강 링 (외경 × 두께, 높이, 하단 높이)"});
+    RG.forEach((r,i)=>o.push({t:"text",L:"DIM",x:xL+.3,z:zl-fs*(1.1+1.05*i),h:fs*.72,num:1,s:`${r.no} Ø${fx(r.D*1000,0)} × ${fx(r.t*1000,0)}, h ${fx(r.h*1000,0)}, z ${fx(r.z*1000,0)}`})); }
   o.push({t:"line",L:"CEN",x1:0,z1:-P.tg-1.5,x2:0,z2:P.ztop+3});
   // 수위
   const wl=(z,lab,dash)=>{ o.push({t:"line",L:"WL",x1:xL,z1:z,x2:-Rmax-1,z2:z,dash}); o.push({t:"tri",L:"WL",x:xL+3,z,s:0.9}); o.push({t:"text",L:"WL",x:xL+.3,z:z+1.3,h:fs*.85,s:lab}); };
@@ -366,6 +374,12 @@ function planPrims(R){
     o.push({t:"poly",L:"LINE",pts:hx(a)}); o.push({t:"poly",L:"LINE",pts:hx(ai)}); }
   else { o.push({t:"circle",L:"LINE",x:0,z:0,r:P.Dc/2}); o.push({t:"circle",L:"LINE",x:0,z:0,r:P.Dc/2-P.tc}); }
   if(P.Dp>0) o.push({t:"circle",L:"HID",x:0,z:0,r:P.Dp/2});
+  // 보강 링: 저판 위 내부라 숨은선, 번호는 우상 방향
+  const RG=ringList(P);
+  RG.forEach((r,i)=>{ o.push({t:"circle",L:"HID",x:0,z:0,r:r.D/2}); o.push({t:"circle",L:"HID",x:0,z:0,r:r.D/2-r.t});
+    const a=-(62+i*9)*PI/180, rm=r.D/2-r.t/2, px=rm*Math.cos(a), pz=rm*Math.sin(a), tx=R.Rbase*.55+1, tz=-(R.Rbase+1.4+i*fs*1.05);
+    o.push({t:"line",L:"DIM",x1:px,z1:pz,x2:tx-.3,z2:tz+fs*.3}); o.push({t:"dot",L:"DIM",x:px,z:pz,r:.18});
+    o.push({t:"text",L:"DIM",x:tx,z:tz,h:fs*.72,s:`${r.no} 보강 링 Ø${fx(r.D*1000,0)}`,num:1}); });
   o.push({t:"line",L:"CEN",x1:-Rmax,z1:0,x2:Rmax,z2:0}); o.push({t:"line",L:"CEN",x1:0,z1:-Rmax,x2:0,z2:Rmax});
   const lab=(r,ang,s)=>{ const a=ang*PI/180, x=r*Math.cos(a), z=r*Math.sin(a); o.push({t:"line",L:"DIM",x1:x,z1:z,x2:x+2.2*Math.cos(a),z2:z+2.2*Math.sin(a)});
     o.push({t:"text",L:"DIM",x:x+2.4*Math.cos(a),z:z+2.4*Math.sin(a),h:fs,s,anchor:Math.cos(a)<0?"end":"start",num:1}); };
@@ -373,7 +387,7 @@ function planPrims(R){
   if(P.type==="cone") lab(P.Dt/2,40,`Ø${fx(P.Dt*1000,0)} 원추 상단`); else lab(P.cDw/2,40,`Ø${fx(P.cDw*1000,0)} 외벽`);
   if(R.S.hex) lab(P.ha,150,`육각 a=${fx(P.ha*1000,0)}`); else lab(P.Dc/2,150,`Ø${fx(P.Dc*1000,0)} 기둥`);
   if(P.type==="caisson") lab(P.cDw/2-P.ctw,-145,`격벽 ${Math.round(P.cnr)}개`); else lab(P.Dw/2-P.tw,-145,`Ø${fx((P.Dw-2*P.tw)*1000,0)} 원통 내경`);
-  return {o,box:[-Rmax-13,-Rmax-2,Rmax+13,Rmax+2],fs};
+  return {o,box:[-Rmax-13,-Rmax-2-(RG.length?1.2+RG.length*fs*1.05:0),Rmax+13,Rmax+2],fs};
 }
 const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" stroke-linejoin="round"`,FILL:`fill="var(--fill)"`,WATER:`fill="var(--water)" opacity=".75"`,
   SOIL:`fill="var(--soil)" opacity=".55"`,GROUT:`fill="var(--grout)" stroke="var(--conc-line)" stroke-width=".06"`,RAD:`fill="none" stroke="var(--conc-line)" stroke-width=".06" stroke-dasharray=".6 .35"`,
