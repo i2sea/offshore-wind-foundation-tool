@@ -1174,7 +1174,9 @@ function sheetPrims(R){
   T(tx+2*k,ty+5*k,"축척"); T(tx+42*k,ty+5*k,`1 : ${sc} (상세), 1 : ${scC} (기둥 단면)${P.type==="caisson"&&P.cnr>=2?", 1 : 150 (단면 A-A)":""}    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
   T(15*k,13*k,`f_ck ${P.fck} MPa, 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 규격·간격은 부재설계 탭의 검토 결과입니다.`,2.2);
   // 케이슨: 방사형 격벽 단면 A-A 배근을 상세도 아래 왼쪽 빈 곳에
-  let aa=0; if(P.type==="caisson"&&P.cnr>=2){ const top=(d.z0+dz)/k-8, bot=20; if(top-bot>=45) aa=placeCell(o,th2=>wallSecCell(R,th2,true),15,top,228,top-bot,k,2.4,3,150); }
+  let aa=0; if(P.type==="caisson"&&P.cnr>=2){ const top=(d.z0+dz)/k-8, bot=20; if(top-bot>=45){ // 단면 A-A 오른쪽 끝(하부 슬래브 끝)을 위 배근 상세의 저판 오른쪽 끝에 맞춤
+      const kA=0.15, cA=wallSecCell(R,2.4*kA,true), xR=(R.Rbase+dx)/k, sx=Math.max(15,xR-2-(P.cDw/2+0.8-cA.box[0])/kA);
+      aa=placeCell(o,th2=>wallSecCell(R,th2,true),sx,top,240-sx,top-bot,k,2.4,3,150); } }
   return {o,box:[0,0,W,H],sc,scC,bg:1,aa};
 }
 /* ---------- 일반도 A3 (단면도 + 평면도 + 주기 + 표제란) ---------- */
