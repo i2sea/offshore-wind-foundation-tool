@@ -335,6 +335,28 @@ function compute(P){
     mk("LC4","지진 (운전, 설계조위)","H",tgs,{cur:"n",eq:1},{o:P.fsO3,s:P.fsS3,qf:P.qf3,gap:false}),
   ];
 
+  /* 기둥 높이별 단면력·응력 (응력분포도): 단면 z 위쪽 하중만, 단면 기준 모멘트
+     N = 터빈 연직 + 기둥·플랫폼 자중(수중부는 수중단위중량), H·M = 터빈 + 풍·파랑(단면별 최대 위상)·조류·지진
+     σ = N/A ± M/Z (압축 +), 기둥 속채움 하중은 내부 바닥으로 전달된다고 보고 제외 */
+  const colD=(()=>{ const zb=Math.max(z2,P.zc0), zt0=P.ztop, n=60, Ac=PI*(rso*rso-rsi*rsi), Ic=PI/4*(rso**4-rsi**4), Zc=Ic/rso;
+    const Aplat=P.Dp>0&&P.tp>0?Math.max(0,PI*((P.Dp/2)**2-rso**2))*P.tp:0, Wpl=Aplat*P.gc, zPl=zt0-P.tp/2;
+    const zsec=[]; for(let i=0;i<=n;i++) zsec.push(zb+(zt0-zb)*i/n);
+    const defs=[["LC1","H",tgs,{cur:"n"}],["LC2","H",tgu,{wind:1,wave:1,cur:"e"}],["LC3","L",tgu,{wind:1,wave:1,cur:"e"}],["LC4","H",tgs,{cur:"n",eq:1}]];
+    const lc={};
+    defs.forEach(([id,wl,tg,pt])=>{ const t=tl(tg), dW=wl==="L"?dL:dH, N=[],V=[],M=[],sc=[],st=[];
+      zsec.forEach(zc=>{ // 기둥 자중 (단면 위)
+        const top=zt0, sub=Math.max(0,Math.min(dW,top)-zc), dry=Math.max(0,top-Math.max(zc,dW));
+        const Wcol=Ac*(dry*P.gc+Math.max(0,sub)*(P.gc-P.gw));
+        let n_=t.V+Wcol+Wpl, h=t.H, m=t.M+t.H*(zIf-zc);
+        if(pt.wind) windArr.forEach(([z,f])=>{ if(z>zc){ h+=f; m+=f*(z-zc); } });
+        if(pt.wave){ let fi=0,mi=0,fd=0,md=0; zs.forEach((z,i)=>{ if(z>zc){ fi+=fI[i]*step; mi+=fI[i]*step*(z-zc); fd+=fD[i]*step; md+=fD[i]*step*(z-zc); } });
+          let bM=0,bF=0; for(let j=0;j<360;j++){ const th=j/360*2*PI, sn=Math.sin(th), c=Math.cos(th)*Math.abs(Math.cos(th)); const mm=mi*sn+md*c; if(mm>bM){bM=mm;bF=fi*sn+fd*c;} } h+=bF; m+=bM; }
+        if(pt.cur){ const c=pt.cur==="e"?curE:curN; c.arr.forEach(([z,f])=>{ if(z>zc){ h+=f; m+=f*(z-zc); } }); }
+        if(pt.eq){ const k=P.kh, Wc_=Ac*(top-zc)*P.gc; h+=k*(Wt+Wc_+Wpl); m+=k*(Wt*Math.max(0,zt-zc)+Wc_*(top-zc)/2+Wpl*(zPl-zc)); }
+        N.push(n_); V.push(h); M.push(m); sc.push((n_/Ac+m/Zc)/1000); st.push((n_/Ac-m/Zc)/1000); });
+      lc[id]={N,V,M,sc,st}; });
+    return {z:zsec,lc,Ac,Zc,ro:rso,ri:rsi,hex:!!S.hex}; })();
+
   /* 부유 상태 */
   const WcT=Vct*P.gc, zcT=Vct>0?Mct/Vct:0, Wb=Vb*P.gw, zcB=Vb>0?Mb/Vb:0;
   const Wfl=WcT+Wb+P.Wadd, KG=(WcT*zcT+Wb*zcB+P.Wadd*P.zadd)/Wfl, Vneed=Wfl/P.gw;
@@ -362,7 +384,7 @@ function compute(P){
   }
   const grout=Abase*P.tg, pad=P.padN*P.padB**2*P.padH;
   return {P,parts:partRows,z2,wideTop,Rbase,Rwide,S,rso,rsi,zmax,Vgross,Vc,overlap:Vgross-Vc,zcC,Wc,Vf1,Vf2,Vf,Wf,zcF,Cap1,Cap2,
-    inst,T,TL,Wt,zIf,zt,freq,wind,wave,cur,cdTbl,colSec,eq,LC,flt,grout,pad,warns,Re,dz,N,envAt,reAt};
+    inst,T,TL,Wt,zIf,zt,freq,wind,wave,cur,cdTbl,colSec,colD,eq,LC,flt,grout,pad,warns,Re,dz,N,envAt,reAt};
 }
 /* 예인 높이별 흘수·GM 표 */
 function towTable(P){

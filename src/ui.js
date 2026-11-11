@@ -169,7 +169,7 @@ function run(){
   if(jack){ $("jacketNote").textContent=jacketNote(); $("soilNote").textContent=soilNote(); }
   else if(mono){ $("monoNote").textContent=monoNote(); $("soilNote").textContent=soilNote(); } else $("shpNote").textContent=R.S.hex?`육각: 맞변 ${fx(R.S.hex.flats,2)} m, 꼭짓점 ${fx(R.S.hex.corners,2)} m, 면적이 같은 원 외경 ${fx(2*R.rso,3)} m (부력·파랑에 사용). 높이는 저판 하면 기준.`:"높이는 모두 저판 하면 기준입니다.";
   renderSummary(); renderWarns();
-  dirty={gen:1,rbd:1,m3d:1,load:1,stab:1,mem:1,flt:1,wt:1,qty:1,calc:1,cmp:1,mchk:1,mpy:1}; if((mono||jack)&&!$("soilEd").innerHTML) drawSoil();
+  dirty={gen:1,rbd:1,m3d:1,load:1,stab:1,mem:1,flt:1,wt:1,qty:1,strs:1,calc:1,mchk:1,mpy:1}; if((mono||jack)&&!$("soilEd").innerHTML) drawSoil();
   renderTab(curTab);
 }
 function renderTab(t){
@@ -185,6 +185,7 @@ function renderTab(t){
   else if(t==="flt"){ if(!R.tow) R.tow=towTable(R.P); $("repFlt").innerHTML=htmlFlt(); }
   else if(t==="wt") $("repWt").innerHTML=htmlWt();
   else if(t==="qty") $("repQty").innerHTML=htmlQty();
+  else if(t==="strs") $("repStr").innerHTML=htmlStress();
   else if(t==="calc"){ if(!R.tow) R.tow=towTable(R.P); $("report").innerHTML=htmlReport(); }
 }
 const chip=(ok,na)=>ok===null||na?`<span class="chip na">자료 없음</span>`:`<span class="chip ${ok?"ok":"bad"}">${ok?"O.K":"N.G"}</span>`;
@@ -677,6 +678,75 @@ function htmlQty(){
   R.M.qty.rows.forEach(r=>h+=`<tr><td class="l">${r.nm}</td><td class="n">${fx(r.kg/1000,2)}</td></tr>`);
   h+=`<tr class="tot"><td class="l">합계 (콘크리트 1 m³당 ${fx(R.M.qty.perM3,0)} kg)</td><td class="n">${fx(R.M.qty.tot/1000,2)}</td></tr></tbody></table></div>
   <p class="note">부재설계에서 정한 주철근 규격·간격에 배력철근(0.0018bt 이상)을 더한 개략 수량입니다. 정착·이음·할증은 들어 있지 않습니다.</p>`;
+  return h;
+}
+/* ---------- 응력분포도 (중력식) ---------- */
+const LCS={LC1:["var(--l-cur)",""],LC2:["var(--l-wave)",""],LC3:["var(--l-wind)","5 3"],LC4:["#c2552e",""]};
+const niceTk=(a,b,n=5)=>{ const d=b-a||1, s=Math.pow(10,Math.floor(Math.log10(d/n))), m=[1,2,5,10].find(m=>d/(m*s)<=n)*s, r=[]; for(let v=Math.ceil(a/m)*m; v<=b+1e-9; v+=m) r.push(+v.toPrecision(6)); return r; };
+/* 높이(표고)에 따른 분포 그래프: series [{id,v:[...] }], z 배열(저판 하면 기준) → 표고 DL로 표시 */
+function heightSVG(series,z,xlab,unit,marks,zero){
+  const W=300,H=320,ml=46,mr=12,mt=12,mb=34, P=R.P, y=zz=>zz+P.zbDL, y0=y(z[0]), y1=y(z[z.length-1]);
+  let lo=Infinity,hi=-Infinity; series.forEach(s=>s.v.forEach(v=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); })); if(zero!==false){ lo=Math.min(lo,0); hi=Math.max(hi,0); } if(hi-lo<1e-9) hi=lo+1; const pd=(hi-lo)*0.06; lo-=pd; hi+=pd;
+  const X=v=>ml+(W-ml-mr)*(v-lo)/(hi-lo), Y=v=>mt+(H-mt-mb)*(y1-v)/(y1-y0);
+  let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${xlab} 높이 분포">`;
+  niceTk(lo,hi,4).forEach(v=>g+=`<line x1="${X(v)}" y1="${mt}" x2="${X(v)}" y2="${H-mb}" stroke="var(--line)" stroke-width="${v===0?1.1:.5}"/><text x="${X(v)}" y="${H-mb+12}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--f-num)">${fx(v,Math.abs(hi-lo)<20?1:0)}</text>`);
+  niceTk(y0,y1,6).forEach(v=>g+=`<text x="${ml-4}" y="${Y(v)+3}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="var(--f-num)">${v}</text>`);
+  (marks||[]).forEach(([zz,lab,c])=>{ const yy=y(zz); if(yy<y0||yy>y1) return; g+=`<line x1="${ml}" y1="${Y(yy)}" x2="${W-mr}" y2="${Y(yy)}" stroke="${c}" stroke-width=".8" stroke-dasharray="3 2"/><text x="${W-mr-2}" y="${Y(yy)-3}" font-size="8.5" fill="${c}" text-anchor="end">${lab}</text>`; });
+  series.forEach(s=>{ const [c,d]=LCS[s.id]||["var(--ink)",""]; g+=`<polyline points="${s.v.map((v,i)=>`${X(v).toFixed(1)},${Y(y(z[i])).toFixed(1)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="1.6" ${d?`stroke-dasharray="${d}"`:""}/>`; });
+  g+=`<text x="${(ml+W-mr)/2}" y="${H-6}" font-size="10" fill="var(--ink)" text-anchor="middle">${xlab}${unit?` (${unit})`:""}</text>`;
+  g+=`<text x="11" y="${(mt+H-mb)/2}" font-size="10" fill="var(--ink)" transform="rotate(-90 11 ${(mt+H-mb)/2})" text-anchor="middle">표고 (DL, m)</text></svg>`;
+  return g;
+}
+/* 지반반력 분포 (저판 하면 단면, 압축 측 오른쪽) */
+function pressSVG(l){
+  const W=300,H=170,ml=20,mr=20, Rb=R.Rbase, X=x=>ml+(W-ml-mr)*(x+Rb)/(2*Rb), qs=Math.max(l.noGap?l.qmax:l.qeff,l.qa)*1.1, Yb=46, S=v=>Yb+ (H-Yb-30)*v/qs;
+  const [c]=LCS[l.id]||["var(--ink)"];
+  let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${l.id} 지반반력 분포">`;
+  g+=`<rect x="${X(-Rb)}" y="${Yb-14}" width="${X(Rb)-X(-Rb)}" height="14" fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".8"/>`;
+  g+=`<text x="${W/2}" y="${Yb-20}" font-size="9" fill="var(--muted)" text-anchor="middle">저판 Ø${fx(2*Rb*1000,0)} · e = ${fx(l.e,2)} m ${l.noGap?"(핵 안, 전면 접지)":"(핵 밖, 유효 면적)"}</text>`;
+  if(l.noGap){ g+=`<polygon points="${X(-Rb)},${Yb} ${X(Rb)},${Yb} ${X(Rb)},${S(l.qmax)} ${X(-Rb)},${S(Math.max(0,l.qmin))}" fill="${c}" fill-opacity=".18" stroke="${c}" stroke-width="1.4"/>`;
+    g+=`<text x="${X(Rb)-2}" y="${S(l.qmax)+11}" font-size="9.5" fill="var(--ink)" text-anchor="end" font-family="var(--f-num)">q<tspan font-size="7" dy="2">max</tspan><tspan dy="-2"> ${fx(l.qmax,0)}</tspan></text><text x="${X(-Rb)+2}" y="${S(Math.max(0,l.qmin))+11}" font-size="9.5" fill="var(--ink)" font-family="var(--f-num)">q<tspan font-size="7" dy="2">min</tspan><tspan dy="-2"> ${fx(l.qmin,0)}</tspan></text>`; }
+  else if(l.Aeff>0){ const x0=Rb-l.be; g+=`<polygon points="${X(x0)},${Yb} ${X(Rb)},${Yb} ${X(Rb)},${S(l.qeff)} ${X(x0)},${S(l.qeff)}" fill="${c}" fill-opacity=".18" stroke="${c}" stroke-width="1.4"/>`;
+    g+=`<line x1="${X(x0)}" y1="${Yb}" x2="${X(Rb)}" y2="${S(Math.max(0,l.qmax))}" stroke="${c}" stroke-width=".8" stroke-dasharray="3 2"/>`;
+    g+=`<text x="${X(Rb)-2}" y="${S(l.qeff)+11}" font-size="9.5" fill="var(--ink)" text-anchor="end" font-family="var(--f-num)">q<tspan font-size="7" dy="2">eff</tspan><tspan dy="-2"> ${fx(l.qeff,0)}</tspan></text><text x="${(X(x0)+X(Rb))/2}" y="${Yb+10}" font-size="8.5" fill="var(--muted)" text-anchor="middle">유효 폭 b' ${fx(l.be,2)} m</text>`; }
+  g+=`<line x1="${X(-Rb)}" y1="${S(l.qa)}" x2="${X(Rb)}" y2="${S(l.qa)}" stroke="#c23b2e" stroke-width=".9" stroke-dasharray="5 3"/><text x="${X(-Rb)+2}" y="${S(l.qa)-3}" font-size="8.5" fill="#c23b2e" font-family="var(--f-num)">허용 q<tspan font-size="7" dy="2">a</tspan><tspan dy="-2"> ${fx(l.qa,0)}</tspan></text>`;
+  return g+`<text x="${W/2}" y="${H-6}" font-size="9" fill="var(--muted)" text-anchor="middle">단위 kPa · 실선 = 검토에 쓴 분포${l.noGap?"":", 점선 = 선형 분포(참고)"}</text></svg>`;
+}
+/* 보 모멘트 분포 (x: 0~L, 값 배열) */
+function beamSVG(xs,ms,xlab,lab,marks){
+  const W=300,H=180,ml=46,mr=12,mt=14,mb=34; let lo=Math.min(0,...ms),hi=Math.max(0,...ms); const pd=(hi-lo)*0.08||1; lo-=pd; hi+=pd;
+  const L=xs[xs.length-1], X=x=>ml+(W-ml-mr)*x/L, Y=v=>mt+(H-mt-mb)*(hi-v)/(hi-lo);
+  let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lab}">`;
+  niceTk(lo,hi,4).forEach(v=>g+=`<line x1="${ml}" y1="${Y(v)}" x2="${W-mr}" y2="${Y(v)}" stroke="var(--line)" stroke-width="${v===0?1.1:.5}"/><text x="${ml-4}" y="${Y(v)+3}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="var(--f-num)">${fx(v,0)}</text>`);
+  niceTk(0,L,5).forEach(v=>g+=`<text x="${X(v)}" y="${H-mb+12}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--f-num)">${v}</text>`);
+  g+=`<polygon points="${X(0)},${Y(0)} ${xs.map((x,i)=>`${X(x).toFixed(1)},${Y(ms[i]).toFixed(1)}`).join(" ")} ${X(L)},${Y(0)}" fill="var(--l-wave)" fill-opacity=".15" stroke="var(--l-wave)" stroke-width="1.5"/>`;
+  (marks||[]).forEach(([x,v,t])=>g+=`<circle cx="${X(x)}" cy="${Y(v)}" r="2.2" fill="var(--ink)"/><text x="${Math.min(X(x)+4,W-mr-60)}" y="${Y(v)+(v>=0?-4:11)}" font-size="9" fill="var(--ink)" font-family="var(--f-num)">${t}</text>`);
+  return g+`<text x="${(ml+W-mr)/2}" y="${H-6}" font-size="10" fill="var(--ink)" text-anchor="middle">${xlab}</text><text x="11" y="${(mt+H-mb)/2}" font-size="10" fill="var(--ink)" transform="rotate(-90 11 ${(mt+H-mb)/2})" text-anchor="middle">M (kN·m/m)</text></svg>`;
+}
+function htmlStress(){
+  const P=R.P, C=R.colD, ids=["LC1","LC2","LC3","LC4"], F=memberForces(R), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm]));
+  const leg=`<div class="legend" style="margin:4px 0 0">${ids.map(id=>`<span><i style="background:${LCS[id][0]}"></i>${id} ${nm[id]}</span>`).join("")}</div>`;
+  const marks=[[P.hwl-P.zbDL,"설계조위","var(--water-line)"],[R.zIf,"터빈 인터페이스","var(--muted)"]];
+  const ser=k=>ids.map(id=>({id,v:C.lc[id][k]}));
+  const at=(arr,i)=>arr[i];
+  let h=`<h2>1. 기둥 높이별 단면력·응력 (사용하중)</h2>
+  <p class="note">기둥 ${C.hex?"(육각 → 같은 면적의 등가 원형)":""} 외경 ${fx(2*C.ro,3)} m · 내경 ${fx(2*C.ri,3)} m, A = π/4(D² − d²) = ${fx(C.Ac,3)} m², Z = π(D⁴ − d⁴)/(32D) = ${fx(C.Zc,3)} m³.
+  단면 위쪽 하중만 모음: N = 터빈 연직 + 기둥·플랫폼 자중(수중부 수중단위중량), H·M = 터빈 + 풍하중 + 파랑(단면마다 최대 위상) + 조류 + 지진 관성력. σ = N/A ± M/Z (압축 +). 기둥 속채움은 내부 바닥으로 전달된다고 보고 뺐습니다.</p>${leg}
+  <div class="plots"><div class="sheet">${heightSVG(ser("N"),C.z,"축력 N","kN",marks)}</div><div class="sheet">${heightSVG(ser("V"),C.z,"전단력 V","kN",marks)}</div><div class="sheet">${heightSVG(ser("M").map(s=>({...s,v:s.v.map(v=>v/1000)})),C.z,"휨모멘트 M","MN·m",marks)}</div>
+  <div class="sheet">${heightSVG(ids.flatMap(id=>[{id,v:C.lc[id].sc},{id,v:C.lc[id].st}]),C.z,"연단 응력 σ (압축 +)","MPa",marks)}</div></div>`;
+  h+=`<div class="tblwrap"><table class="t"><thead><tr><th>하중조합</th><th>단면 (기둥 하단)</th><th>N (kN)</th><th>V (kN)</th><th>M (kN·m)</th><th>σ 압축측 (MPa)</th><th>σ 인장측 (MPa)</th></tr></thead><tbody>${ids.map(id=>{ const l=C.lc[id]; return `<tr><td class="l">${id} ${nm[id]}</td><td class="n">${dl(C.z[0]+P.zbDL)}</td><td class="n">${fx(l.N[0],0)}</td><td class="n">${fx(l.V[0],0)}</td><td class="n">${fx(l.M[0],0)}</td><td class="n">${fx(l.sc[0],2)}</td><td class="n">${fx(l.st[0],2)}${l.st[0]<0?" (인장)":""}</td></tr>`; }).join("")}</tbody></table></div>
+  <p class="note">인장측 응력이 음(−)이면 콘크리트 단면에 인장이 생깁니다. 기둥 축방향 철근 검토(계수하중)는 부재설계 탭에 있습니다.</p>`;
+  h+=`<h2>2. 지반반력 분포 (저판 하면)</h2><p class="note">e = M/V. e ≤ R/4(핵 안)이면 q = V/A ± M/Z 사다리꼴, 핵 밖이면 들림이 생겨 유효 면적 A' 위 균등 q<sub>eff</sub> = V/A' (DNV-ST-0126)로 검토합니다. 빨간 점선은 허용지지력(가정값).</p>
+  <div class="plots">${R.LC.map(l=>`<div class="sheet"><div class="cap">${l.id} ${l.nm}</div>${pressSVG(l)}</div>`).join("")}</div>`;
+  // 저판: 1방향 양단고정 (지점 −qL²/12, 중앙 qL²/24), 뒷굽 캔틸레버
+  const sl=F.slab, nx=40, xs=[...Array(nx+1)].map((_,i)=>sl.L*i/nx);
+  const msl=xs.map(x=>sl.qu*(6*sl.L*x-6*x*x-sl.L*sl.L)/12);
+  h+=`<h2>3. 하부 부재 휨모멘트 분포 (계수하중)</h2><p class="note">저판은 기둥과 벽체 사이 1방향 양단고정 보, 벽체·원추는 하단 고정 원통 쉘의 경계 휨(보 이론 근사, 가정)으로 봤습니다. 값은 부재설계 탭과 같습니다.</p><div class="plots">
+  <div class="sheet"><div class="cap">저판 (경간 L = ${fx(sl.L,2)} m, q<sub>u</sub> = ${fx(sl.qu,1)} kPa, ${sl.gov})</div>${beamSVG(xs,msl,"기둥 면에서 거리 (m)","저판 휨모멘트",[[0,-sl.Msup,`지점 −${fx(sl.Msup,0)}`],[sl.L/2,sl.Mmid,`중앙 +${fx(sl.Mmid,0)}`]])}</div>`;
+  const shell=(o,t)=>{ if(!o) return ""; const Lx=Math.min(o.h||4,Math.max(3,4/o.beta)), xs2=[...Array(41)].map((_,i)=>Lx*i/40), m2=xs2.map(x=>o.Mu*Math.exp(-o.beta*x)*(Math.cos(o.beta*x)-Math.sin(o.beta*x)));
+    return `<div class="sheet"><div class="cap">${t} (β = ${fx(o.beta,3)} 1/m, M<sub>u</sub> = ${fx(o.Mu,0)} kN·m/m)</div>${beamSVG(xs2,m2,"하단에서 높이 (m)",t+" 휨모멘트",[[0,o.Mu,`하단 ${fx(o.Mu,0)}`]])}</div>`; };
+  h+=shell(F.wall,P.type==="caisson"?"외벽 연직 방향":"하부 원통 연직 방향")+shell(F.cone,"원추 자오선 방향")+`</div>
+  <p class="note">원통 쉘 경계 휨: M(x) = M<sub>u</sub>·e<sup>−βx</sup>(cos βx − sin βx), β = ⁴√(3(1−ν²)/(r²t²)). 하단에서 멀어질수록 빠르게 줄어 약 π/β 안에서 거의 사라집니다.</p>`;
   return h;
 }
 function htmlReport(){
