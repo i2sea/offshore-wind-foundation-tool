@@ -121,7 +121,7 @@ main{min-width:0;display:flex;flex-direction:column;gap:12px}
 @media (max-width:1100px){.drw{grid-template-columns:minmax(0,1fr)}}
 .sheet{background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:auto;position:relative}
 .sheet svg{display:block;width:100%;height:auto}
-#rbWrap.zoom svg,#genWrap.zoom svg{width:2400px;max-width:none}
+#rbWrap.zoom svg,#genWrap.zoom svg,#genDWrap.zoom svg,#rbDWrap.zoom svg{width:2400px;max-width:none}
 .sheet .cap{font-size:12px;font-weight:600;padding:8px 10px 0;color:var(--muted)}
 #view3d{position:relative;height:600px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:hidden}
 #view3d canvas{display:block;width:100%;height:100%}
@@ -537,12 +537,16 @@ svg [data-k]:hover{fill:var(--bad)}
       <div data-cat="grav" style="margin-top:14px">
         <div class="ctl3d"><b style="font-size:13px">일반도 (A3)</b><button class="btn small" id="genZoom" type="button">크게 보기</button><span class="note" id="genNote"></span></div>
         <div class="sheet" id="genWrap" style="background:#fff"><div id="svgGen"></div></div>
-        <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 일반도가 A3 DXF로 들어 있습니다. 주기·설계 조건·검토 결과·수량은 입력값과 계산 결과에서 바로 만들어집니다.</p>
+        <div class="ctl3d" style="margin-top:14px"><b style="font-size:13px">상세도 (A3) — 보강 링·격벽</b><button class="btn small" id="genDZoom" type="button">크게 보기</button><span class="note" id="genDNote"></span></div>
+        <div class="sheet" id="genDWrap" style="background:#fff"><div id="svgGenD"></div></div>
+        <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 일반도·상세도가 A3 DXF로 들어 있습니다. 주기·설계 조건·검토 결과·수량은 입력값과 계산 결과에서 바로 만들어집니다.</p>
       </div>
     </div>
     <div class="pane" data-p="rbd" hidden>
       <div class="ctl3d"><button class="btn small" id="rbZoom" type="button">크게 보기</button><span class="note" id="rbNote"></span></div>
       <div class="sheet" id="rbWrap" style="background:#fff"><div id="svgRb"></div></div>
+      <div class="ctl3d" style="margin-top:14px"><b style="font-size:13px">배근 상세도 (A3) — 보강 링·격벽</b><button class="btn small" id="rbDZoom" type="button">크게 보기</button><span class="note" id="rbDNote"></span></div>
+      <div class="sheet" id="rbDWrap" style="background:#fff"><div id="svgRbD"></div></div>
       <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 배근도가 A3 DXF로 들어 있습니다. 철근 규격·간격을 바꾸거나 "최적 배근 자동 계산"을 누르면 도면이 바로 바뀝니다.</p>
     </div>
     <div class="pane" data-p="m3d" hidden>

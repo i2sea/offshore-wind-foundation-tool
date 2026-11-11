@@ -121,7 +121,7 @@ main{min-width:0;display:flex;flex-direction:column;gap:12px}
 @media (max-width:1100px){.drw{grid-template-columns:minmax(0,1fr)}}
 .sheet{background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:auto;position:relative}
 .sheet svg{display:block;width:100%;height:auto}
-#rbWrap.zoom svg,#genWrap.zoom svg{width:2400px;max-width:none}
+#rbWrap.zoom svg,#genWrap.zoom svg,#genDWrap.zoom svg,#rbDWrap.zoom svg{width:2400px;max-width:none}
 .sheet .cap{font-size:12px;font-weight:600;padding:8px 10px 0;color:var(--muted)}
 #view3d{position:relative;height:600px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:hidden}
 #view3d canvas{display:block;width:100%;height:100%}
@@ -537,12 +537,16 @@ svg [data-k]:hover{fill:var(--bad)}
       <div data-cat="grav" style="margin-top:14px">
         <div class="ctl3d"><b style="font-size:13px">일반도 (A3)</b><button class="btn small" id="genZoom" type="button">크게 보기</button><span class="note" id="genNote"></span></div>
         <div class="sheet" id="genWrap" style="background:#fff"><div id="svgGen"></div></div>
-        <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 일반도가 A3 DXF로 들어 있습니다. 주기·설계 조건·검토 결과·수량은 입력값과 계산 결과에서 바로 만들어집니다.</p>
+        <div class="ctl3d" style="margin-top:14px"><b style="font-size:13px">상세도 (A3) — 보강 링·격벽</b><button class="btn small" id="genDZoom" type="button">크게 보기</button><span class="note" id="genDNote"></span></div>
+        <div class="sheet" id="genDWrap" style="background:#fff"><div id="svgGenD"></div></div>
+        <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 일반도·상세도가 A3 DXF로 들어 있습니다. 주기·설계 조건·검토 결과·수량은 입력값과 계산 결과에서 바로 만들어집니다.</p>
       </div>
     </div>
     <div class="pane" data-p="rbd" hidden>
       <div class="ctl3d"><button class="btn small" id="rbZoom" type="button">크게 보기</button><span class="note" id="rbNote"></span></div>
       <div class="sheet" id="rbWrap" style="background:#fff"><div id="svgRb"></div></div>
+      <div class="ctl3d" style="margin-top:14px"><b style="font-size:13px">배근 상세도 (A3) — 보강 링·격벽</b><button class="btn small" id="rbDZoom" type="button">크게 보기</button><span class="note" id="rbDNote"></span></div>
+      <div class="sheet" id="rbDWrap" style="background:#fff"><div id="svgRbD"></div></div>
       <p class="note" style="margin-top:8px">CAD 도면 받기(.zip)에 같은 배근도가 A3 DXF로 들어 있습니다. 철근 규격·간격을 바꾸거나 "최적 배근 자동 계산"을 누르면 도면이 바로 바뀝니다.</p>
     </div>
     <div class="pane" data-p="m3d" hidden>
@@ -635,7 +639,7 @@ function shaftR(P){
   return {ro:P.Dc/2,ri:Math.max(0,P.Dc/2-P.tc),hex:null};
 }
 
-/* 보강 링 자동 배치 (가정): 두 곳
+/* 보강 링 자동 배치 (가정): 두 곳 (케이슨은 상판·기둥 접합부 포함 세 곳)
    ① 기둥 하단 링: 기둥 내면에 붙여 저판 상면에서 시작. 외경 = 기둥 내경, 두께 = 기둥 벽두께,
       높이 = 1.5 × 기둥 주철근 정착길이(40d) → 0.5 m 단위 올림 (최소 1.0 m)
    ② 벽체 접합부 링: 하부 원통(케이슨 외벽) 내면에 붙여 저판 상면에서 시작. 외경 = 벽체 내경, 두께 = max(0.5, 벽두께),
@@ -649,6 +653,9 @@ function autoRings(P){
   if(S.ri>0.5&&tcw>0) out.push({D:+(2*S.ri).toFixed(3),t:+Math.min(tcw,S.ri-0.3).toFixed(3),h:hOf((rb.cL||{}).bar||"H32",Math.max(1,P.ztop-zc-1)),z:+zc.toFixed(3),auto:"기둥 하단"});
   const Rwi=cais?P.cDw/2-P.ctw:P.Dw/2-P.tw, tw=cais?P.ctw:P.tw, hw=cais?P.cH-P.cts-P.ctt:P.hw;
   const tr=Math.max(0.5,tw); if(Rwi-tr>S.ro+0.5) out.push({D:+(2*Rwi).toFixed(3),t:+tr.toFixed(3),h:hOf((rb.wV||{}).bar||"H22",Math.max(1,hw)),z:+tb.toFixed(3),auto:"벽체 접합부"});
+  // ③ 케이슨 상판·기둥 접합부 링: 기둥 외면에 붙여 상판 하면에 매닮. 두께 = max(0.5, 상판 두께), 높이 = 1.5 × 기둥 주철근 40d (≤ 격실 높이의 1/3)
+  if(cais){ const t3=Math.max(0.5,P.ctt), h3=hOf((rb.cL||{}).bar||"H32",Math.max(1,hw/3)), z3=P.cH-P.ctt-h3;
+    if(S.ro+t3<Rwi-0.5&&z3>tb+0.5) out.push({D:+(2*(S.ro+t3)).toFixed(3),t:+t3.toFixed(3),h:+h3.toFixed(3),z:+z3.toFixed(3),auto:"상판·기둥 접합부"}); }
   return out;
 }
 function buildParts(P){
@@ -696,8 +703,9 @@ function ringSupport(P,R){
     rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2,ring:q.i}); } });
     const hc=ov(z0,z1,P.zc0,P.ztop); if(hc>eps){ if(Math.abs(ro-S.ri)<eps) side.push({nm:"기둥 내면",r:ro,h:hc}); if(Math.abs(ri-S.ro)<eps) side.push({nm:"기둥 외면",r:ri,h:hc}); }
     const hw=ov(z0,z1,zw0,zw1); if(hw>eps&&Math.abs(ro-Rwi)<eps) side.push({nm:cais?"외벽 내면":"원통 내면",r:ro,h:hw});
+    const above=[]; if(cais){ const zu=P.cH-P.ctt; if(Math.abs(z1-zu)<eps&&ri>=S.ro-eps&&ro<=Rwi+eps) above.push({nm:"상판",slab:true}); }
     const wb=below.reduce((a,b)=>Math.max(a,b.w),0);
-    return {...r,ro,ri,below,side,wb,float:!below.length&&!side.length,part:below.length&&wb<r.t-eps&&!side.length}; });
+    return {...r,ro,ri,below,side,above,wb,float:!below.length&&!side.length&&!above.length,part:below.length&&wb<r.t-eps&&!side.length&&!above.length}; });
 }
 
 /* ---------- Bessel (Numerical Recipes) ---------- */
@@ -1136,9 +1144,12 @@ function rebarDetail(R,M){
     // 연직: 저판까지 곧게 닿는 면은 저판 하부철근 위까지 내려 갈고리(40d) — 시공 시 저판 철근에 걸어 세움
     const dSB=BARS[rb.sB.bar].d/1000, zBot=cv+2*dSB, Lfull=g.z+g.h-cv-zBot+Ld, Lfree=g.h-2*cv+0.2;
     const fI=ringToSlab(RG,g,g.ri+cv,cv), fO=ringToSlab(RG,g,g.ro-cv,cv), nI=2*PI*rmI/(d.s/1000), nO=2*PI*rmO/(d.s/1000);
-    const lab=f=>f?`, 저판 하부철근까지 내려 갈고리`:(g.side.length?", 옆 부재 연결철근으로 고정":"");
-    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,fI?Lfull:Lfree,"L");
-    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,fI?Lfull:Lfree,"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,fO?Lfull:Lfree,"L"); }
+    // 상판에 매달린 링: 위로 상판 상부철근 아래까지 올려 갈고리
+    const up=(g.above||[]).length>0, Lup=up?(P.cH-cv-2*BARS[distRB(P.ctt).bar].d/1000)-(g.z+cv)+Ld:0;
+    const lab=f=>f?`, 저판 하부철근까지 내려 갈고리`:up?", 상판 상부철근까지 올려 갈고리":(g.side.length?", 옆 부재 연결철근으로 고정":"");
+    const len=f=>f?Lfull:up?Lup:Lfree;
+    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,len(fI),"L");
+    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,len(fI),"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,len(fO),"L"); }
     g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자)`,{bar:d.bar,s:300},n,2*Ld,"I"); });
   });
   // 기둥
@@ -2094,7 +2105,7 @@ function drawRings(){
   const auto=ST.ringAuto==="1"; $("ringAdd").hidden=auto;
   if(auto){ const rg=(R&&R.P&&R.P.ringAuto==="1"&&R.P.rings)||autoRings(readInputs());
     $("ringBody").innerHTML=rg.map(r=>`<tr>${["D","t","h","z"].map(k=>`<td class="n" style="padding:4px 6px">${fx(r[k],2)}</td>`).join("")}<td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.auto}</td></tr>`).join("")||`<tr><td colspan="5" class="hint">자동 배치할 자리가 없습니다</td></tr>`;
-    $("ringNote").innerHTML="자동 배치(가정): 기둥 하단 링 = 기둥 내경 · 기둥 벽두께, 벽체 접합부 링 = 벽체 내경 · max(0.5, 벽두께). 둘 다 저판 상면에서 시작, 높이 = 1.5 × 정착길이 40d(기둥 주철근·벽체 연직철근) → 0.5 m 올림(최소 1.0 m). 직접 고치려면 \"직접 입력\"으로 바꾸세요(지금 값이 옮겨집니다)."; return; }
+    $("ringNote").innerHTML="자동 배치(가정): 기둥 하단 링 = 기둥 내경 · 기둥 벽두께, 벽체 접합부 링 = 벽체 내경 · max(0.5, 벽두께) — 둘 다 저판 상면에서 시작. 케이슨은 상판·기둥 접합부 링(기둥 외면에 붙여 상판 하면에 매닮, 두께 max(0.5, 상판 두께), 높이 ≤ 격실 높이/3) 추가. 높이 = 1.5 × 정착길이 40d(기둥 주철근·벽체 연직철근) → 0.5 m 올림(최소 1.0 m). 직접 고치려면 \"직접 입력\"으로 바꾸세요(지금 값이 옮겨집니다)."; return; }
   $("ringNote").textContent="직접 입력: 외경·두께·높이·하단 높이(z, 저판 하면 기준). 아래(저판·다른 링)나 옆(기둥·벽체 면)에 닿아야 연결철근이 들어갑니다.";
   $("ringBody").innerHTML=ST.rings.map((r,i)=>`<tr>${["D","t","h","z"].map(k=>`<td><input id="rg_${i}_${k}" type="number" step="0.1" value="${r[k]}" aria-label="링 ${i+1} ${k}"></td>`).join("")}<td><button type="button" data-del="${i}" aria-label="링 ${i+1} 삭제">✕</button></td></tr>`).join("")||`<tr><td colspan="5" class="note">없음</td></tr>`;
   $("ringBody").querySelectorAll("input").forEach(el=>el.addEventListener("input",()=>{ const [,i,k]=el.id.split("_"); ST.rings[+i][k]=parseFloat(el.value)||0; run(); }));
@@ -2205,8 +2216,8 @@ function renderTab(t){
   if(!dirty[t]) return; dirty[t]=0;
   if(R.cat==="mono"){ renderMonoTab(t); return; }
   if(R.cat==="jacket"){ renderJacketTab(t); return; }
-  if(t==="gen"){ $("capSec").textContent="정면 단면도"; drawSection(); drawPlan(); drawGenSheet(); }
-  else if(t==="rbd") drawRebarSheet();
+  if(t==="gen"){ $("capSec").textContent="정면 단면도"; drawSection(); drawPlan(); drawGenSheet(); drawDetailSheets("gen"); }
+  else if(t==="rbd"){ drawRebarSheet(); drawDetailSheets("rb"); }
   else if(t==="m3d") build3D();
   else if(t==="load") $("repLoad").innerHTML=htmlLoad();
   else if(t==="stab") $("repStab").innerHTML=htmlStab();
@@ -2769,9 +2780,10 @@ function keySVG(kind){
     const r2=Rwi-0.8; g+=`<path d="${arc(r2,a0,a1)}" fill="none" stroke="${A}" stroke-width="1.6" marker-end="url(#ah)"/><defs><marker id="ah" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${A}"/></marker></defs>`;
     g+=`<text x="${X(Rwi)+6}" y="${cy+3}" font-size="9" fill="var(--ink)">격벽 사이 (외벽 쪽)</text><text x="6" y="${H-6}" font-size="9" fill="var(--muted)">평면 · 칠한 칸 = 저판 한 칸, 화살표 = x 방향</text></svg>`;
     return g; }
-  const zTop=kind==="cone"?z2+2:Math.max(z1+1.5,tb+Rb*0.32), W=300, H=130, sc=Math.min((W-20)/Rb,(H-22)/zTop), X=x=>10+x*sc, Y=z=>H-14-z*sc;
+  const zTop=kind==="cone"?z2+2:Math.max(z1+1.5,tb+Rb*0.32), W=300, H=140, sc=Math.min((W-150*(kind==="cone"?1:0)-20)/Rb,(H-34)/zTop), X=x=>10+x*sc, Y=z=>H-8-z*sc;
   const poly=(pts,hl)=>`<polygon points="${pts.map(([x,z])=>`${X(x).toFixed(1)},${Y(z).toFixed(1)}`).join(" ")}" fill="${hl?A:"var(--conc)"}" fill-opacity="${hl?.55:.6}" stroke="${hl?A:"var(--conc-line)"}" stroke-width="${hl?1.4:.7}"/>`;
-  let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${kind} 위치"><defs><marker id="ah2" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${A}"/></marker></defs>`;
+  const cid="kc"+(keySVG.n=(keySVG.n||0)+1), cy0=14;
+  let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${kind} 위치"><defs><marker id="ah2" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${A}"/></marker><clipPath id="${cid}"><rect x="2" y="${cy0}" width="${W-4}" height="${H-cy0-2}"/></clipPath></defs><rect x="2" y="${cy0}" width="${W-4}" height="${H-cy0-2}" fill="none" stroke="var(--line)" stroke-width=".8"/><g clip-path="url(#${cid})">`;
   const slabHL=kind==="slab";
   g+=poly([[0,0],[Rb,0],[Rb,tb],[0,tb]],false);
   if(slabHL) g+=poly([[ro,0],[Rwi,0],[Rwi,tb],[ro,tb]],true);
@@ -2781,10 +2793,12 @@ function keySVG(kind){
   g+=`<line x1="${X(0)}" y1="${Y(-0.5)}" x2="${X(0)}" y2="${Y(zTop)}" stroke="var(--muted)" stroke-dasharray="4 2 1 2" stroke-width=".7"/>`;
   const arr=(x1,z1_,x2,z2_)=>`<line x1="${X(x1)}" y1="${Y(z1_)}" x2="${X(x2)}" y2="${Y(z2_)}" stroke="${A}" stroke-width="1.6" marker-end="url(#ah2)"/>`;
   const za=tb+8/sc;
-  if(kind==="slab"){ g+=arr(ro,za,Rwi,za); g+=`<text x="${X(ro)}" y="${Y(0)+10}" font-size="8.5" fill="var(--ink)">▲ x = 0 (기둥 외면)</text><text x="${X(Rwi)-2}" y="${Y(za)-5}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = L (벽체 내면)</text>`; }
+  if(kind==="slab"){ g+=arr(ro,za,Rwi,za); g+=`<text x="${X(ro)+2}" y="${Y(za)-16}" font-size="8.5" fill="var(--ink)">x = 0 (기둥 외면) →</text><text x="${X(Rwi)-2}" y="${Y(za)-5}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = L (벽체 내면)</text>`; }
   if(kind==="wall"){ const xx=Rwi-8/sc, zw=cais?P.cH-P.ctt:z1; g+=arr(xx,tb,xx,zw); g+=`<text x="${X(xx)-5}" y="${Y(tb)-4}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = 0 (저판 상면)</text><text x="${X(xx)-5}" y="${Y(zw)+11}" font-size="8.5" fill="var(--ink)" text-anchor="end">x = ${fx(zw-tb,2)} m (${cais?"상판 하면":"벽 상단"})</text>`; }
   if(kind==="cone"){ const dxn=-8/sc; g+=arr(Rw-P.tkh+dxn,z1,P.Dt/2-P.tkh+dxn,z2); g+=`<text x="${X(Rw)+4}" y="${Y(z1)+3}" font-size="8.5" fill="var(--ink)">x = 0 (원추 하단)</text><text x="${X(P.Dt/2)+6}" y="${Y(z2)+3}" font-size="8.5" fill="var(--ink)">x = 끝 (원추 상단)</text>`; }
-  return g+`<text x="${W-6}" y="10" font-size="8.5" fill="var(--muted)" text-anchor="end">오른쪽 반단면 · 칠한 부재, 화살표 = x 방향</text></svg>`;
+  // 위쪽을 끊어 그렸으면 끊음 표시
+  const zCut=zTop-0.3; if(kind!=="cone"||P.ztop>zTop){ const yy=Y(zCut), xa=X(ri)-6, xb=X(ro)+6, m=(xa+xb)/2; g+=`<polyline points="${xa},${yy} ${m-3},${yy} ${m-1},${yy-4} ${m+1},${yy+4} ${m+3},${yy} ${xb},${yy}" fill="none" stroke="var(--ink)" stroke-width=".8"/>`; }
+  return g+`</g><text x="${W-4}" y="10" font-size="8.5" fill="var(--muted)" text-anchor="end">오른쪽 반단면 · 칠한 부재, 화살표 = x 방향</text></svg>`;
 }
 function htmlStress(){
   const P=R.P, C=R.colD, ids=["LC1","LC2","LC3","LC4"], F=memberForces(R), nm=Object.fromEntries(R.LC.map(l=>[l.id,l.nm]));
@@ -2962,6 +2976,7 @@ $("btnDxf").addEventListener("click",async()=>{ try{
   const z=new JSZip(); z.file(`${baseName()}_일반도.dxf`,all); z.file(`${baseName()}_단면도.dxf`,primsDXF([{pr:sp,dx:0,dy:0}])); z.file(`${baseName()}_평면도.dxf`,primsDXF([{pr:pp,dx:0,dy:0}]));
   { const sh=sheetPrims(R); z.file(`${baseName()}_배근도_A3.dxf`,primsDXF([{pr:sh,dx:0,dy:0}])); }
   { const gs=genSheetPrims(R); z.file(`${baseName()}_일반도_A3.dxf`,primsDXF([{pr:gs,dx:0,dy:0}])); }
+  { const a=detailSheetPrims(R,false), b=detailSheetPrims(R,true); if(a.n){ z.file(`${baseName()}_상세도_A3.dxf`,primsDXF([{pr:a,dx:0,dy:0}])); z.file(`${baseName()}_배근상세도_A3.dxf`,primsDXF([{pr:b,dx:0,dy:0}])); } }
   z.file("읽어보기.txt",`단위: mm, 원점 = 기초 중심 · 저판 하면.\r\n레이어: REBAR 철근, SHEET 도면 테두리·표, CONC 콘크리트, FILL 속채움, WATER 해수·수위, SOIL 지반, GROUT 그라우팅, HIDDEN 숨은선(격벽 등), CENTER 중심선, DIM 치수, TEXT 문자.\r\n한글 문자는 \\U+ 형식으로 들어 있어 AutoCAD에서 그대로 보입니다. 글꼴이 깨지면 문자 스타일을 한글 글꼴(맑은 고딕 등)로 바꾸세요.\r\n`);
   saveFile(`${baseName()}_도면_${stamp()}.zip`,await z.generateAsync({type:"blob"}));
 }catch(e){ toast("도면을 만들지 못했습니다"); console.error(e); } });
@@ -3080,7 +3095,8 @@ function rbDetail(R,th){
     if(xo>xi){ dots(xi+d,za,xi+d,zb2,sp); dots(xo-d,za,xo-d,zb2,sp);
       // 저판까지 곧게 닿는 면: 저판 하부철근 위까지 내려 갈고리
       const zBot=cv+2*db(rb.sB.bar);
-      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ line(x,zBot,x,zb2); line(x,zBot,x+sg*Math.min(la,0.6),zBot); } else line(x,za,x,zb2); }); }
+      const up=(g.above||[]).length>0, zUp=P.cH-cv-2*db(distRB(P.ctt).bar);
+      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ line(x,zBot,x,zb2); line(x,zBot,x+sg*Math.min(la,0.6),zBot); } else if(up){ line(x,za,x,zUp); line(x,zUp,x+sg*Math.min(la,0.6),zUp); } else line(x,za,x,zb2); }); }
     g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) line(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
     tag(xo,g.z+g.h*0.6,`G${k} 보강 링 ${k} ${r1.bar}@${r1.s}${g.side.length?" + 연결철근":""}`); });
   // 저판: X방향 주철근(선) + Y방향(점)
@@ -3273,6 +3289,105 @@ function genSheetPrims(R){
   return {o,box:[0,0,W,H],sc,scP,bg:1,over,mono:1};
 }
 function drawGenSheet(){ const pr=genSheetPrims(R); $("svgGen").innerHTML=primsSVG(pr,"일반도"); $("genNote").textContent=`A3 도면, 단면도 1:${pr.sc}, 평면도 1:${pr.scP}${pr.over?" · 주기가 길어 표제란과 겹칩니다":""}`; }
+/* ---------- 상세도 (보강 링 · 방사형 격벽): 일반 상세 / 배근 상세 A3 ---------- */
+const DSCALES=[20,25,30,40,50,60,75,100,125,150,200,250,300];
+/* 국부 창(x0~x1, z0~z1) 안에 들어오는 사각형만 잘라서 그림 */
+function clipRect(o,x0,x1,z0,z1,ax0,ax1,az0,az1,L){ const a=Math.max(x0,ax0), b=Math.min(x1,ax1), c=Math.max(z0,az0), d=Math.min(z1,az1); if(b-a>1e-6&&d-c>1e-6) o.push({t:"poly",L:L||"CONC",pts:[[a,c],[b,c],[b,d],[a,d]]}); }
+function dimH(o,xa,xb,z,th,txt){ o.push({t:"line",L:"DIM",x1:xa,z1:z,x2:xb,z2:z}); [xa,xb].forEach(x=>{ o.push({t:"line",L:"DIM",x1:x-th*.35,z1:z-th*.35,x2:x+th*.35,z2:z+th*.35}); }); o.push({t:"text",L:"DIM",x:(xa+xb)/2,z:z+th*.35,h:th,s:txt,anchor:"middle",num:1}); }
+function dimV(o,za,zb,x,th,txt){ o.push({t:"line",L:"DIM",x1:x,z1:za,x2:x,z2:zb}); [za,zb].forEach(z=>{ o.push({t:"line",L:"DIM",x1:x-th*.35,z1:z-th*.35,x2:x+th*.35,z2:z+th*.35}); }); o.push({t:"text",L:"DIM",x:x-th*.3,z:(za+zb)/2,h:th,s:txt,rot:90,anchor:"middle",num:1}); }
+const mm=v=>fx(v*1000,0);
+/* 보강 링 상세 (반경 x, 높이 z, 저판 하면 기준) */
+function ringCell(R,g,th,rebar){
+  const P=R.P, cais=P.type==="caisson", tb=cais?P.cts:P.tb, S=R.S, cro=S.hex?S.hex.flats/2:R.rso, cri=S.hex?cro-P.hth:R.rsi;
+  const Rw=cais?P.cDw/2:P.Dw/2, tw=cais?P.ctw:P.tw, Rwi=Rw-tw, zw1=cais?P.cH:P.tb+P.hw, up=(g.above||[]).length>0;
+  const cv0=P.cov/1000, RG0=ringSupport(P,R), toSlab=ringToSlab(RG0,g,g.ri+cv0,cv0)||ringToSlab(RG0,g,g.ro-cv0,cv0);
+  const pad=Math.max(1.0,g.t*1.5), x0=Math.max(0,g.ri-pad), x1=g.ro+pad, z0=(g.z<=tb+0.05||toSlab)?0:g.z-pad, z1=up?P.cH:g.z+g.h+pad, o=[];
+  clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,tb);
+  clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop);
+  clipRect(o,x0,x1,z0,z1,Rwi,Rw,tb,zw1);
+  if(cais) clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH);
+  ringSupport(P,R).forEach(q=>{ if(q.i!==g.i) clipRect(o,x0,x1,z0,z1,q.ri,q.ro,q.z,q.z+q.h); });
+  o.push({t:"poly",L:"CONC",pts:[[g.ri,g.z],[g.ro,g.z],[g.ro,g.z+g.h],[g.ri,g.z+g.h]],w:th*.12});
+  // 창 테두리 (끊음)
+  o.push({t:"poly",L:"HID",pts:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]});
+  // 치수
+  dimH(o,g.ri,g.ro,g.z+g.h+th*1.6,th,mm(g.t));
+  dimV(o,g.z,g.z+g.h,x1+th*1.4,th,mm(g.h));
+  if(g.z-tb>0.05&&z0<=tb+1e-6) dimV(o,tb,g.z,x1+th*1.4,th,mm(g.z-tb));
+  o.push({t:"text",L:"TXT",x:(g.ri+g.ro)/2,z:g.z+g.h/2,h:th*.9,s:g.no,anchor:"middle"});
+  const lab=[`외경 Ø${mm(g.D)}, 두께 ${mm(g.t)}, 높이 ${mm(g.h)}`,`하단 z ${mm(g.z)} (저판 상면 ${g.z-tb>0.005?"+"+mm(g.z-tb):"위"})`,
+    `${g.below.length?"아래 "+g.below.map(b=>b.nm).join("·"):""}${g.side.length?(g.below.length?" · ":"")+"옆 "+g.side.map(sd=>sd.nm).join("·"):""}${(g.above||[]).length?" · 위 상판":""}`];
+  if(rebar){ const D=R.M.qty.detail, cv=P.cov/1000, r1=D.rows.find(r=>r.mk===`G${g.i+1}1`); if(r1){ const d=BARS[r1.bar].d/1000, sp=r1.s/1000, la=Math.ceil(40*d*10)/10, rb=R.M.rb;
+      const xi=g.ri+cv+d/2, xo=g.ro-cv-d/2, za=g.z+cv, zb2=g.z+g.h-cv, zBot=cv+2*BARS[rb.sB.bar].d/1000, zUp=P.cH-cv-2*BARS[distRB(P.ctt).bar].d/1000, RGs=ringSupport(P,R);
+      const ln=(a,b,c,d2)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:d2,w:th*.16});
+      for(let z=za;z<=zb2+1e-6;z+=sp){ o.push({t:"dot",L:"RBD",x:xi+d,z,r:th*.22}); o.push({t:"dot",L:"RBD",x:xo-d,z,r:th*.22}); }
+      [[xi,-1],[xo,1]].forEach(([x,sg])=>{ if(ringToSlab(RGs,g,x,cv)){ ln(x,zBot,x,zb2); ln(x,zBot,x+sg*Math.min(la,0.6),zBot); } else if(up){ ln(x,za,x,zUp); ln(x,zUp,x+sg*Math.min(la,0.6),zUp); } else ln(x,za,x,zb2); });
+      g.side.forEach(sd=>{ for(let z=g.z+0.15;z<g.z+g.h;z+=0.3) ln(sd.r-Math.min(la,0.5),z,sd.r+Math.min(la,0.5),z); });
+      lab.length=0; D.rows.filter(r=>r.mk.startsWith(`G${g.i+1}`)).forEach(r=>lab.push(`${r.mk} ${r.bar}@${r.s} ${r.face}`)); } }
+  return {o,box:[x0,z0,x1+th*2.4,z1],lab,title:`보강 링 ${g.no} ${rebar?"배근 ":""}상세${g.auto?` (${g.auto})`:""}`};
+}
+/* 방사형 격벽 평면 (케이슨): 격벽 두 개 사이 한 칸 */
+function wallPlanCell(R,th){
+  const P=R.P, n=Math.round(P.cnr), ph=PI/n, cro=R.S.hex?R.S.hex.flats/2:R.rso, Rw=P.cDw/2, Rwi=Rw-P.ctw, o=[], a0=-1.5*ph, a1=1.5*ph;
+  const arc=(r,L)=>{ const pts=[]; for(let i=0;i<=40;i++){ const a=a0+(a1-a0)*i/40; pts.push([r*Math.cos(a),r*Math.sin(a)]); } o.push({t:"poly",open:1,L:L||"LINE",pts,w:th*.12}); };
+  arc(cro); arc(cro-(R.rso-R.rsi),"HID"); arc(Rwi); arc(Rw);
+  [-ph,ph].forEach(a=>{ const c=Math.cos(a),sn=Math.sin(a),nx=-sn*P.ctr/2,nz=c*P.ctr/2; o.push({t:"poly",L:"CONC",pts:[[cro*c+nx,cro*sn+nz],[Rwi*c+nx,Rwi*sn+nz],[Rwi*c-nx,Rwi*sn-nz],[cro*c-nx,cro*sn-nz]]}); });
+  const Lr=Rwi-cro, La=2*PI*Rwi/n;
+  o.push({t:"text",L:"DIM",x:(cro+Rwi)/2,z:-th*1.2,h:th,s:`격실 길이 ${mm(Lr)}`,anchor:"middle",num:1});
+  o.push({t:"text",L:"DIM",x:Rwi-th*1,z:0,h:th,s:`외벽 쪽 간격 ${mm(La)}`,anchor:"end",num:1});
+  o.push({t:"text",L:"DIM",x:cro+th,z:th*0.4,h:th,s:`θ = 360°/${n} = ${fx(360/n,1)}°`,num:1});
+  o.push({t:"text",L:"DIM",x:(cro+Rwi)/2*Math.cos(ph),z:(cro+Rwi)/2*Math.sin(ph)+th*1.2,h:th,s:`격벽 두께 ${mm(P.ctr)}`,anchor:"middle",num:1});
+  const ys=[a0,a1].map(a=>Rw*Math.sin(a)); 
+  return {o,box:[cro*Math.cos(a1)-th*2,Math.min(...ys)-th*2,Rw+th*2,Math.max(...ys)+th*2],lab:[`방사형 격벽 ${n}개, 두께 ${mm(P.ctr)}`,`기둥 외면 ~ 외벽 내면 ${mm(Lr)}`],title:"방사형 격벽 평면 상세"};
+}
+/* 방사형 격벽 단면 (격벽을 따라 자른 A-A) */
+function wallSecCell(R,th,rebar){
+  const P=R.P, cro=R.S.hex?R.S.hex.flats/2:R.rso, cri=R.S.hex?cro-P.hth:R.rsi, Rw=P.cDw/2, Rwi=Rw-P.ctw, o=[], x0=Math.max(0,cri-0.8), x1=Rw+0.8, z0=0, z1=P.cH+0.8;
+  clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,P.cts); clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop); clipRect(o,x0,x1,z0,z1,Rwi,Rw,P.cts,P.cH); clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH);
+  o.push({t:"poly",L:"CONC",pts:[[cro,P.cts],[Rwi,P.cts],[Rwi,P.cH-P.ctt],[cro,P.cH-P.ctt]],w:th*.12});
+  o.push({t:"poly",L:"HID",pts:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]});
+  dimH(o,cro,Rwi,-th*1.8,th,mm(Rwi-cro)); dimV(o,P.cts,P.cH-P.ctt,x1+th*1.4,th,mm(P.cH-P.ctt-P.cts)); dimV(o,0,P.cts,x1+th*1.4,th,mm(P.cts)); dimV(o,P.cH-P.ctt,P.cH,x1+th*1.4,th,mm(P.ctt));
+  o.push({t:"text",L:"TXT",x:(cro+Rwi)/2,z:(P.cts+P.cH-P.ctt)/2,h:th,s:"격벽",anchor:"middle"});
+  let lab=[`높이 ${mm(P.cH-P.ctt-P.cts)} (하부 슬래브 위 ~ 상판 아래)`,`길이 ${mm(Rwi-cro)} (기둥 외면 ~ 외벽 내면)`];
+  if(rebar){ const D=R.M.qty.detail, r1=D.rows.find(r=>r.mk==="R1"); if(r1){ const cv=P.cov/1000, d=BARS[r1.bar].d/1000, sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
+      const ln=(a,b,c,d2)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:d2,w:th*.14});
+      for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) ln(cro-Math.min(la,cro-cri-cv),z,Rwi+Math.min(la,P.ctw-cv),z);
+      for(let x=cro+cv;x<=Rwi-cv+1e-6;x+=sp) ln(x,P.cts-Math.min(la,P.cts-cv),x,P.cH-P.ctt+Math.min(la,P.ctt-cv));
+      lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·상판·기둥·외벽에 40d(부재 두께 이내)`]); } }
+  return {o,box:[x0,-th*3,x1+th*2.4,z1],lab,title:`방사형 격벽 단면 A-A ${rebar?"배근 ":""}상세`};
+}
+function detailSheetPrims(R,rebar){
+  const P=R.P, cais=P.type==="caisson", rg=ringSupport(P,R).map(g=>({...g,no:String.fromCharCode(0x2460+Math.min(g.i,19))}));
+  const makers=rg.map(g=>th=>ringCell(R,g,th,rebar)); if(cais&&P.cnr>=2){ if(!rebar) makers.push(th=>wallPlanCell(R,th)); makers.push(th=>wallSecCell(R,th,rebar)); }
+  const k0=1/1000, Wp=420, Hp=297, o=[], cols=3, rows=Math.max(1,Math.ceil(makers.length/cols)), sw=(Wp-28)/cols, sh=(Hp-22-52)/Math.min(2,rows)-4;
+  // 도면 좌표는 종이 mm(×0.001 m)로 두고 상세마다 축척을 따로 씀
+  const sheetK=0.4; const W=Wp*sheetK, H=Hp*sheetK;  // 종이 1 mm = 0.4 (선 굵기 기본값이 1:400 도면과 같게)
+  o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:.2*sheetK}); o.push({t:"poly",L:"SHT",pts:[[10*sheetK,10*sheetK],[W-10*sheetK,10*sheetK],[W-10*sheetK,H-10*sheetK],[10*sheetK,H-10*sheetK]],w:.5*sheetK});
+  const scs=[];
+  makers.slice(0,6).forEach((mk,i)=>{ const c=i%cols, r=Math.floor(i/cols), sx=14+c*sw, sz=Hp-16-r*(sh+4);
+    let sc=DSCALES[DSCALES.length-1], cell=null; for(const s2 of DSCALES){ const k=s2/1000, cl=mk(2.2*k), [a,b,c2,d]=cl.box; if((c2-a)/k<=sw-8&&(d-b)/k<=sh-26-cl.lab.length*3.8){ sc=s2; cell=cl; break; } } if(!cell){ cell=mk(2.2*sc/1000); }
+    const k=sc/1000, f=sheetK/k, [a,b]=cell.box, dx=sx*sheetK-a*f+4*sheetK, dz=(sz-10)*sheetK-cell.box[3]*f;
+    o.push(...mapPrims(cell.o,f,dx,dz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
+    o.push({t:"text",L:"STX",x:sx*sheetK,z:(sz-3)*sheetK,h:3.0*sheetK,s:`${cell.title}   S = 1 : ${sc}`});
+    let zl=(cell.box[1]*f+dz)-5*sheetK; cell.lab.forEach(t=>{ wrapTxt(t,2.2*sheetK,(sw-8)*sheetK).forEach(ln=>{ o.push({t:"text",L:"STX",x:sx*sheetK+2*sheetK,z:zl,h:2.2*sheetK,s:ln}); zl-=3.6*sheetK; }); });
+    scs.push(sc); });
+  if(!makers.length) o.push({t:"text",L:"STX",x:20*sheetK,z:(Hp-40)*sheetK,h:4*sheetK,s:"보강 링·격벽이 없어 상세가 없습니다."});
+  // 표제란
+  const tx=250*sheetK, ty=12*sheetK, tw=158*sheetK, thh=34*sheetK;
+  o.push({t:"poly",L:"SHT",pts:[[tx,ty],[tx+tw,ty],[tx+tw,ty+thh],[tx,ty+thh]],w:.4*sheetK});
+  [ty+12*sheetK,ty+23*sheetK].forEach(zz=>o.push({t:"line",L:"SHT",x1:tx,z1:zz,x2:tx+tw,z2:zz,w:.2*sheetK}));
+  o.push({t:"line",L:"SHT",x1:tx+40*sheetK,z1:ty,x2:tx+40*sheetK,z2:ty+thh,w:.2*sheetK});
+  const T=(x,zz,s2,h)=>o.push({t:"text",L:"STX",x,z:zz,h:(h||2.6)*sheetK,s:s2});
+  T(tx+2*sheetK,ty+27*sheetK,"공사명"); T(tx+42*sheetK,ty+27*sheetK,"해상풍력발전기 기초 — 중력식 "+(cais?"케이슨형":"원추형"),3);
+  T(tx+2*sheetK,ty+16*sheetK,"도면명"); T(tx+42*sheetK,ty+16*sheetK,`해상풍력발전기 기초 ${rebar?"배근 상세도":"상세도"} (보강 링${cais?"·격벽":""})`,3.4);
+  T(tx+2*sheetK,ty+5*sheetK,"축척"); T(tx+42*sheetK,ty+5*sheetK,`상세별 표기 (1 : ${[...new Set(scs)].join(", 1 : ")})    ${new Date().toLocaleDateString("ko-KR")}    ${baseName()}`,2.4);
+  T(14*sheetK,14*sheetK,rebar?"치수 mm. 철근 규격·간격은 배근도 철근재료표와 같다. 보강 링 연직철근은 저판 하부철근(또는 상판 상부철근)까지 이어 갈고리로 건다.":"치수 mm, 높이는 저판 하면 기준. 보강 링 위치·크기는 가정값(자동 배치 또는 직접 입력).",2.2);
+  return {o,box:[0,0,W,H],bg:1,mono:rebar?0:1,sc:scs[0]||0,n:makers.length};
+}
+function drawDetailSheets(which){
+  if(which!=="rb"){ const a=detailSheetPrims(R,false); $("svgGenD").innerHTML=primsSVG(a,"상세도"); $("genDNote").textContent=`A3 상세도 ${a.n}개`; }
+  if(which!=="gen"){ const b=detailSheetPrims(R,true); $("svgRbD").innerHTML=primsSVG(b,"배근 상세도"); $("rbDNote").textContent=`A3 배근 상세도 ${b.n}개`; }
+}
 function drawRebarSheet(){
   const pr=sheetPrims(R);
   $("svgRb").innerHTML=primsSVG(pr,"배근도");
@@ -3416,6 +3531,7 @@ document.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()
   openOpt(); $("optPanel").scrollIntoView({behavior:"smooth",block:"start"});
 }));
 
+[["genDZoom","genDWrap"],["rbDZoom","rbDWrap"]].forEach(([b,w])=>$(b).addEventListener("click",()=>{ const e=$(w); e.classList.toggle("zoom"); $(b).textContent=e.classList.contains("zoom")?"맞춰 보기":"크게 보기"; }));
 $("genZoom").addEventListener("click",()=>{ const w=$("genWrap"); w.classList.toggle("zoom"); $("genZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 $("rbZoom").addEventListener("click",()=>{ const w=$("rbWrap"); w.classList.toggle("zoom"); $("rbZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 

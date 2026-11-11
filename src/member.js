@@ -156,9 +156,12 @@ function rebarDetail(R,M){
     // 연직: 저판까지 곧게 닿는 면은 저판 하부철근 위까지 내려 갈고리(40d) — 시공 시 저판 철근에 걸어 세움
     const dSB=BARS[rb.sB.bar].d/1000, zBot=cv+2*dSB, Lfull=g.z+g.h-cv-zBot+Ld, Lfree=g.h-2*cv+0.2;
     const fI=ringToSlab(RG,g,g.ri+cv,cv), fO=ringToSlab(RG,g,g.ro-cv,cv), nI=2*PI*rmI/(d.s/1000), nO=2*PI*rmO/(d.s/1000);
-    const lab=f=>f?`, 저판 하부철근까지 내려 갈고리`:(g.side.length?", 옆 부재 연결철근으로 고정":"");
-    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,fI?Lfull:Lfree,"L");
-    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,fI?Lfull:Lfree,"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,fO?Lfull:Lfree,"L"); }
+    // 상판에 매달린 링: 위로 상판 상부철근 아래까지 올려 갈고리
+    const up=(g.above||[]).length>0, Lup=up?(P.cH-cv-2*BARS[distRB(P.ctt).bar].d/1000)-(g.z+cv)+Ld:0;
+    const lab=f=>f?`, 저판 하부철근까지 내려 갈고리`:up?", 상판 상부철근까지 올려 갈고리":(g.side.length?", 옆 부재 연결철근으로 고정":"");
+    const len=f=>f?Lfull:up?Lup:Lfree;
+    if(fI===fO) add(`G${k}2`,nm,`연직 (내·외면${lab(fI)})`,d,nI+nO,len(fI),"L");
+    else { add(`G${k}2`,nm,`연직 내면${lab(fI)}`,d,nI,len(fI),"L"); add(`G${k}2`,nm,`연직 외면${lab(fO)}`,d,nO,len(fO),"L"); }
     g.side.forEach(sd=>{ const n=(2*PI*sd.r/0.3)*(sd.h/0.3); add(`G${k}3`,nm,`연결철근 — ${sd.nm} (수평, 0.3 m 격자)`,{bar:d.bar,s:300},n,2*Ld,"I"); });
   });
   // 기둥

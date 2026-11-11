@@ -56,7 +56,7 @@ function shaftR(P){
   return {ro:P.Dc/2,ri:Math.max(0,P.Dc/2-P.tc),hex:null};
 }
 
-/* 보강 링 자동 배치 (가정): 두 곳
+/* 보강 링 자동 배치 (가정): 두 곳 (케이슨은 상판·기둥 접합부 포함 세 곳)
    ① 기둥 하단 링: 기둥 내면에 붙여 저판 상면에서 시작. 외경 = 기둥 내경, 두께 = 기둥 벽두께,
       높이 = 1.5 × 기둥 주철근 정착길이(40d) → 0.5 m 단위 올림 (최소 1.0 m)
    ② 벽체 접합부 링: 하부 원통(케이슨 외벽) 내면에 붙여 저판 상면에서 시작. 외경 = 벽체 내경, 두께 = max(0.5, 벽두께),
@@ -70,6 +70,9 @@ function autoRings(P){
   if(S.ri>0.5&&tcw>0) out.push({D:+(2*S.ri).toFixed(3),t:+Math.min(tcw,S.ri-0.3).toFixed(3),h:hOf((rb.cL||{}).bar||"H32",Math.max(1,P.ztop-zc-1)),z:+zc.toFixed(3),auto:"기둥 하단"});
   const Rwi=cais?P.cDw/2-P.ctw:P.Dw/2-P.tw, tw=cais?P.ctw:P.tw, hw=cais?P.cH-P.cts-P.ctt:P.hw;
   const tr=Math.max(0.5,tw); if(Rwi-tr>S.ro+0.5) out.push({D:+(2*Rwi).toFixed(3),t:+tr.toFixed(3),h:hOf((rb.wV||{}).bar||"H22",Math.max(1,hw)),z:+tb.toFixed(3),auto:"벽체 접합부"});
+  // ③ 케이슨 상판·기둥 접합부 링: 기둥 외면에 붙여 상판 하면에 매닮. 두께 = max(0.5, 상판 두께), 높이 = 1.5 × 기둥 주철근 40d (≤ 격실 높이의 1/3)
+  if(cais){ const t3=Math.max(0.5,P.ctt), h3=hOf((rb.cL||{}).bar||"H32",Math.max(1,hw/3)), z3=P.cH-P.ctt-h3;
+    if(S.ro+t3<Rwi-0.5&&z3>tb+0.5) out.push({D:+(2*(S.ro+t3)).toFixed(3),t:+t3.toFixed(3),h:+h3.toFixed(3),z:+z3.toFixed(3),auto:"상판·기둥 접합부"}); }
   return out;
 }
 function buildParts(P){
@@ -117,8 +120,9 @@ function ringSupport(P,R){
     rg.forEach(q=>{ if(q.i!==r.i&&Math.abs(q.z+q.h-z0)<eps){ const w=ov(ri,ro,q.D/2-q.t,q.D/2); if(w>eps) below.push({nm:`보강 링 ${q.i+1}`,w,a0:q.D/2-q.t,a1:q.D/2,ring:q.i}); } });
     const hc=ov(z0,z1,P.zc0,P.ztop); if(hc>eps){ if(Math.abs(ro-S.ri)<eps) side.push({nm:"기둥 내면",r:ro,h:hc}); if(Math.abs(ri-S.ro)<eps) side.push({nm:"기둥 외면",r:ri,h:hc}); }
     const hw=ov(z0,z1,zw0,zw1); if(hw>eps&&Math.abs(ro-Rwi)<eps) side.push({nm:cais?"외벽 내면":"원통 내면",r:ro,h:hw});
+    const above=[]; if(cais){ const zu=P.cH-P.ctt; if(Math.abs(z1-zu)<eps&&ri>=S.ro-eps&&ro<=Rwi+eps) above.push({nm:"상판",slab:true}); }
     const wb=below.reduce((a,b)=>Math.max(a,b.w),0);
-    return {...r,ro,ri,below,side,wb,float:!below.length&&!side.length,part:below.length&&wb<r.t-eps&&!side.length}; });
+    return {...r,ro,ri,below,side,above,wb,float:!below.length&&!side.length&&!above.length,part:below.length&&wb<r.t-eps&&!side.length&&!above.length}; });
 }
 
 /* ---------- Bessel (Numerical Recipes) ---------- */
