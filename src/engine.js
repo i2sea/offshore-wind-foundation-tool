@@ -32,7 +32,7 @@ const DEF={
   // 풍
   Uref:30,zref:10,Tavg:600,Cs:0.6,rhoa:1.225,
   // 파랑·조류
-  Hw:12,Tw:14,waveSrc:"",waveRef:null,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
+  Hw:12,Tw:14,waveSrc:"",waveSrcFile:"",waveRef:null,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
   // 지진
   kh:0.077,hydro:1,sgc:"",kfac:0.5,
   // 지반·검토

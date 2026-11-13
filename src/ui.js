@@ -49,7 +49,12 @@ function readInputs(){
 }
 function persist(){ try{ localStorage.setItem(LS,JSON.stringify(ST)); }catch(e){} }
 /* 설계파 파일 (관측 대시보드 "설계파 산정 보고서" 결과, app "design-wave") */
-function wvNote(){ const W=ST.waveRef; $("wvNote").textContent=W?`연결됨: ${W.title||"설계파 파일"}${W.reportNo?" ("+W.reportNo+")":""} · H ${W.Hmax} m, T ${W.T} s${W.depth?`, 수심 ${W.depth} m`:""}`:"설계파 파일 없음 (직접 입력)"; $("wvClr").hidden=!W; }
+/* 설계파 파일에서 채운 칸 표시: 파일 값 그대로면 파란 칸, 손으로 바꿨으면 주황 칸 */
+function wvMark(){ const W=ST.waveRef, src=W?ST.waveSrc:null; [["Hw",W&&W.Hmax],["Tw",W&&W.T],["waveSrc",null]].forEach(([k,v])=>{ const el=$(k); if(!el) return;
+    const same=!W?false:k==="waveSrc"?el.value.trim()!==""&&el.value.trim()===(ST.waveSrcFile||""):Math.abs(parseFloat(el.value)-v)<0.005;
+    el.classList.toggle("fromFile",!!W&&same); el.classList.toggle("fileDiff",!!W&&!same); el.title=W?(same?"설계파 파일에서 가져온 값":"설계파 파일 값과 다름"):""; }); }
+["Hw","Tw","waveSrc"].forEach(k=>$(k).addEventListener("input",wvMark));
+function wvNote(){ const W=ST.waveRef; $("wvNote").textContent=W?`연결됨: ${W.title||"설계파 파일"}${W.reportNo?" ("+W.reportNo+")":""} · H ${W.Hmax} m, T ${W.T} s${W.depth?`, 수심 ${W.depth} m`:""}`:"설계파 파일 없음 (직접 입력)"; $("wvClr").hidden=!W; wvMark(); }
 function wvParse(o){ if(!o||o.app!=="design-wave") throw new Error("설계파 파일(app: design-wave)이 아닙니다");
   const D=o.design||o, n=v=>{ const x=parseFloat(v); return isFinite(x)?x:0; };
   let Hmax=n(D.Hmax), note=""; const Hs=n(D.Hs); if(!(Hmax>0)&&Hs>0){ Hmax=+(1.8*Hs).toFixed(3); note="파일에 Hmax가 없어 1.8 × H1/3로 환산(가정)"; }
@@ -60,7 +65,7 @@ function wvParse(o){ if(!o||o.app!=="design-wave") throw new Error("설계파 �
 $("wvImp").addEventListener("change",async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return;
   try{ const W=wvParse(JSON.parse(await f.text())); const P=readInputs();
     const src=`${W.title}${W.reportNo?` (${W.reportNo})`:""}${W.site?` — ${W.site}`:""}${W.rp?`, 재현기간 ${W.rp}년`:""}${W.method?`, ${W.method}`:""} (첨부)`;
-    setInputs({...P,Hw:W.Hmax,Tw:W.T,waveRef:W,waveSrc:src}); igShow($("Hw")); run(); toast(`설계파를 가져왔습니다: H ${W.Hmax} m, T ${W.T} s${W.note?" — "+W.note:""}`);
+    setInputs({...P,Hw:W.Hmax,Tw:W.T,waveRef:W,waveSrc:src,waveSrcFile:src}); igShow($("Hw")); run(); toast(`설계파를 가져왔습니다: H ${W.Hmax} m, T ${W.T} s${W.note?" — "+W.note:""}`);
     ["Hw","Tw","waveSrc"].forEach(k=>{ $(k).classList.add("flash"); setTimeout(()=>$(k).classList.remove("flash"),1200); });
   }catch(err){ toast("가져오지 못했습니다: "+err.message); } });
 $("wvClr").addEventListener("click",()=>{ const P=readInputs(); setInputs({...P,waveRef:null}); run(); toast("설계파 파일 연결을 해제했습니다 (값은 그대로)"); });
