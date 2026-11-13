@@ -173,14 +173,14 @@ function computeMono(P){
   const qty={Ldr,Dd,Vexc,Vann,Dsc,Asc,Vsc,Aocc,Vplug,Apaint,Dsb0,Asb:PI/4*Dsb0*Dsb0};
 
   /* 주의 */
-  const crestDL=P.hwl+P.Hw/2;
+  const AC=airCrest(P), crestDL=AC.crestDL, gapA=AC.gap;
   if(T.scaled) warns.push({k:"scaled",msg:`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`});
   waveRefWarns(P).forEach(m=>warns.push({k:"wvRef",msg:m}));
   if(!TL.gu) warns.push({k:"noTL",msg:`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 계산합니다. 제작사 하중표를 넣으세요.`});
-  if(yIf<crestDL+1.5) warns.push({k:"ifLow",msg:`터빈 인터페이스 ${dlS(yIf)}가 설계 파봉 ${dlS(crestDL)} + 여유고 1.5 m보다 낮습니다.`,crestDL});
+  if(yIf<crestDL+gapA) warns.push({k:"ifLow",msg:`터빈 인터페이스 ${dlS(yIf)}가 설계 파봉 ${dlS(crestDL)} + 여유고 ${gapA} m보다 낮습니다.`,crestDL});
   if(yIf<=P.mtop+1) warns.push({k:"tpLen",msg:`말뚝 상단 ${dlS(P.mtop)}이 터빈 인터페이스 ${dlS(yIf)}보다 높거나 1 m 안쪽입니다. 트랜지션피스가 들어갈 자리가 없습니다.`});
   if(grout&&yTP0<=P.sbDL+1) warns.push({k:"tpLow",msg:`그라우트 연결 트랜지션피스 하단 ${dlS(yTP0)}이 해저면 가까이(1 m 이내)까지 내려갑니다.`});
-  if(!grout&&P.mtop<crestDL+1.5) warns.push({k:"flgLow",msg:`볼트 연결 플랜지(말뚝 상단 ${dlS(P.mtop)})가 설계 파봉 ${dlS(crestDL)} + 1.5 m보다 낮아 비말대에 있습니다.`,crestDL});
+  if(!grout&&P.mtop<crestDL+gapA) warns.push({k:"flgLow",msg:`볼트 연결 플랜지(말뚝 상단 ${dlS(P.mtop)})가 설계 파봉 ${dlS(crestDL)} + ${gapA} m보다 낮아 비말대에 있습니다.`,crestDL});
   if(g.taper&&P.mzA>=P.mzB) warns.push({k:"taper",msg:`테이퍼 구간 하단(${dlS(P.mzA)})이 상단(${dlS(P.mzB)})보다 높거나 같습니다.`});
   if(g.taper&&P.mDt>P.mD) warns.push({k:"taperUp",msg:`테이퍼형 상부 직경(${P.mDt} m)이 하부 직경(${P.mD} m)보다 큽니다.`});
   if(P.mz1>=P.mz2) warns.push({k:"zone",msg:`두께 구간 경계가 거꾸로입니다(하부 경계 ${dlS(P.mz1)} ≥ 상부 경계 ${dlS(P.mz2)}).`});

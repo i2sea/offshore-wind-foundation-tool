@@ -448,6 +448,7 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f"><label for="Tavg">풍속 평균시간 (s)</label><input id="Tavg" type="number" step="60"></div>
       <div class="f"><label for="Hw">설계 파고 H (m)</label><input id="Hw" type="number" step="0.01"></div>
       <div class="f"><label for="Tw">주기 T (s)</label><input id="Tw" type="number" step="0.1"></div>
+      <div class="f"><label for="airGap">에어갭 여유고 (m, 가정)</label><input id="airGap" type="number" step="0.1" title="파봉 위로 기둥 상단·플랫폼이 떨어져야 하는 거리. 파봉 = 설계파 보고서 파봉고, 없으면 0.65H"></div>
       <div class="f wide"><label for="waveSrc">설계파 출처 (계산서에 표기)</label><input id="waveSrc" type="text" placeholder="예: 설계파 산정 보고서(첨부) — 직접 입력 시 비워 둠"></div>
       <div class="f wide" style="flex-direction:row;gap:6px;align-items:center;flex-wrap:wrap"><label class="btn small" for="wvImp" style="cursor:pointer">설계파 파일 가져오기</label><input id="wvImp" type="file" accept=".json,application/json" hidden><button class="btn small" id="wvClr" type="button">연결 해제</button><span class="note" id="wvNote" style="font-size:11.5px"></span></div>
       <div class="f wide"><label for="crest">파랑 적분 상단</label><select id="crest"><option value="0">설계조위까지</option><option value="1">파봉(H/2)까지 연장</option></select></div>
@@ -635,7 +636,7 @@ const DEF={
   // 풍
   Uref:30,zref:10,Tavg:600,Cs:0.6,rhoa:1.225,
   // 파랑·조류
-  Hw:12,Tw:14,waveSrc:"",waveSrcFile:"",waveRef:null,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
+  Hw:12,Tw:14,waveSrc:"",waveSrcFile:"",waveRef:null,airGap:1.5,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
   // 지진
   kh:0.077,hydro:1,sgc:"",kfac:0.5,
   // 지반·검토
@@ -778,6 +779,10 @@ function freqBand(T,P){ const r=rpmOf(T,P), m=P.fmar; if(!r) return {r:null,f1P:
 function turbWeight(t){ return t.Wdirect>0?t.Wdirect:((t.rna||0)+(t.tower||0))*G; }
 
 /* ---------- 계산 ---------- */
+/* 에어갭 검토용 파봉: 설계파 파일의 파봉고(값이 지금 입력과 같을 때) → 없으면 0.65 H (비선형 근사, 가정). 파랑하중 적분 상단(H/2)과는 별개 */
+function airCrest(P){ const W=P.waveRef, useW=!!(W&&W.crest>0&&Math.abs(W.Hmax-P.Hw)<0.005&&Math.abs(W.T-P.Tw)<0.005);
+  const eta=useW?W.crest:0.65*P.Hw, gap=P.airGap>=0?P.airGap:1.5;
+  return {eta,useW,src:useW?`설계파 보고서 파봉고 ${W.crest} m`:`0.65 × H = 0.65 × ${P.Hw} = ${(0.65*P.Hw).toFixed(2)} m (비선형 파봉 근사, 가정)`,gap,crestDL:P.hwl+eta,needDL:P.hwl+eta+gap}; }
 /* 설계파 파일(설계파 산정 보고서 결과, app "design-wave")과 지금 입력 비교 → 경고 문장 */
 function waveRefWarns(P){ const W=P.waveRef, o=[]; if(!W) return o; const d=P.hwl-P.sbDL;
   if(Math.abs(W.Hmax-P.Hw)>0.005||Math.abs(W.T-P.Tw)>0.005) o.push(`설계파 입력(H ${P.Hw} m, T ${P.Tw} s)이 가져온 설계파 파일 값(H ${W.Hmax} m, T ${W.T} s)과 다릅니다. 계산서 출처 표기를 확인하세요.`);
@@ -851,6 +856,7 @@ function compute(P){
   if(T.scaled) warns.push(`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`);
   if(!TL.gu) warns.push(`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 안정검토합니다. 제작사 하중표를 넣으세요.`);
   waveRefWarns(P).forEach(m=>warns.push(m));
+  { const A=airCrest(P), topDL=P.ztop+P.zbDL; if(topDL<A.needDL-1e-6) warns.push(`구조물 상단(기둥 상단) DL${topDL>=0?"+":""}${topDL.toFixed(2)}이 설계 파봉 DL${A.crestDL>=0?"+":""}${A.crestDL.toFixed(2)} + 여유고 ${A.gap} m보다 낮습니다 (에어갭 부족).`); }
   if(!(Wt>0)) warns.push(`선택한 터빈(${T.name})에 RNA·타워 중량이 없습니다 (발전량 계산 도구에서 만든 터빈 파일 등). 터빈 자중 0으로 계산하므로 터빈 편집에서 중량을 넣으세요.`);
   if(T.ifzNote) warns.push(`선택한 터빈(${T.name})의 인터페이스 높이 MSL+${T.ifz} m는 가정값입니다 — ${T.ifzNote}`);
 
@@ -1517,14 +1523,14 @@ function computeMono(P){
   const qty={Ldr,Dd,Vexc,Vann,Dsc,Asc,Vsc,Aocc,Vplug,Apaint,Dsb0,Asb:PI/4*Dsb0*Dsb0};
 
   /* 주의 */
-  const crestDL=P.hwl+P.Hw/2;
+  const AC=airCrest(P), crestDL=AC.crestDL, gapA=AC.gap;
   if(T.scaled) warns.push({k:"scaled",msg:`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`});
   waveRefWarns(P).forEach(m=>warns.push({k:"wvRef",msg:m}));
   if(!TL.gu) warns.push({k:"noTL",msg:`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 계산합니다. 제작사 하중표를 넣으세요.`});
-  if(yIf<crestDL+1.5) warns.push({k:"ifLow",msg:`터빈 인터페이스 ${dlS(yIf)}가 설계 파봉 ${dlS(crestDL)} + 여유고 1.5 m보다 낮습니다.`,crestDL});
+  if(yIf<crestDL+gapA) warns.push({k:"ifLow",msg:`터빈 인터페이스 ${dlS(yIf)}가 설계 파봉 ${dlS(crestDL)} + 여유고 ${gapA} m보다 낮습니다.`,crestDL});
   if(yIf<=P.mtop+1) warns.push({k:"tpLen",msg:`말뚝 상단 ${dlS(P.mtop)}이 터빈 인터페이스 ${dlS(yIf)}보다 높거나 1 m 안쪽입니다. 트랜지션피스가 들어갈 자리가 없습니다.`});
   if(grout&&yTP0<=P.sbDL+1) warns.push({k:"tpLow",msg:`그라우트 연결 트랜지션피스 하단 ${dlS(yTP0)}이 해저면 가까이(1 m 이내)까지 내려갑니다.`});
-  if(!grout&&P.mtop<crestDL+1.5) warns.push({k:"flgLow",msg:`볼트 연결 플랜지(말뚝 상단 ${dlS(P.mtop)})가 설계 파봉 ${dlS(crestDL)} + 1.5 m보다 낮아 비말대에 있습니다.`,crestDL});
+  if(!grout&&P.mtop<crestDL+gapA) warns.push({k:"flgLow",msg:`볼트 연결 플랜지(말뚝 상단 ${dlS(P.mtop)})가 설계 파봉 ${dlS(crestDL)} + ${gapA} m보다 낮아 비말대에 있습니다.`,crestDL});
   if(g.taper&&P.mzA>=P.mzB) warns.push({k:"taper",msg:`테이퍼 구간 하단(${dlS(P.mzA)})이 상단(${dlS(P.mzB)})보다 높거나 같습니다.`});
   if(g.taper&&P.mDt>P.mD) warns.push({k:"taperUp",msg:`테이퍼형 상부 직경(${P.mDt} m)이 하부 직경(${P.mD} m)보다 큽니다.`});
   if(P.mz1>=P.mz2) warns.push({k:"zone",msg:`두께 구간 경계가 거꾸로입니다(하부 경계 ${dlS(P.mz1)} ≥ 상부 경계 ${dlS(P.mz2)}).`});
@@ -2066,11 +2072,11 @@ function computeJacket(P){
   qty.marg=prot?Math.max(1.0,Dsc/2):P.jPD/2+1.0;   // 점용 면적 여유: 보호공 반경 또는 말뚝 반경 + 1 m
   qty.Aocc=(()=>{ const R=g.Rz(g.zb)+qty.marg; return g.nL===4?2*R*R:3*Math.sqrt(3)/4*R*R; })(); // 다리 바깥 여유 다각형
   /* 주의 */
-  const crestDL=P.hwl+P.Hw/2;
+  const AC=airCrest(P), crestDL=AC.crestDL, gapA=AC.gap;
   if(T.scaled) warns.push({k:"scaled",msg:`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`});
   waveRefWarns(P).forEach(m=>warns.push({k:"wvRef",msg:m}));
   if(!TL.gu) warns.push({k:"noTL",msg:`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 계산합니다.`});
-  if(g.zt<crestDL+1.5) warns.push({k:"jTop",msg:`자켓 상단(TP 하단) ${dlS(g.zt)}이 설계 파봉 ${dlS(crestDL)} + 1.5 m보다 낮아 TP가 파도를 맞습니다.`,crestDL});
+  if(g.zt<crestDL+gapA) warns.push({k:"jTop",msg:`자켓 상단(TP 하단) ${dlS(g.zt)}이 설계 파봉 ${dlS(crestDL)} + ${gapA} m보다 낮아 TP가 파도를 맞습니다.`,crestDL});
   if(P.jWt>P.jWb) warns.push({k:"jBat",msg:`자켓 상단 다리 간격(${P.jWt} m)이 하단(${P.jWb} m)보다 넓습니다.`});
   if(uMax>1) { const w=chk.reduce((a,b)=>b.u>a.u?b:a); warns.push({k:"jMem",msg:`부재 검토 이용률 최대 ${isFinite(w.u)?w.u.toFixed(2):"∞ (오일러 좌굴 하중 초과)"} (${({leg:"다리",brace:"X 브레이스",mud:"하단 수평재",hz:"수평재"})[w.grp]}, ${w.lc}, ${w.mode})로 1을 넘습니다.`,grp:w.grp}); }
   const dtB=P.jBrD*1000/P.jBrt, dtL=P.jLD*1000/P.jLt;
@@ -2110,7 +2116,7 @@ const dl=v=>`DL(${v>=0?"+":"−"})${fx(Math.abs(v),3)}`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
 const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH","ctt","cnr","ctr","Dc","tc","ha","hth","hhn","zc0","ztop","Dp","tp",
-  "zf1","zf2","gf","gc","zbDL","sbDL","hwl","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","Uc","Uce","wcf","d0w","ks","kh","kfac",
+  "zf1","zf2","gf","gc","zbDL","sbDL","hwl","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
   "mu","qa","tilt","aeff","fck","fy","cov","kcr","phiF","gH","gE","fsO1","fsS1","fsO2","fsS2","fsO3","fsS3","qf3","dTow","ukc","gmMin","zcut","zbal","Wadd","zadd","padN","padB","padH",
   "mD","mDt","mzA","mzB","mtop","mL","mz1","mz2","mt1","mt2","mt3","mca","mfy","mgM","mgs","mgE","mtTP","mgap","mWsec","mgg","mDrG","mDrL","mScK","mScT","mScS","mmg","mRot","mFSc","mFSu",
   "jWb","jWt","jN","jRat","jTPh","jStub","jDir","jLD","jLt","jBrD","jBrt","jMbD","jMbt","jMg","jfy","jgM","jgE","jWtp","jWsec","jPD","jPt","jPL","jScK","jScT","jScS"];
@@ -2174,6 +2180,9 @@ $("wvImp").addEventListener("change",async e=>{ const f=e.target.files[0]; e.tar
     ["Hw","Tw","waveSrc"].forEach(k=>{ $(k).classList.add("flash"); setTimeout(()=>$(k).classList.remove("flash"),1200); });
   }catch(err){ toast("가져오지 못했습니다: "+err.message); } });
 $("wvClr").addEventListener("click",()=>{ const P=readInputs(); setInputs({...P,waveRef:null}); run(); toast("설계파 파일 연결을 해제했습니다 (값은 그대로)"); });
+function airGapHtml(P,topDL,nm){ const A=airCrest(P), ok=topDL>=A.needDL-1e-6;
+  return `<div class="eq">에어갭: 파봉 = 설계조위 + 파봉고 = ${dl(P.hwl)} + ${fx(A.eta,2)} = ${dl(A.crestDL)}  (파봉고: ${A.src})
+필요 상단 = 파봉 + 여유고 ${fx(A.gap,2)} m(가정) = ${dl(A.needDL)}  ${ok?"≤":">"}  ${nm} ${dl(topDL)}  → <span class="chip ${ok?"ok":"bad"}">${ok?"O.K":"N.G"}</span></div>`; }
 function waveSrcHtml(P){ if(!P.waveSrc&&!P.waveRef) return ""; const W=P.waveRef;
   return `<p>설계파는 ${P.waveSrc?esc(P.waveSrc):"설계파 파일"}에서 정한 값을 쓴다${W?` — 유의파고 H<sub>1/3</sub> ${W.Hs?fx(W.Hs,2)+" m":"–"}, 최대파고 H<sub>max</sub> ${fx(W.Hmax,2)} m, 주기 ${fx(W.T,2)} s${W.depth?`, 산정 수심 ${fx(W.depth,2)} m`:""}${W.Hb?`, 쇄파 한계 ${fx(W.Hb,2)} m`:""}${W.crest?`, 파봉고(정수면 위) ${fx(W.crest,2)} m`:""}${W.dir?`, 파향 ${esc(W.dir)}`:""}${W.note?` (${esc(W.note)})`:""}`:""}. 산정 과정은 첨부 보고서 참조.</p>`; }
 /* 입력 묶음 탭: 형상 / 수위·풍·파랑 / 터빈 / 지반·기준 / 부재·시공 / 전체 */
@@ -2388,11 +2397,13 @@ function warnInfo(w){
   if(/^1차 고유진동수 .*Hz가/.test(w)) return freqFixInfo();
   const P=R.P, r1=v=>Math.round(v*100)/100;
   if(/터빈 하중 인터페이스/.test(w)){
-    const dH=P.hwl-P.zbDL, crest=dH+P.Hw/2, need=crest+1.5, zdl=R.zIf+P.zbDL;
-    if(R.zIf<need) return {tip:`터빈 인터페이스(MSL+${R.T.ifz} m = 저판 하면에서 ${fx(R.zIf,2)} m, ${dl(zdl)})가 설계 파봉(${fx(crest,2)} m, ${dl(crest+P.zbDL)})에 여유고 1.5 m를 더한 ${fx(need,2)} m보다 낮습니다. 이 높이에 구조물 상단을 맞추면 파도가 넘칩니다. 터빈의 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
-      fixes:[{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
+    const A=airCrest(P), crest=A.crestDL-P.zbDL, need=A.needDL-P.zbDL, zdl=R.zIf+P.zbDL, tgt=r1(Math.max(R.zIf,Math.ceil(need*2)/2));
+    if(R.zIf<need) return {tip:`터빈 인터페이스(MSL+${R.T.ifz} m = 저판 하면에서 ${fx(R.zIf,2)} m, ${dl(zdl)})가 설계 파봉(${dl(A.crestDL)}, 파봉고 ${A.src})에 여유고 ${A.gap} m를 더한 ${dl(A.needDL)}보다 낮습니다. 이 높이에 구조물 상단을 맞추면 파도가 넘칩니다. 기둥 상단은 파봉 + 여유고로 두고, 타워 길이(인터페이스 높이)를 제작사와 맞춰야 합니다.`,
+      fixes:[{label:`기둥 상단을 필요 높이로 맞춤: 파봉 + 여유고 ${fx(tgt,1)} m (저판 하면 기준, ${dl(tgt+P.zbDL)})`,patch:{ztop:tgt}},{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
     return {tip:"터빈 하중표의 작용 높이와 기초 꼭대기 높이가 다르면 터빈 모멘트를 옮길 때 팔길이가 달라집니다. 실제 설계에서는 기초 상단이 터빈 인터페이스(타워 하단 플랜지)와 같아야 합니다. 높이는 저판 하면 기준입니다.",
-      fixes:[{label:`구조물 상단을 ${fx(R.zIf,2)} m로 (저판 하면 기준, ${dl(zdl)} = MSL+${R.T.ifz} m, 설계 파봉보다 ${fx(R.zIf-crest,1)} m 위)`,patch:{ztop:r1(R.zIf)}}]}; }
+      fixes:[{label:`기둥 상단을 필요 높이로 맞춤: 터빈 인터페이스 ${fx(R.zIf,2)} m (저판 하면 기준, ${dl(zdl)} = MSL+${R.T.ifz} m, 설계 파봉 + 여유고보다 ${fx(R.zIf-need,1)} m 위)`,patch:{ztop:r1(R.zIf)}}]}; }
+  if(/^구조물 상단\(기둥 상단\)/.test(w)){ const A=airCrest(P), need=A.needDL-P.zbDL, tgt=r1(Math.max(R.zIf,Math.ceil(need*2)/2));
+    return {tip:`파봉고는 ${A.src}, 여유고 ${A.gap} m(가정, 입력에서 변경)입니다. 기둥 상단(타워 하단 플랜지·작업대)이 이보다 낮으면 파도가 칩니다.`,fixes:[{label:`기둥 상단을 필요 높이로 맞춤: ${fx(tgt,1)} m (저판 하면 기준, ${dl(tgt+P.zbDL)})`,patch:{ztop:tgt}}]}; }
   if(/수면이 (원추|기둥)에 걸립니다/.test(w)){ const a=bestZcut(P), b=widenForTow(P), fx_=[];
     if(a) fx_.push({label:`예인 시 상단 높이를 ${fx(a.z,1)} m로 (저판 하면 기준, 나머지는 해상 시공, GM ${fx(a.f.GM,2)} m)`,patch:{zcut:a.z}});
     if(b) fx_.push({label:`${b.k==="hw"?"원통 높이":"케이슨 높이"}를 ${fx(b.v,1)} m로 (GM ${fx(b.f.GM,2)} m)`,patch:{[b.k]:b.v,zf1:b.zf1,...(b.zf2?{zf2:b.zf2}:{})}});
@@ -2454,7 +2465,7 @@ function wallIn(P,z){ if(P.type==="caisson") return P.cDw/2-P.ctw; const z1=P.tb
 function ringList(P){ return (P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0).map((r,i)=>({...r,no:String.fromCharCode(0x2460+Math.min(i,19))})); }
 /* 설계파 표시(정면도 오른쪽): 파형 스케치(2차 성분으로 파봉 뾰족), 파봉·파곡 선, 파고 치수, 제원. zHW = 그림 좌표의 설계조위, off = 표고(DL) − 그림 좌표 */
 function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb-xa>6)) return;
-  const W=P.waveRef, ec=H/2, zc=zHW+ec, zt=zHW-(H-ec), a=H/2, b=Math.min(H*0.08,ec*0.3), n=60, Lw=(xb-xa)/1.25, pts=[];
+  const W=P.waveRef, AC=airCrest(P), ec=Math.min(H*0.95,Math.max(H*0.5,AC.eta)), zc=zHW+ec, zt=zHW-(H-ec), a=H/2, b=Math.min(H*0.08,ec*0.3), n=60, Lw=(xb-xa)/1.25, pts=[];
   for(let i=0;i<=n;i++){ const x=xa+(xb-xa)*i/n, th=2*Math.PI*(x-xa-Lw*0.35)/Lw; pts.push([x,zHW+a*Math.cos(th)+b*Math.cos(2*th)]); }
   // 파형이 정확히 파봉·파곡에 닿도록 맞춤
   const mx=Math.max(...pts.map(p=>p[1])), mn=Math.min(...pts.map(p=>p[1])); pts.forEach(p=>{ p[1]=zt+(p[1]-mn)*(zc-zt)/(mx-mn); });
@@ -2463,11 +2474,12 @@ function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb
   if(crestLine!==false) o.push({t:"line",L:"WL",x1:xa,z1:zc,x2:xb,z2:zc,dash:1});
   o.push({t:"line",L:"WL",x1:xa,z1:zt,x2:xb,z2:zt,dash:1});
   if(crestLine!==false) o.push({t:"text",L:"WL",x:xb,z:zc+fs*0.35,h:fs*.75,s:`파봉 ${dl(zc+off)}`,anchor:"end"});
+  if(crestLine!==false&&AC.gap>0){ const zg=zc+AC.gap; o.push({t:"line",L:"WL",x1:xa,z1:zg,x2:xb,z2:zg,dash:1}); o.push({t:"text",L:"WL",x:xa,z:zg+fs*0.35,h:fs*.7,s:`파봉 + 여유고 ${dl(zg+off)}`}); }
   o.push({t:"text",L:"WL",x:xb,z:zt-fs*1.05,h:fs*.75,s:`파곡 ${dl(zt+off)}`,anchor:"end"});
   const xd=xc; o.push({t:"line",L:"DIM",x1:xd,z1:zt,x2:xd,z2:zc}); [zc,zt].forEach(z=>o.push({t:"line",L:"DIM",x1:xd-fs*.35,z1:z-fs*.35,x2:xd+fs*.35,z2:z+fs*.35}));
   const lab=[`설계파 H = ${fx(H,2)} m, T = ${fx(P.Tw,1)} s`]; if(W) lab.push(`${W.title||"설계파 산정 보고서"}${W.reportNo?` (${W.reportNo})`:""} 첨부`);
-  if(W&&W.crest>0&&Math.abs(W.crest-ec)>0.05) lab.push(`보고서 파봉고 정수면 +${fx(W.crest,2)} m (계산은 H/2)`);
-  lab.forEach((t,i)=>o.push({t:"text",L:"DIM",x:xb,z:zc+fs*(1.5+1.05*(lab.length-1-i)),h:fs*.75,s:t,anchor:"end"})); }
+  lab.push(`파봉고 +${fx(ec,2)} m (${AC.useW?"설계파 보고서":"0.65H, 가정"}), 여유고 ${fx(AC.gap,1)} m`);
+  lab.forEach((t,i)=>o.push({t:"text",L:"DIM",x:xb,z:zc+(crestLine!==false?AC.gap:0)+fs*(1.5+1.05*(lab.length-1-i)),h:fs*.75,s:t,anchor:"end"})); }
 function secPrims(R){
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
@@ -2730,7 +2742,7 @@ C<sub>D</sub> = 1.05                       (Δ &gt; 10⁻², 거친 면)
     const sh=(dd,c)=>dd<1e-4?"0.65 (매끈)":dd>1e-2?"1.05 (거침)":`(29 + 4·log₁₀ ${dd.toExponential(2)}) / 20`;
     h+=`<tr><td class="n">${fx(r.z0,2)} ~ ${fx(r.z1,2)}</td><td class="n">${one?fx(r.Da,3):fx(r.Da,2)+" → "+fx(r.Db,2)}</td><td class="n">${one?r.dA.toExponential(2):r.dA.toExponential(2)+" → "+r.dB.toExponential(2)}</td><td class="fm">${one?sh(r.dA):sh(r.dA)+" → "+sh(r.dB)}</td><td class="n">${one?fx(r.cA,3):fx(r.cA,3)+" → "+fx(r.cB,3)}</td></tr>`; });
   h+=`</tbody></table></div><p class="note">높이마다 그 높이의 외곽 직경으로 C<sub>D</sub>를 다시 계산해 파랑 항력과 조류하중에 씁니다.${R.S.hex?" 육각 샤프트는 면적이 같은 원의 직경으로 원형 식을 적용했습니다. 육각 단면은 모서리에서 흐름이 떨어져 원형보다 클 수 있으니 기준 표로 확인하세요.":""} 파랑 항력은 KC 수에 따른 후류 보정 없이 정상류 값을 썼습니다.</p>`;
-  h+=`<h3>5. 파랑하중 (MacCamy-Fuchs 회절 관성력 + 항력)</h3>${waveSrcHtml(P)}
+  h+=`<h3>5. 파랑하중 (MacCamy-Fuchs 회절 관성력 + 항력)</h3>${waveSrcHtml(P)}${airGapHtml(P,P.ztop+P.zbDL,"기둥 상단")}
   <div class="eq">수심 d = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = 2π/T = ${fx(V.w,4)} rad/s
 분산식 ω² = g·k·tanh(kd) → k = ${fx(V.k,5)} /m,  파장 L = ${fx(V.L,2)} m,  해수면 D/L = ${fx(V.DL,3)}
 C<sub>M</sub> = 4 / {π(ka)² √(J₁′(ka)² + Y₁′(ka)²)}
@@ -3867,12 +3879,12 @@ function monoWarnInfo(w){
   const P=R.P, g=R.g, r1=v=>Math.round(v*100)/100;
   if(w.k==="noTL") return {tip:"하중표가 없으면 터빈의 수평력·모멘트가 빠져 해저면 단면력이 실제보다 작게 나옵니다. 제작사 인터페이스 하중(ULS·SLS 12행)을 넣어야 합니다.",
     fixes:[{label:"하중표가 든 터빈 파일 가져오기",act:()=>$("tImp").click()},{label:"선택 터빈 복제해서 하중표 입력",act:()=>$("tDup").click()}]};
-  if(w.k==="ifLow") return {tip:`TP 상단(= 터빈 인터페이스)이 설계 파봉 ${dl(w.crestDL)}에 여유고 1.5 m를 더한 ${dl(w.crestDL+1.5)}보다 낮으면 파도가 타워 하단 플랜지와 작업 플랫폼을 칩니다. 터빈 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
+  if(w.k==="ifLow") return {tip:`TP 상단(= 터빈 인터페이스)이 설계 파봉 ${dl(w.crestDL)}에 여유고 ${R.P.airGap} m를 더한 ${dl(w.crestDL+R.P.airGap)}보다 낮으면 파도가 타워 하단 플랜지와 작업 플랫폼을 칩니다. 터빈 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
     fixes:[{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
   if(w.k==="tpLen"){ const v=r1(R.yIf-3); return {tip:"말뚝 상단은 TP 상단(터빈 인터페이스)보다 충분히 아래여야 TP가 들어갑니다.",fixes:[{label:"수정 (TP 길이 3 m 확보)",patch:{mtop:v}}]}; }
   if(w.k==="tpLow"){ const v=r1(Math.min(R.yIf-2,P.sbDL+2+g.Lov)); return {tip:`그라우트 연결 길이(1.5 × 말뚝 상단 직경 = ${fx(g.Lov,2)} m)만큼 TP가 말뚝을 감싸 내려옵니다. 말뚝 상단이 낮으면 TP 하단이 해저면에 닿습니다. 말뚝 상단을 올리거나 볼트 연결로 바꾸세요.`,
     fixes:[{label:"수정 (TP 하단을 해저면 2 m 위로)",patch:{mtop:v}},{label:"수정 (볼트 연결이면 TP 하단 = 말뚝 상단)",patch:{mTP:"bolt"}}]}; }
-  if(w.k==="flgLow"){ const v=r1(Math.min(R.yIf-2,Math.ceil((w.crestDL+1.5)*2)/2)); return {tip:"볼트 연결 플랜지가 파도에 직접 맞는 높이에 있으면 부식·피로에 불리하고 볼트 점검이 어렵습니다. 플랜지를 파봉 위로 올리거나 그라우트 연결로 바꾸세요.",
+  if(w.k==="flgLow"){ const v=r1(Math.min(R.yIf-2,Math.ceil((w.crestDL+R.P.airGap)*2)/2)); return {tip:"볼트 연결 플랜지가 파도에 직접 맞는 높이에 있으면 부식·피로에 불리하고 볼트 점검이 어렵습니다. 플랜지를 파봉 위로 올리거나 그라우트 연결로 바꾸세요.",
     fixes:[...(v>P.mtop?[{label:"수정 (플랜지를 파봉 + 1.5 m 위로)",patch:{mtop:v}}]:[]),{label:"수정 (TP가 말뚝을 감싸 플랜지가 TP 상단으로 올라감)",patch:{mTP:"grout"}}]}; }
   if(w.k==="taper") return {tip:"테이퍼 구간은 하단 표고가 상단보다 낮아야 합니다.",fixes:[{label:"수정 (두 값 바꾸기)",patch:{mzA:P.mzB,mzB:P.mzA}}]};
   if(w.k==="taperUp") return {tip:"모노파일 테이퍼는 보통 아래(해저면 쪽, 모멘트 큰 곳)가 넓고 위(TP 쪽)가 좁습니다. 의도한 형상인지 확인하세요.",fixes:[{label:"수정 (상·하부 직경 바꾸기)",patch:{mD:P.mDt,mDt:P.mD}}]};
@@ -4057,7 +4069,7 @@ F = C<sub>s</sub> · ½ρ<sub>a</sub>U² · D,  C<sub>s</sub> = ${P.Cs}.  적용
     h+=`<tr><td class="n">${dl(r.y0)} ~ ${dl(r.y1)}</td><td class="n">${one?fx(r.Da,3):fx(r.Da,3)+" → "+fx(r.Db,3)}</td><td class="n">${one?r.dA.toExponential(2):r.dA.toExponential(2)+" → "+r.dB.toExponential(2)}</td><td class="n">${one?fx(r.cdA,3):fx(r.cdA,3)+" → "+fx(r.cdB,3)}</td></tr>`; });
   h+=`</tbody></table></div>`;
   h+=`<h3>5. 파랑하중</h3>
-  ${waveSrcHtml(P)}<div class="eq">수심 d = 설계조위 − 원지반 = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = ${fx(V.w,4)} rad/s
+  ${waveSrcHtml(P)}${airGapHtml(P,R.yIf,"TP 상단(인터페이스)")}<div class="eq">수심 d = 설계조위 − 원지반 = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = ${fx(V.w,4)} rad/s
 분산식 ω² = g·k·tanh(kd) → k = ${fx(V.k,5)} /m,  파장 L = ${fx(V.L,2)} m
 해수면 직경 D = ${fx(V.Dsw,3)} m → D/L = ${fx(V.DL,3)} ${V.diff?"&gt; 0.2 → 회절 영역 (MacCamy-Fuchs 관성력)":"≤ 0.2 → 회절 영향 작음 (Morison 영역). MacCamy-Fuchs 식은 ka가 작으면 C<sub>M</sub> → 2.0으로 Morison 식과 같아지므로 같은 식으로 계산"}
 C<sub>M</sub> = 4 / {π(ka)² √(J₁′(ka)² + Y₁′(ka)²)},  a = D(z)/2
@@ -4420,7 +4432,7 @@ function renderJacketSummary(){
 function jacketWarnInfo(w){
   const P=R.P, r1=v=>Math.round(v*100)/100;
   if(["scaled","noTL","noFref"].includes(w.k)) return monoWarnInfo(w);
-  if(w.k==="jTop"){ const v=r1(R.yIf-(w.crestDL+1.5)); return {tip:"자켓 상단(TP 하단)이 파봉에 걸리면 TP가 큰 파랑하중을 받습니다. TP 높이를 줄여 자켓 상단을 올리거나, 터빈 인터페이스 높이를 확인하세요.",
+  if(w.k==="jTop"){ const v=r1(R.yIf-(w.crestDL+R.P.airGap)); return {tip:"자켓 상단(TP 하단)이 파봉에 걸리면 TP가 큰 파랑하중을 받습니다. TP 높이를 줄여 자켓 상단을 올리거나, 터빈 인터페이스 높이를 확인하세요.",
     fixes:v>=1?[{label:"수정 (자켓 상단을 파봉 + 1.5 m로)",patch:{jTPh:v}}]:[{label:"선택 터빈의 인터페이스 높이 확인 (터빈 편집)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]}; }
   if(w.k==="jBat") return {tip:"자켓은 보통 아래가 넓습니다(경사 다리).",fixes:[{label:"수정 (상·하단 간격 바꾸기)",patch:{jWb:P.jWt,jWt:P.jWb}}]};
   if(w.k==="jDtB"){ const v=Math.ceil(P.jBrD*1000/60/5)*5; return {tip:"브레이스가 얇으면 접합부 펀칭 전단과 국부좌굴에 불리합니다. D/t 20~60이 보통입니다.",fixes:[{label:"수정 (D/t ≤ 60)",patch:{jBrt:v}}]}; }
@@ -4543,7 +4555,7 @@ function htmlJkLoad(){
   h+=TL.uls?turbTablesHtml(TL,t):`<p class="warn">이 터빈은 하중표가 없어 터빈 수평력·모멘트가 빠집니다.</p>`;
   h+=`<h3>2. 고유진동수</h3>`+htmlJkFreq();
   h+=`<h3>3. 파랑 + 극치 조류 (부재별 Morison)</h3>
-  ${waveSrcHtml(P)}<div class="eq">수심 d = ${fx(W.d,3)} m, H = ${P.Hw} m, T = ${P.Tw} s → k = ${fx(W.k,5)} /m, 파장 L = ${fx(W.L,2)} m (선형파)
+  ${waveSrcHtml(P)}${airGapHtml(P,R.g.zt,"자켓 상단(TP 하단)")}<div class="eq">수심 d = ${fx(W.d,3)} m, H = ${P.Hw} m, T = ${P.Tw} s → k = ${fx(W.k,5)} /m, 파장 L = ${fx(W.L,2)} m (선형파)
 부재를 약 1 m 조각으로 나누고 조각마다 부재 축에 직각인 성분만 사용:
   f = ρ·C<sub>M</sub>·πD²/4·a<sub>n</sub> + ½ρ·C<sub>D</sub>·D·|v<sub>n</sub>|·v<sub>n</sub>,  v = 파랑 입자속도(수평·연직) + 조류(극치 ${P.Uce} m/s + 바람 해류 ${fx(ld.Uw0,3)} m/s)
   D = 외경 + 2 × 해양생물 ${P.jMg} mm,  C<sub>M</sub> = MacCamy-Fuchs(ka) ≈ 2.0 (가는 부재),  C<sub>D</sub> = 표면 거칠기 k = ${P.ks} mm와 D로 계산 (하중 탭 항력계수 식과 같음)

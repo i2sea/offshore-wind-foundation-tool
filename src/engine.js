@@ -32,7 +32,7 @@ const DEF={
   // 풍
   Uref:30,zref:10,Tavg:600,Cs:0.6,rhoa:1.225,
   // 파랑·조류
-  Hw:12,Tw:14,waveSrc:"",waveSrcFile:"",waveRef:null,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
+  Hw:12,Tw:14,waveSrc:"",waveSrcFile:"",waveRef:null,airGap:1.5,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
   // 지진
   kh:0.077,hydro:1,sgc:"",kfac:0.5,
   // 지반·검토
@@ -175,6 +175,10 @@ function freqBand(T,P){ const r=rpmOf(T,P), m=P.fmar; if(!r) return {r:null,f1P:
 function turbWeight(t){ return t.Wdirect>0?t.Wdirect:((t.rna||0)+(t.tower||0))*G; }
 
 /* ---------- 계산 ---------- */
+/* 에어갭 검토용 파봉: 설계파 파일의 파봉고(값이 지금 입력과 같을 때) → 없으면 0.65 H (비선형 근사, 가정). 파랑하중 적분 상단(H/2)과는 별개 */
+function airCrest(P){ const W=P.waveRef, useW=!!(W&&W.crest>0&&Math.abs(W.Hmax-P.Hw)<0.005&&Math.abs(W.T-P.Tw)<0.005);
+  const eta=useW?W.crest:0.65*P.Hw, gap=P.airGap>=0?P.airGap:1.5;
+  return {eta,useW,src:useW?`설계파 보고서 파봉고 ${W.crest} m`:`0.65 × H = 0.65 × ${P.Hw} = ${(0.65*P.Hw).toFixed(2)} m (비선형 파봉 근사, 가정)`,gap,crestDL:P.hwl+eta,needDL:P.hwl+eta+gap}; }
 /* 설계파 파일(설계파 산정 보고서 결과, app "design-wave")과 지금 입력 비교 → 경고 문장 */
 function waveRefWarns(P){ const W=P.waveRef, o=[]; if(!W) return o; const d=P.hwl-P.sbDL;
   if(Math.abs(W.Hmax-P.Hw)>0.005||Math.abs(W.T-P.Tw)>0.005) o.push(`설계파 입력(H ${P.Hw} m, T ${P.Tw} s)이 가져온 설계파 파일 값(H ${W.Hmax} m, T ${W.T} s)과 다릅니다. 계산서 출처 표기를 확인하세요.`);
@@ -248,6 +252,7 @@ function compute(P){
   if(T.scaled) warns.push(`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`);
   if(!TL.gu) warns.push(`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 안정검토합니다. 제작사 하중표를 넣으세요.`);
   waveRefWarns(P).forEach(m=>warns.push(m));
+  { const A=airCrest(P), topDL=P.ztop+P.zbDL; if(topDL<A.needDL-1e-6) warns.push(`구조물 상단(기둥 상단) DL${topDL>=0?"+":""}${topDL.toFixed(2)}이 설계 파봉 DL${A.crestDL>=0?"+":""}${A.crestDL.toFixed(2)} + 여유고 ${A.gap} m보다 낮습니다 (에어갭 부족).`); }
   if(!(Wt>0)) warns.push(`선택한 터빈(${T.name})에 RNA·타워 중량이 없습니다 (발전량 계산 도구에서 만든 터빈 파일 등). 터빈 자중 0으로 계산하므로 터빈 편집에서 중량을 넣으세요.`);
   if(T.ifzNote) warns.push(`선택한 터빈(${T.name})의 인터페이스 높이 MSL+${T.ifz} m는 가정값입니다 — ${T.ifzNote}`);
 

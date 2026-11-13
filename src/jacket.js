@@ -246,11 +246,11 @@ function computeJacket(P){
   qty.marg=prot?Math.max(1.0,Dsc/2):P.jPD/2+1.0;   // 점용 면적 여유: 보호공 반경 또는 말뚝 반경 + 1 m
   qty.Aocc=(()=>{ const R=g.Rz(g.zb)+qty.marg; return g.nL===4?2*R*R:3*Math.sqrt(3)/4*R*R; })(); // 다리 바깥 여유 다각형
   /* 주의 */
-  const crestDL=P.hwl+P.Hw/2;
+  const AC=airCrest(P), crestDL=AC.crestDL, gapA=AC.gap;
   if(T.scaled) warns.push({k:"scaled",msg:`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`});
   waveRefWarns(P).forEach(m=>warns.push({k:"wvRef",msg:m}));
   if(!TL.gu) warns.push({k:"noTL",msg:`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 계산합니다.`});
-  if(g.zt<crestDL+1.5) warns.push({k:"jTop",msg:`자켓 상단(TP 하단) ${dlS(g.zt)}이 설계 파봉 ${dlS(crestDL)} + 1.5 m보다 낮아 TP가 파도를 맞습니다.`,crestDL});
+  if(g.zt<crestDL+gapA) warns.push({k:"jTop",msg:`자켓 상단(TP 하단) ${dlS(g.zt)}이 설계 파봉 ${dlS(crestDL)} + ${gapA} m보다 낮아 TP가 파도를 맞습니다.`,crestDL});
   if(P.jWt>P.jWb) warns.push({k:"jBat",msg:`자켓 상단 다리 간격(${P.jWt} m)이 하단(${P.jWb} m)보다 넓습니다.`});
   if(uMax>1) { const w=chk.reduce((a,b)=>b.u>a.u?b:a); warns.push({k:"jMem",msg:`부재 검토 이용률 최대 ${isFinite(w.u)?w.u.toFixed(2):"∞ (오일러 좌굴 하중 초과)"} (${({leg:"다리",brace:"X 브레이스",mud:"하단 수평재",hz:"수평재"})[w.grp]}, ${w.lc}, ${w.mode})로 1을 넘습니다.`,grp:w.grp}); }
   const dtB=P.jBrD*1000/P.jBrt, dtL=P.jLD*1000/P.jLt;

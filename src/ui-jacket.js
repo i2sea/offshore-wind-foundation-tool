@@ -32,7 +32,7 @@ function renderJacketSummary(){
 function jacketWarnInfo(w){
   const P=R.P, r1=v=>Math.round(v*100)/100;
   if(["scaled","noTL","noFref"].includes(w.k)) return monoWarnInfo(w);
-  if(w.k==="jTop"){ const v=r1(R.yIf-(w.crestDL+1.5)); return {tip:"자켓 상단(TP 하단)이 파봉에 걸리면 TP가 큰 파랑하중을 받습니다. TP 높이를 줄여 자켓 상단을 올리거나, 터빈 인터페이스 높이를 확인하세요.",
+  if(w.k==="jTop"){ const v=r1(R.yIf-(w.crestDL+R.P.airGap)); return {tip:"자켓 상단(TP 하단)이 파봉에 걸리면 TP가 큰 파랑하중을 받습니다. TP 높이를 줄여 자켓 상단을 올리거나, 터빈 인터페이스 높이를 확인하세요.",
     fixes:v>=1?[{label:"수정 (자켓 상단을 파봉 + 1.5 m로)",patch:{jTPh:v}}]:[{label:"선택 터빈의 인터페이스 높이 확인 (터빈 편집)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]}; }
   if(w.k==="jBat") return {tip:"자켓은 보통 아래가 넓습니다(경사 다리).",fixes:[{label:"수정 (상·하단 간격 바꾸기)",patch:{jWb:P.jWt,jWt:P.jWb}}]};
   if(w.k==="jDtB"){ const v=Math.ceil(P.jBrD*1000/60/5)*5; return {tip:"브레이스가 얇으면 접합부 펀칭 전단과 국부좌굴에 불리합니다. D/t 20~60이 보통입니다.",fixes:[{label:"수정 (D/t ≤ 60)",patch:{jBrt:v}}]}; }
@@ -155,7 +155,7 @@ function htmlJkLoad(){
   h+=TL.uls?turbTablesHtml(TL,t):`<p class="warn">이 터빈은 하중표가 없어 터빈 수평력·모멘트가 빠집니다.</p>`;
   h+=`<h3>2. 고유진동수</h3>`+htmlJkFreq();
   h+=`<h3>3. 파랑 + 극치 조류 (부재별 Morison)</h3>
-  ${waveSrcHtml(P)}<div class="eq">수심 d = ${fx(W.d,3)} m, H = ${P.Hw} m, T = ${P.Tw} s → k = ${fx(W.k,5)} /m, 파장 L = ${fx(W.L,2)} m (선형파)
+  ${waveSrcHtml(P)}${airGapHtml(P,R.g.zt,"자켓 상단(TP 하단)")}<div class="eq">수심 d = ${fx(W.d,3)} m, H = ${P.Hw} m, T = ${P.Tw} s → k = ${fx(W.k,5)} /m, 파장 L = ${fx(W.L,2)} m (선형파)
 부재를 약 1 m 조각으로 나누고 조각마다 부재 축에 직각인 성분만 사용:
   f = ρ·C<sub>M</sub>·πD²/4·a<sub>n</sub> + ½ρ·C<sub>D</sub>·D·|v<sub>n</sub>|·v<sub>n</sub>,  v = 파랑 입자속도(수평·연직) + 조류(극치 ${P.Uce} m/s + 바람 해류 ${fx(ld.Uw0,3)} m/s)
   D = 외경 + 2 × 해양생물 ${P.jMg} mm,  C<sub>M</sub> = MacCamy-Fuchs(ka) ≈ 2.0 (가는 부재),  C<sub>D</sub> = 표면 거칠기 k = ${P.ks} mm와 D로 계산 (하중 탭 항력계수 식과 같음)

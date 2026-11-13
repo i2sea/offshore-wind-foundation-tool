@@ -41,12 +41,12 @@ function monoWarnInfo(w){
   const P=R.P, g=R.g, r1=v=>Math.round(v*100)/100;
   if(w.k==="noTL") return {tip:"하중표가 없으면 터빈의 수평력·모멘트가 빠져 해저면 단면력이 실제보다 작게 나옵니다. 제작사 인터페이스 하중(ULS·SLS 12행)을 넣어야 합니다.",
     fixes:[{label:"하중표가 든 터빈 파일 가져오기",act:()=>$("tImp").click()},{label:"선택 터빈 복제해서 하중표 입력",act:()=>$("tDup").click()}]};
-  if(w.k==="ifLow") return {tip:`TP 상단(= 터빈 인터페이스)이 설계 파봉 ${dl(w.crestDL)}에 여유고 1.5 m를 더한 ${dl(w.crestDL+1.5)}보다 낮으면 파도가 타워 하단 플랜지와 작업 플랫폼을 칩니다. 터빈 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
+  if(w.k==="ifLow") return {tip:`TP 상단(= 터빈 인터페이스)이 설계 파봉 ${dl(w.crestDL)}에 여유고 ${R.P.airGap} m를 더한 ${dl(w.crestDL+R.P.airGap)}보다 낮으면 파도가 타워 하단 플랜지와 작업 플랫폼을 칩니다. 터빈 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
     fixes:[{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
   if(w.k==="tpLen"){ const v=r1(R.yIf-3); return {tip:"말뚝 상단은 TP 상단(터빈 인터페이스)보다 충분히 아래여야 TP가 들어갑니다.",fixes:[{label:"수정 (TP 길이 3 m 확보)",patch:{mtop:v}}]}; }
   if(w.k==="tpLow"){ const v=r1(Math.min(R.yIf-2,P.sbDL+2+g.Lov)); return {tip:`그라우트 연결 길이(1.5 × 말뚝 상단 직경 = ${fx(g.Lov,2)} m)만큼 TP가 말뚝을 감싸 내려옵니다. 말뚝 상단이 낮으면 TP 하단이 해저면에 닿습니다. 말뚝 상단을 올리거나 볼트 연결로 바꾸세요.`,
     fixes:[{label:"수정 (TP 하단을 해저면 2 m 위로)",patch:{mtop:v}},{label:"수정 (볼트 연결이면 TP 하단 = 말뚝 상단)",patch:{mTP:"bolt"}}]}; }
-  if(w.k==="flgLow"){ const v=r1(Math.min(R.yIf-2,Math.ceil((w.crestDL+1.5)*2)/2)); return {tip:"볼트 연결 플랜지가 파도에 직접 맞는 높이에 있으면 부식·피로에 불리하고 볼트 점검이 어렵습니다. 플랜지를 파봉 위로 올리거나 그라우트 연결로 바꾸세요.",
+  if(w.k==="flgLow"){ const v=r1(Math.min(R.yIf-2,Math.ceil((w.crestDL+R.P.airGap)*2)/2)); return {tip:"볼트 연결 플랜지가 파도에 직접 맞는 높이에 있으면 부식·피로에 불리하고 볼트 점검이 어렵습니다. 플랜지를 파봉 위로 올리거나 그라우트 연결로 바꾸세요.",
     fixes:[...(v>P.mtop?[{label:"수정 (플랜지를 파봉 + 1.5 m 위로)",patch:{mtop:v}}]:[]),{label:"수정 (TP가 말뚝을 감싸 플랜지가 TP 상단으로 올라감)",patch:{mTP:"grout"}}]}; }
   if(w.k==="taper") return {tip:"테이퍼 구간은 하단 표고가 상단보다 낮아야 합니다.",fixes:[{label:"수정 (두 값 바꾸기)",patch:{mzA:P.mzB,mzB:P.mzA}}]};
   if(w.k==="taperUp") return {tip:"모노파일 테이퍼는 보통 아래(해저면 쪽, 모멘트 큰 곳)가 넓고 위(TP 쪽)가 좁습니다. 의도한 형상인지 확인하세요.",fixes:[{label:"수정 (상·하부 직경 바꾸기)",patch:{mD:P.mDt,mDt:P.mD}}]};
@@ -231,7 +231,7 @@ F = C<sub>s</sub> · ½ρ<sub>a</sub>U² · D,  C<sub>s</sub> = ${P.Cs}.  적용
     h+=`<tr><td class="n">${dl(r.y0)} ~ ${dl(r.y1)}</td><td class="n">${one?fx(r.Da,3):fx(r.Da,3)+" → "+fx(r.Db,3)}</td><td class="n">${one?r.dA.toExponential(2):r.dA.toExponential(2)+" → "+r.dB.toExponential(2)}</td><td class="n">${one?fx(r.cdA,3):fx(r.cdA,3)+" → "+fx(r.cdB,3)}</td></tr>`; });
   h+=`</tbody></table></div>`;
   h+=`<h3>5. 파랑하중</h3>
-  ${waveSrcHtml(P)}<div class="eq">수심 d = 설계조위 − 원지반 = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = ${fx(V.w,4)} rad/s
+  ${waveSrcHtml(P)}${airGapHtml(P,R.yIf,"TP 상단(인터페이스)")}<div class="eq">수심 d = 설계조위 − 원지반 = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = ${fx(V.w,4)} rad/s
 분산식 ω² = g·k·tanh(kd) → k = ${fx(V.k,5)} /m,  파장 L = ${fx(V.L,2)} m
 해수면 직경 D = ${fx(V.Dsw,3)} m → D/L = ${fx(V.DL,3)} ${V.diff?"&gt; 0.2 → 회절 영역 (MacCamy-Fuchs 관성력)":"≤ 0.2 → 회절 영향 작음 (Morison 영역). MacCamy-Fuchs 식은 ka가 작으면 C<sub>M</sub> → 2.0으로 Morison 식과 같아지므로 같은 식으로 계산"}
 C<sub>M</sub> = 4 / {π(ka)² √(J₁′(ka)² + Y₁′(ka)²)},  a = D(z)/2

@@ -5,7 +5,7 @@ const dl=v=>`DL(${v>=0?"+":"−"})${fx(Math.abs(v),3)}`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
 const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH","ctt","cnr","ctr","Dc","tc","ha","hth","hhn","zc0","ztop","Dp","tp",
-  "zf1","zf2","gf","gc","zbDL","sbDL","hwl","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","Uc","Uce","wcf","d0w","ks","kh","kfac",
+  "zf1","zf2","gf","gc","zbDL","sbDL","hwl","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
   "mu","qa","tilt","aeff","fck","fy","cov","kcr","phiF","gH","gE","fsO1","fsS1","fsO2","fsS2","fsO3","fsS3","qf3","dTow","ukc","gmMin","zcut","zbal","Wadd","zadd","padN","padB","padH",
   "mD","mDt","mzA","mzB","mtop","mL","mz1","mz2","mt1","mt2","mt3","mca","mfy","mgM","mgs","mgE","mtTP","mgap","mWsec","mgg","mDrG","mDrL","mScK","mScT","mScS","mmg","mRot","mFSc","mFSu",
   "jWb","jWt","jN","jRat","jTPh","jStub","jDir","jLD","jLt","jBrD","jBrt","jMbD","jMbt","jMg","jfy","jgM","jgE","jWtp","jWsec","jPD","jPt","jPL","jScK","jScT","jScS"];
@@ -69,6 +69,9 @@ $("wvImp").addEventListener("change",async e=>{ const f=e.target.files[0]; e.tar
     ["Hw","Tw","waveSrc"].forEach(k=>{ $(k).classList.add("flash"); setTimeout(()=>$(k).classList.remove("flash"),1200); });
   }catch(err){ toast("가져오지 못했습니다: "+err.message); } });
 $("wvClr").addEventListener("click",()=>{ const P=readInputs(); setInputs({...P,waveRef:null}); run(); toast("설계파 파일 연결을 해제했습니다 (값은 그대로)"); });
+function airGapHtml(P,topDL,nm){ const A=airCrest(P), ok=topDL>=A.needDL-1e-6;
+  return `<div class="eq">에어갭: 파봉 = 설계조위 + 파봉고 = ${dl(P.hwl)} + ${fx(A.eta,2)} = ${dl(A.crestDL)}  (파봉고: ${A.src})
+필요 상단 = 파봉 + 여유고 ${fx(A.gap,2)} m(가정) = ${dl(A.needDL)}  ${ok?"≤":">"}  ${nm} ${dl(topDL)}  → <span class="chip ${ok?"ok":"bad"}">${ok?"O.K":"N.G"}</span></div>`; }
 function waveSrcHtml(P){ if(!P.waveSrc&&!P.waveRef) return ""; const W=P.waveRef;
   return `<p>설계파는 ${P.waveSrc?esc(P.waveSrc):"설계파 파일"}에서 정한 값을 쓴다${W?` — 유의파고 H<sub>1/3</sub> ${W.Hs?fx(W.Hs,2)+" m":"–"}, 최대파고 H<sub>max</sub> ${fx(W.Hmax,2)} m, 주기 ${fx(W.T,2)} s${W.depth?`, 산정 수심 ${fx(W.depth,2)} m`:""}${W.Hb?`, 쇄파 한계 ${fx(W.Hb,2)} m`:""}${W.crest?`, 파봉고(정수면 위) ${fx(W.crest,2)} m`:""}${W.dir?`, 파향 ${esc(W.dir)}`:""}${W.note?` (${esc(W.note)})`:""}`:""}. 산정 과정은 첨부 보고서 참조.</p>`; }
 /* 입력 묶음 탭: 형상 / 수위·풍·파랑 / 터빈 / 지반·기준 / 부재·시공 / 전체 */
@@ -283,11 +286,13 @@ function warnInfo(w){
   if(/^1차 고유진동수 .*Hz가/.test(w)) return freqFixInfo();
   const P=R.P, r1=v=>Math.round(v*100)/100;
   if(/터빈 하중 인터페이스/.test(w)){
-    const dH=P.hwl-P.zbDL, crest=dH+P.Hw/2, need=crest+1.5, zdl=R.zIf+P.zbDL;
-    if(R.zIf<need) return {tip:`터빈 인터페이스(MSL+${R.T.ifz} m = 저판 하면에서 ${fx(R.zIf,2)} m, ${dl(zdl)})가 설계 파봉(${fx(crest,2)} m, ${dl(crest+P.zbDL)})에 여유고 1.5 m를 더한 ${fx(need,2)} m보다 낮습니다. 이 높이에 구조물 상단을 맞추면 파도가 넘칩니다. 터빈의 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
-      fixes:[{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
+    const A=airCrest(P), crest=A.crestDL-P.zbDL, need=A.needDL-P.zbDL, zdl=R.zIf+P.zbDL, tgt=r1(Math.max(R.zIf,Math.ceil(need*2)/2));
+    if(R.zIf<need) return {tip:`터빈 인터페이스(MSL+${R.T.ifz} m = 저판 하면에서 ${fx(R.zIf,2)} m, ${dl(zdl)})가 설계 파봉(${dl(A.crestDL)}, 파봉고 ${A.src})에 여유고 ${A.gap} m를 더한 ${dl(A.needDL)}보다 낮습니다. 이 높이에 구조물 상단을 맞추면 파도가 넘칩니다. 기둥 상단은 파봉 + 여유고로 두고, 타워 길이(인터페이스 높이)를 제작사와 맞춰야 합니다.`,
+      fixes:[{label:`기둥 상단을 필요 높이로 맞춤: 파봉 + 여유고 ${fx(tgt,1)} m (저판 하면 기준, ${dl(tgt+P.zbDL)})`,patch:{ztop:tgt}},{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
     return {tip:"터빈 하중표의 작용 높이와 기초 꼭대기 높이가 다르면 터빈 모멘트를 옮길 때 팔길이가 달라집니다. 실제 설계에서는 기초 상단이 터빈 인터페이스(타워 하단 플랜지)와 같아야 합니다. 높이는 저판 하면 기준입니다.",
-      fixes:[{label:`구조물 상단을 ${fx(R.zIf,2)} m로 (저판 하면 기준, ${dl(zdl)} = MSL+${R.T.ifz} m, 설계 파봉보다 ${fx(R.zIf-crest,1)} m 위)`,patch:{ztop:r1(R.zIf)}}]}; }
+      fixes:[{label:`기둥 상단을 필요 높이로 맞춤: 터빈 인터페이스 ${fx(R.zIf,2)} m (저판 하면 기준, ${dl(zdl)} = MSL+${R.T.ifz} m, 설계 파봉 + 여유고보다 ${fx(R.zIf-need,1)} m 위)`,patch:{ztop:r1(R.zIf)}}]}; }
+  if(/^구조물 상단\(기둥 상단\)/.test(w)){ const A=airCrest(P), need=A.needDL-P.zbDL, tgt=r1(Math.max(R.zIf,Math.ceil(need*2)/2));
+    return {tip:`파봉고는 ${A.src}, 여유고 ${A.gap} m(가정, 입력에서 변경)입니다. 기둥 상단(타워 하단 플랜지·작업대)이 이보다 낮으면 파도가 칩니다.`,fixes:[{label:`기둥 상단을 필요 높이로 맞춤: ${fx(tgt,1)} m (저판 하면 기준, ${dl(tgt+P.zbDL)})`,patch:{ztop:tgt}}]}; }
   if(/수면이 (원추|기둥)에 걸립니다/.test(w)){ const a=bestZcut(P), b=widenForTow(P), fx_=[];
     if(a) fx_.push({label:`예인 시 상단 높이를 ${fx(a.z,1)} m로 (저판 하면 기준, 나머지는 해상 시공, GM ${fx(a.f.GM,2)} m)`,patch:{zcut:a.z}});
     if(b) fx_.push({label:`${b.k==="hw"?"원통 높이":"케이슨 높이"}를 ${fx(b.v,1)} m로 (GM ${fx(b.f.GM,2)} m)`,patch:{[b.k]:b.v,zf1:b.zf1,...(b.zf2?{zf2:b.zf2}:{})}});
@@ -349,7 +354,7 @@ function wallIn(P,z){ if(P.type==="caisson") return P.cDw/2-P.ctw; const z1=P.tb
 function ringList(P){ return (P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0).map((r,i)=>({...r,no:String.fromCharCode(0x2460+Math.min(i,19))})); }
 /* 설계파 표시(정면도 오른쪽): 파형 스케치(2차 성분으로 파봉 뾰족), 파봉·파곡 선, 파고 치수, 제원. zHW = 그림 좌표의 설계조위, off = 표고(DL) − 그림 좌표 */
 function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb-xa>6)) return;
-  const W=P.waveRef, ec=H/2, zc=zHW+ec, zt=zHW-(H-ec), a=H/2, b=Math.min(H*0.08,ec*0.3), n=60, Lw=(xb-xa)/1.25, pts=[];
+  const W=P.waveRef, AC=airCrest(P), ec=Math.min(H*0.95,Math.max(H*0.5,AC.eta)), zc=zHW+ec, zt=zHW-(H-ec), a=H/2, b=Math.min(H*0.08,ec*0.3), n=60, Lw=(xb-xa)/1.25, pts=[];
   for(let i=0;i<=n;i++){ const x=xa+(xb-xa)*i/n, th=2*Math.PI*(x-xa-Lw*0.35)/Lw; pts.push([x,zHW+a*Math.cos(th)+b*Math.cos(2*th)]); }
   // 파형이 정확히 파봉·파곡에 닿도록 맞춤
   const mx=Math.max(...pts.map(p=>p[1])), mn=Math.min(...pts.map(p=>p[1])); pts.forEach(p=>{ p[1]=zt+(p[1]-mn)*(zc-zt)/(mx-mn); });
@@ -358,11 +363,12 @@ function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb
   if(crestLine!==false) o.push({t:"line",L:"WL",x1:xa,z1:zc,x2:xb,z2:zc,dash:1});
   o.push({t:"line",L:"WL",x1:xa,z1:zt,x2:xb,z2:zt,dash:1});
   if(crestLine!==false) o.push({t:"text",L:"WL",x:xb,z:zc+fs*0.35,h:fs*.75,s:`파봉 ${dl(zc+off)}`,anchor:"end"});
+  if(crestLine!==false&&AC.gap>0){ const zg=zc+AC.gap; o.push({t:"line",L:"WL",x1:xa,z1:zg,x2:xb,z2:zg,dash:1}); o.push({t:"text",L:"WL",x:xa,z:zg+fs*0.35,h:fs*.7,s:`파봉 + 여유고 ${dl(zg+off)}`}); }
   o.push({t:"text",L:"WL",x:xb,z:zt-fs*1.05,h:fs*.75,s:`파곡 ${dl(zt+off)}`,anchor:"end"});
   const xd=xc; o.push({t:"line",L:"DIM",x1:xd,z1:zt,x2:xd,z2:zc}); [zc,zt].forEach(z=>o.push({t:"line",L:"DIM",x1:xd-fs*.35,z1:z-fs*.35,x2:xd+fs*.35,z2:z+fs*.35}));
   const lab=[`설계파 H = ${fx(H,2)} m, T = ${fx(P.Tw,1)} s`]; if(W) lab.push(`${W.title||"설계파 산정 보고서"}${W.reportNo?` (${W.reportNo})`:""} 첨부`);
-  if(W&&W.crest>0&&Math.abs(W.crest-ec)>0.05) lab.push(`보고서 파봉고 정수면 +${fx(W.crest,2)} m (계산은 H/2)`);
-  lab.forEach((t,i)=>o.push({t:"text",L:"DIM",x:xb,z:zc+fs*(1.5+1.05*(lab.length-1-i)),h:fs*.75,s:t,anchor:"end"})); }
+  lab.push(`파봉고 +${fx(ec,2)} m (${AC.useW?"설계파 보고서":"0.65H, 가정"}), 여유고 ${fx(AC.gap,1)} m`);
+  lab.forEach((t,i)=>o.push({t:"text",L:"DIM",x:xb,z:zc+(crestLine!==false?AC.gap:0)+fs*(1.5+1.05*(lab.length-1-i)),h:fs*.75,s:t,anchor:"end"})); }
 function secPrims(R){
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
@@ -625,7 +631,7 @@ C<sub>D</sub> = 1.05                       (Δ &gt; 10⁻², 거친 면)
     const sh=(dd,c)=>dd<1e-4?"0.65 (매끈)":dd>1e-2?"1.05 (거침)":`(29 + 4·log₁₀ ${dd.toExponential(2)}) / 20`;
     h+=`<tr><td class="n">${fx(r.z0,2)} ~ ${fx(r.z1,2)}</td><td class="n">${one?fx(r.Da,3):fx(r.Da,2)+" → "+fx(r.Db,2)}</td><td class="n">${one?r.dA.toExponential(2):r.dA.toExponential(2)+" → "+r.dB.toExponential(2)}</td><td class="fm">${one?sh(r.dA):sh(r.dA)+" → "+sh(r.dB)}</td><td class="n">${one?fx(r.cA,3):fx(r.cA,3)+" → "+fx(r.cB,3)}</td></tr>`; });
   h+=`</tbody></table></div><p class="note">높이마다 그 높이의 외곽 직경으로 C<sub>D</sub>를 다시 계산해 파랑 항력과 조류하중에 씁니다.${R.S.hex?" 육각 샤프트는 면적이 같은 원의 직경으로 원형 식을 적용했습니다. 육각 단면은 모서리에서 흐름이 떨어져 원형보다 클 수 있으니 기준 표로 확인하세요.":""} 파랑 항력은 KC 수에 따른 후류 보정 없이 정상류 값을 썼습니다.</p>`;
-  h+=`<h3>5. 파랑하중 (MacCamy-Fuchs 회절 관성력 + 항력)</h3>${waveSrcHtml(P)}
+  h+=`<h3>5. 파랑하중 (MacCamy-Fuchs 회절 관성력 + 항력)</h3>${waveSrcHtml(P)}${airGapHtml(P,P.ztop+P.zbDL,"기둥 상단")}
   <div class="eq">수심 d = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = 2π/T = ${fx(V.w,4)} rad/s
 분산식 ω² = g·k·tanh(kd) → k = ${fx(V.k,5)} /m,  파장 L = ${fx(V.L,2)} m,  해수면 D/L = ${fx(V.DL,3)}
 C<sub>M</sub> = 4 / {π(ka)² √(J₁′(ka)² + Y₁′(ka)²)}
