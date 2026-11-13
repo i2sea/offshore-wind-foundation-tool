@@ -2175,7 +2175,7 @@ function fillTurbSel(){
   $("turb").value=ST.turb;
 }
 function setInputs(o){
-  ST={...DEF,...o}; if(o&&o!==DEF&&o.zbAuto==null&&Object.keys(o).length>20){ ST.zbAuto="0"; } if(o&&o.emb==null) ST.emb=+((ST.sbDL-ST.zbDL)||0).toFixed(3); if(o&&o!==DEF&&o.topR==null&&Object.keys(o).length>20) ST.topR=0; if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null; if(o&&o.dhw==null) ST.dhw=ST.hwl; if(o&&o.dlw==null) ST.dlw=0; if(o&&o.yIfD==null){ const t0=turbineRaw(ST); ST.yIfD=+(t0.ifz+ST.msl).toFixed(3); }
+  ST={...DEF,...o}; if(o&&o!==DEF&&o.zbAuto==null&&Object.keys(o).length>20){ ST.zbAuto="0"; } if(o&&o.emb==null) ST.emb=+((ST.sbDL-ST.zbDL)||0).toFixed(3); if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null; if(o&&o.dhw==null) ST.dhw=ST.hwl; if(o&&o.dlw==null) ST.dlw=0; if(o&&o.yIfD==null){ const t0=turbineRaw(ST); ST.yIfD=+(t0.ifz+ST.msl).toFixed(3); }
   ST.rb=Object.fromEntries(MEMB.map(m=>[m[0],{...(DEF_RB[m[0]]),...((o.rb||{})[m[0]]||{})}]));
   NUM.forEach(k=>{ if(ST[k]!==undefined) $(k).value=ST[k]; });
   fillTurbSel(); fillSoilSel(); SEL.forEach(k=>{ if(k!=="turb") $(k).value=String(ST[k]); }); $("waveSrc").value=ST.waveSrc||""; wvNote();
@@ -2514,15 +2514,15 @@ function ringList(P){ return (P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0).map((r
 /* 설계파 표시(정면도 오른쪽): 파형 스케치(2차 성분으로 파봉 뾰족), 파봉·파곡 선, 파고 치수, 제원. zHW = 그림 좌표의 설계조위, off = 표고(DL) − 그림 좌표 */
 function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb-xa>6)) return;
   const W=P.waveRef, AC=airCrest(P), ec=Math.min(H*0.95,Math.max(H*0.5,AC.eta)), zc=zHW+ec, zt=zHW-(H-ec), a=H/2, b=Math.min(H*0.08,ec*0.3), n=60, Lw=(xb-xa)/1.25, pts=[];
-  for(let i=0;i<=n;i++){ const x=xa+(xb-xa)*i/n, th=2*Math.PI*(x-xa-Lw*0.35)/Lw; pts.push([x,zHW+a*Math.cos(th)+b*Math.cos(2*th)]); }
+  for(let i=0;i<=n;i++){ const x=xa+(xb-xa)*i/n, th=2*Math.PI*(x-xa-Lw*0.75)/Lw; pts.push([x,zHW+a*Math.cos(th)+b*Math.cos(2*th)]); }
   // 파형이 정확히 파봉·파곡에 닿도록 맞춤
   const mx=Math.max(...pts.map(p=>p[1])), mn=Math.min(...pts.map(p=>p[1])); pts.forEach(p=>{ p[1]=zt+(p[1]-mn)*(zc-zt)/(mx-mn); });
   o.push({t:"poly",open:1,L:"WL",pts,w:.18});
-  const xc=xa+Lw*0.35;
+  const xc=xa+Lw*0.75;
   if(crestLine!==false) o.push({t:"line",L:"WL",x1:xa,z1:zc,x2:xb,z2:zc,dash:1});
   o.push({t:"line",L:"WL",x1:xa,z1:zt,x2:xb,z2:zt,dash:1});
-  if(crestLine!==false) o.push({t:"text",L:"WL",x:xb,z:zc+fs*0.35,h:fs*.75,s:`파봉 ${dl(zc+off)}`,anchor:"end"});
-  if(crestLine!==false&&AC.gap>0){ const zg=zc+AC.gap; o.push({t:"line",L:"WL",x1:xa,z1:zg,x2:xb,z2:zg,dash:1}); o.push({t:"text",L:"WL",x:xa,z:zg+fs*0.35,h:fs*.7,s:`파봉 + 여유고 ${dl(zg+off)}`}); }
+  if(crestLine!==false) o.push({t:"text",L:"WL",x:xa,z:zc-fs*1.05,h:fs*.75,s:`파봉 ${dl(zc+off)}`});
+  if(crestLine!==false&&AC.gap>0){ const zg=zc+AC.gap; o.push({t:"line",L:"WL",x1:xa,z1:zg,x2:xb,z2:zg,dash:1}); o.push({t:"text",L:"WL",x:xb,z:zg+fs*0.35,h:fs*.7,s:`파봉 + 여유고 ${dl(zg+off)}`,anchor:"end"}); }
   o.push({t:"text",L:"WL",x:xb,z:zt-fs*1.05,h:fs*.75,s:`파곡 ${dl(zt+off)}`,anchor:"end"});
   const xd=xc; o.push({t:"line",L:"DIM",x1:xd,z1:zt,x2:xd,z2:zc}); [zc,zt].forEach(z=>o.push({t:"line",L:"DIM",x1:xd-fs*.35,z1:z-fs*.35,x2:xd+fs*.35,z2:z+fs*.35}));
   const lab=[`설계파 H = ${fx(H,2)} m, T = ${fx(P.Tw,1)} s`]; if(W) lab.push(`${W.title||"설계파 산정 보고서"}${W.reportNo?` (${W.reportNo})`:""} 첨부`);
