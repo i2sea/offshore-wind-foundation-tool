@@ -32,7 +32,7 @@ const DEF={
   // 풍
   Uref:30,zref:10,Tavg:600,Cs:0.6,rhoa:1.225,
   // 파랑·조류
-  Hw:12,Tw:14,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
+  Hw:12,Tw:14,waveSrc:"",waveRef:null,crest:0,surf:"conc",ks:3,Uc:1.0,Uce:1.0,wcf:0.015,d0w:50,nu:1.19e-6,
   // 지진
   kh:0.077,hydro:1,sgc:"",kfac:0.5,
   // 지반·검토
@@ -175,6 +175,12 @@ function freqBand(T,P){ const r=rpmOf(T,P), m=P.fmar; if(!r) return {r:null,f1P:
 function turbWeight(t){ return t.Wdirect>0?t.Wdirect:((t.rna||0)+(t.tower||0))*G; }
 
 /* ---------- 계산 ---------- */
+/* 설계파 파일(설계파 산정 보고서 결과, app "design-wave")과 지금 입력 비교 → 경고 문장 */
+function waveRefWarns(P){ const W=P.waveRef, o=[]; if(!W) return o; const d=P.hwl-P.sbDL;
+  if(Math.abs(W.Hmax-P.Hw)>0.005||Math.abs(W.T-P.Tw)>0.005) o.push(`설계파 입력(H ${P.Hw} m, T ${P.Tw} s)이 가져온 설계파 파일 값(H ${W.Hmax} m, T ${W.T} s)과 다릅니다. 계산서 출처 표기를 확인하세요.`);
+  if(W.depth>0&&Math.abs(W.depth-d)>1) o.push(`설계파 파일의 산정 수심 ${W.depth} m와 이 설계의 수심(설계조위 − 해저면) ${d.toFixed(2)} m가 1 m 넘게 다릅니다. 설계파는 산정 수심에서만 유효합니다.`);
+  if(W.Hb>0&&P.Hw>W.Hb+0.005) o.push(`설계파고 ${P.Hw} m가 설계파 파일의 쇄파 한계 ${W.Hb} m를 넘습니다.`);
+  return o; }
 function compute(P){
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};
   const warns=[];
@@ -241,6 +247,7 @@ function compute(P){
   if(gfq.cal&&freq.ok===false) warns.push(`1차 고유진동수 ${freq.f.toFixed(3)} Hz가 ${freq.z.nm}에 있습니다${freq.r&&freq.r.est?" (회전수는 추정값)":""}.`);
   if(T.scaled) warns.push(`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`);
   if(!TL.gu) warns.push(`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 안정검토합니다. 제작사 하중표를 넣으세요.`);
+  waveRefWarns(P).forEach(m=>warns.push(m));
   if(!(Wt>0)) warns.push(`선택한 터빈(${T.name})에 RNA·타워 중량이 없습니다 (발전량 계산 도구에서 만든 터빈 파일 등). 터빈 자중 0으로 계산하므로 터빈 편집에서 중량을 넣으세요.`);
   if(T.ifzNote) warns.push(`선택한 터빈(${T.name})의 인터페이스 높이 MSL+${T.ifz} m는 가정값입니다 — ${T.ifzNote}`);
 

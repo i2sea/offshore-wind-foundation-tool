@@ -30,7 +30,7 @@ function setInputs(o){
   ST={...DEF,...o}; if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null;
   ST.rb=Object.fromEntries(MEMB.map(m=>[m[0],{...(DEF_RB[m[0]]),...((o.rb||{})[m[0]]||{})}]));
   NUM.forEach(k=>{ if(ST[k]!==undefined) $(k).value=ST[k]; });
-  fillTurbSel(); fillSoilSel(); SEL.forEach(k=>{ if(k!=="turb") $(k).value=String(ST[k]); });
+  fillTurbSel(); fillSoilSel(); SEL.forEach(k=>{ if(k!=="turb") $(k).value=String(ST[k]); }); $("waveSrc").value=ST.waveSrc||""; wvNote();
   drawRings(); drawRb(); applyType(); syncKh(); syncKs(); drawSoil();
 }
 function drawRb(){
@@ -42,11 +42,30 @@ function drawRb(){
 function readInputs(){
   NUM.forEach(k=>{ const v=parseFloat($(k).value); ST[k]=isFinite(v)?v:0; });
   ST.sgc=$("sgc").value; ST.surf=$("surf").value; ST.shp=$("shp").value; ST.turb=$("turb").value; ST.crest=+$("crest").value; ST.hydro=+$("hydro").value; ST.mTP=$("mTP").value; ST.mInst=$("mInst").value; ST.mSc=$("mSc").value; ST.soilPre=$("soilPre").value; ST.jHz=$("jHz").value; ST.jFlood=$("jFlood").value; ST.jSc=$("jSc").value; ST.gBase=$("gBase").value;
+  ST.waveSrc=$("waveSrc").value.trim();
   ST.rings=ST.rings.map(r=>({D:+r.D||0,t:+r.t||0,h:+r.h||0,z:+r.z||0}));
   MEMB.forEach(([k])=>{ const b=$("rb_"+k+"_bar"); if(b) ST.rb[k]={bar:b.value,s:Math.max(50,parseFloat($("rb_"+k+"_s").value)||200)}; });
   return JSON.parse(JSON.stringify(ST));
 }
 function persist(){ try{ localStorage.setItem(LS,JSON.stringify(ST)); }catch(e){} }
+/* 설계파 파일 (관측 대시보드 "설계파 산정 보고서" 결과, app "design-wave") */
+function wvNote(){ const W=ST.waveRef; $("wvNote").textContent=W?`연결됨: ${W.title||"설계파 파일"}${W.reportNo?" ("+W.reportNo+")":""} · H ${W.Hmax} m, T ${W.T} s${W.depth?`, 수심 ${W.depth} m`:""}`:"설계파 파일 없음 (직접 입력)"; $("wvClr").hidden=!W; }
+function wvParse(o){ if(!o||o.app!=="design-wave") throw new Error("설계파 파일(app: design-wave)이 아닙니다");
+  const D=o.design||o, n=v=>{ const x=parseFloat(v); return isFinite(x)?x:0; };
+  let Hmax=n(D.Hmax), note=""; const Hs=n(D.Hs); if(!(Hmax>0)&&Hs>0){ Hmax=+(1.8*Hs).toFixed(3); note="파일에 Hmax가 없어 1.8 × H1/3로 환산(가정)"; }
+  const T=n(D.Tmax)||n(D.T13)||n(D.T); if(!(Hmax>0&&T>0)) throw new Error("파일에 설계파고·주기가 없습니다");
+  const st=o.site||{};
+  return {title:String(o.title||"설계파 산정 보고서").slice(0,120),reportNo:String(o.reportNo||"").slice(0,60),site:String(st.name||"").slice(0,80),depth:n(st.depth||D.depth),
+    rp:n(o.returnPeriod||D.returnPeriod),dir:String(D.dir||"").slice(0,20),Hs,Hmax:+Hmax.toFixed(3),T:+T.toFixed(2),Hb:n(D.Hb),crest:n(D.crest),method:String(o.method||D.method||"").slice(0,200),saved:String(o.saved||"").slice(0,10),note}; }
+$("wvImp").addEventListener("change",async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return;
+  try{ const W=wvParse(JSON.parse(await f.text())); const P=readInputs();
+    const src=`${W.title}${W.reportNo?` (${W.reportNo})`:""}${W.site?` — ${W.site}`:""}${W.rp?`, 재현기간 ${W.rp}년`:""}${W.method?`, ${W.method}`:""} (첨부)`;
+    setInputs({...P,Hw:W.Hmax,Tw:W.T,waveRef:W,waveSrc:src}); igShow($("Hw")); run(); toast(`설계파를 가져왔습니다: H ${W.Hmax} m, T ${W.T} s${W.note?" — "+W.note:""}`);
+    ["Hw","Tw","waveSrc"].forEach(k=>{ $(k).classList.add("flash"); setTimeout(()=>$(k).classList.remove("flash"),1200); });
+  }catch(err){ toast("가져오지 못했습니다: "+err.message); } });
+$("wvClr").addEventListener("click",()=>{ const P=readInputs(); setInputs({...P,waveRef:null}); run(); toast("설계파 파일 연결을 해제했습니다 (값은 그대로)"); });
+function waveSrcHtml(P){ if(!P.waveSrc&&!P.waveRef) return ""; const W=P.waveRef;
+  return `<p>설계파는 ${P.waveSrc?esc(P.waveSrc):"설계파 파일"}에서 정한 값을 쓴다${W?` — 유의파고 H<sub>1/3</sub> ${W.Hs?fx(W.Hs,2)+" m":"–"}, 최대파고 H<sub>max</sub> ${fx(W.Hmax,2)} m, 주기 ${fx(W.T,2)} s${W.depth?`, 산정 수심 ${fx(W.depth,2)} m`:""}${W.Hb?`, 쇄파 한계 ${fx(W.Hb,2)} m`:""}${W.crest?`, 파봉고(정수면 위) ${fx(W.crest,2)} m`:""}${W.dir?`, 파향 ${esc(W.dir)}`:""}${W.note?` (${esc(W.note)})`:""}`:""}. 산정 과정은 첨부 보고서 참조.</p>`; }
 /* 입력 묶음 탭: 형상 / 수위·풍·파랑 / 터빈 / 지반·기준 / 부재·시공 / 전체 */
 let IG=(()=>{ try{ return localStorage.getItem("gbs-ig")||"shape"; }catch(e){ return "shape"; } })();
 function igApply(){ const fs=[...document.querySelectorAll("#frm fieldset[data-g]")];
@@ -580,7 +599,7 @@ C<sub>D</sub> = 1.05                       (Δ &gt; 10⁻², 거친 면)
     const sh=(dd,c)=>dd<1e-4?"0.65 (매끈)":dd>1e-2?"1.05 (거침)":`(29 + 4·log₁₀ ${dd.toExponential(2)}) / 20`;
     h+=`<tr><td class="n">${fx(r.z0,2)} ~ ${fx(r.z1,2)}</td><td class="n">${one?fx(r.Da,3):fx(r.Da,2)+" → "+fx(r.Db,2)}</td><td class="n">${one?r.dA.toExponential(2):r.dA.toExponential(2)+" → "+r.dB.toExponential(2)}</td><td class="fm">${one?sh(r.dA):sh(r.dA)+" → "+sh(r.dB)}</td><td class="n">${one?fx(r.cA,3):fx(r.cA,3)+" → "+fx(r.cB,3)}</td></tr>`; });
   h+=`</tbody></table></div><p class="note">높이마다 그 높이의 외곽 직경으로 C<sub>D</sub>를 다시 계산해 파랑 항력과 조류하중에 씁니다.${R.S.hex?" 육각 샤프트는 면적이 같은 원의 직경으로 원형 식을 적용했습니다. 육각 단면은 모서리에서 흐름이 떨어져 원형보다 클 수 있으니 기준 표로 확인하세요.":""} 파랑 항력은 KC 수에 따른 후류 보정 없이 정상류 값을 썼습니다.</p>`;
-  h+=`<h3>5. 파랑하중 (MacCamy-Fuchs 회절 관성력 + 항력)</h3>
+  h+=`<h3>5. 파랑하중 (MacCamy-Fuchs 회절 관성력 + 항력)</h3>${waveSrcHtml(P)}
   <div class="eq">수심 d = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = 2π/T = ${fx(V.w,4)} rad/s
 분산식 ω² = g·k·tanh(kd) → k = ${fx(V.k,5)} /m,  파장 L = ${fx(V.L,2)} m,  해수면 D/L = ${fx(V.DL,3)}
 C<sub>M</sub> = 4 / {π(ka)² √(J₁′(ka)² + Y₁′(ka)²)}

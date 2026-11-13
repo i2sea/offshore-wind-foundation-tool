@@ -230,7 +230,7 @@ F = C<sub>s</sub> · ½ρ<sub>a</sub>U² · D,  C<sub>s</sub> = ${P.Cs}.  적용
     h+=`<tr><td class="n">${dl(r.y0)} ~ ${dl(r.y1)}</td><td class="n">${one?fx(r.Da,3):fx(r.Da,3)+" → "+fx(r.Db,3)}</td><td class="n">${one?r.dA.toExponential(2):r.dA.toExponential(2)+" → "+r.dB.toExponential(2)}</td><td class="n">${one?fx(r.cdA,3):fx(r.cdA,3)+" → "+fx(r.cdB,3)}</td></tr>`; });
   h+=`</tbody></table></div>`;
   h+=`<h3>5. 파랑하중</h3>
-  <div class="eq">수심 d = 설계조위 − 원지반 = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = ${fx(V.w,4)} rad/s
+  ${waveSrcHtml(P)}<div class="eq">수심 d = 설계조위 − 원지반 = ${fx(V.d,3)} m,  H = ${P.Hw} m,  T = ${P.Tw} s,  ω = ${fx(V.w,4)} rad/s
 분산식 ω² = g·k·tanh(kd) → k = ${fx(V.k,5)} /m,  파장 L = ${fx(V.L,2)} m
 해수면 직경 D = ${fx(V.Dsw,3)} m → D/L = ${fx(V.DL,3)} ${V.diff?"&gt; 0.2 → 회절 영역 (MacCamy-Fuchs 관성력)":"≤ 0.2 → 회절 영향 작음 (Morison 영역). MacCamy-Fuchs 식은 ka가 작으면 C<sub>M</sub> → 2.0으로 Morison 식과 같아지므로 같은 식으로 계산"}
 C<sub>M</sub> = 4 / {π(ka)² √(J₁′(ka)² + Y₁′(ka)²)},  a = D(z)/2
