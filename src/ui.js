@@ -47,6 +47,16 @@ function readInputs(){
   return JSON.parse(JSON.stringify(ST));
 }
 function persist(){ try{ localStorage.setItem(LS,JSON.stringify(ST)); }catch(e){} }
+/* 입력 묶음 탭: 형상 / 수위·풍·파랑 / 터빈 / 지반·기준 / 부재·시공 / 전체 */
+let IG=(()=>{ try{ return localStorage.getItem("gbs-ig")||"shape"; }catch(e){ return "shape"; } })();
+function igApply(){ const fs=[...document.querySelectorAll("#frm fieldset[data-g]")];
+  document.querySelectorAll(".igt").forEach(b=>{ const g=b.dataset.g; b.hidden=g!=="all"&&!fs.some(f=>f.dataset.g===g&&!f.hidden); });
+  const cur=document.querySelector(`.igt[data-g="${IG}"]`); if(!cur||cur.hidden) IG="shape";
+  document.querySelectorAll(".igt").forEach(b=>b.setAttribute("aria-selected",b.dataset.g===IG?"true":"false"));
+  fs.forEach(f=>f.classList.toggle("gOff",IG!=="all"&&f.dataset.g!==IG)); }
+function igSet(g){ IG=g; try{ localStorage.setItem("gbs-ig",g); }catch(e){} igApply(); }
+function igShow(el){ const f=el&&el.closest&&el.closest("fieldset[data-g]"); if(f&&IG!=="all"&&f.dataset.g!==IG) igSet(f.dataset.g); }
+document.querySelectorAll(".igt").forEach(b=>b.addEventListener("click",()=>igSet(b.dataset.g)));
 function applyType(){
   const cat=catOf(ST.type);
   document.querySelectorAll(".wc").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cat===cat?"true":"false"));
@@ -56,6 +66,7 @@ function applyType(){
   document.querySelectorAll("[data-for-tp]").forEach(el=>el.hidden=el.dataset.forTp!==$("mTP").value);
   document.querySelectorAll("[data-for-inst]").forEach(el=>el.hidden=!el.dataset.forInst.split(" ").includes($("mInst").value));
   document.querySelectorAll("[data-for-sc]").forEach(el=>el.hidden=el.dataset.forSc!==$("mSc").value);
+  igApply();
   document.querySelectorAll("[data-for-jsc]").forEach(el=>el.hidden=el.dataset.forJsc!==$("jSc").value);
   document.querySelectorAll("[data-shp]").forEach(f=>f.hidden=f.dataset.shp!==$("shp").value);
   document.querySelectorAll("[data-rb^='k']").forEach(el=>el.hidden=ST.type==="caisson");
@@ -108,7 +119,7 @@ function openTE(t,isNew){
   $("te_rna").value=t?t.rna:0; $("te_tower").value=t?t.tower:0; $("te_W").value=t?t.Wdirect:0; $("te_axis").value=t?t.axis:"z";
   $("te_rmin").value=t?t.rpmMin:0; $("te_rmax").value=t?t.rpmMax:0; $("te_fref").value=t?(t.fref||0):0; $("te_twL").value=t?(t.twL||0):0; $("te_twDb").value=t?(t.twDb||0):0; $("te_twDt").value=t?(t.twDt||0):0;
   $("te_uls").value=t?tableText(t.uls):""; $("te_sls").value=t?tableText(t.sls):"";
-  $("teMsg").textContent=""; $("tEdit").hidden=false; $("te_name").focus();
+  $("teMsg").textContent=""; $("tEdit").hidden=false; igShow($("tEdit")); $("te_name").focus();
 }
 $("tNew").addEventListener("click",()=>openTE(null,true));
 $("tDup").addEventListener("click",()=>{ const t=turbineOf(readInputs()); const custom=(ST.customT||[]).some(c=>c.id===t.id); openTE(t,!custom); });
@@ -303,6 +314,7 @@ function renderWarns(){
     const [i,j]=b.dataset.wf.split("_").map(Number), f=WI[i].fixes[j];
     if(f.act){ f.act(); return; }
     const msg=fixText(f), P=readInputs(); setInputs({...P,...f.patch}); run(); toast("수정했습니다: "+msg);
+    { const k0=Object.keys(f.patch).find(k=>$(k)); if(k0) igShow($(k0)); }
     Object.keys(f.patch).forEach(k=>{ const el=$(k); if(el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"),1200); } });
   }));
 }

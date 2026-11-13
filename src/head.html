@@ -59,6 +59,10 @@ button{font:inherit;cursor:pointer}
 @media (max-width:960px){.layout{grid-template-columns:minmax(0,1fr)}}
 aside.inputs{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:4px 14px 14px}
 fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 4px;min-width:0}
+.igtabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 0 8px;position:sticky;top:0;background:var(--panel);z-index:2;margin-bottom:2px}
+.igt{font:inherit;font-size:12px;padding:5px 9px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--muted);cursor:pointer}
+.igt[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+fieldset.gOff{display:none}
 legend{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:6px;float:left;width:100%}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;clear:both}
 .f{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -205,7 +209,15 @@ svg [data-k]:hover{fill:var(--bad)}
     <div class="sv-file"><button class="btn small" id="svExport" type="button">파일로 내보내기 (.json)</button><label class="btn small" for="svImport" style="cursor:pointer">파일 가져오기</label><input id="svImport" type="file" accept=".json,application/json" hidden></div>
   </section>
 <form id="frm" autocomplete="off">
-  <fieldset data-cat="grav" data-for="cone">
+  <div class="igtabs" role="tablist" aria-label="입력 묶음">
+    <button type="button" class="igt" data-g="shape" aria-selected="true">형상</button>
+    <button type="button" class="igt" data-g="env" aria-selected="false">수위·풍·파랑</button>
+    <button type="button" class="igt" data-g="turb" aria-selected="false">터빈</button>
+    <button type="button" class="igt" data-g="soil" aria-selected="false">지반·기준</button>
+    <button type="button" class="igt" data-g="mem" aria-selected="false">부재·시공</button>
+    <button type="button" class="igt" data-g="all" aria-selected="false" title="모든 입력을 한 번에">전체</button>
+  </div>
+  <fieldset data-g="shape" data-cat="grav" data-for="cone">
     <legend>원추형 · 저판 / 하부 원통 / 원추</legend>
     <button class="btn primary small" data-opt="cone" type="button" style="clear:both;margin:0 0 8px">원추형 최적 제원 찾기</button>
     <div class="grid2">
@@ -220,7 +232,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint" id="tkNote"></p>
   </fieldset>
-  <fieldset data-cat="grav" data-for="caisson" hidden>
+  <fieldset data-g="shape" data-cat="grav" data-for="caisson" hidden>
     <legend>케이슨형 · 하부 케이슨</legend>
     <button class="btn primary small" data-opt="caisson" type="button" style="clear:both;margin:0 0 8px">케이슨형 최적 제원 찾기</button>
     <div class="grid2">
@@ -234,7 +246,7 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f"><label for="ctr">격벽 두께</label><input id="ctr" type="number" step="0.05"></div>
     </div>
   </fieldset>
-  <fieldset data-cat="mono" hidden>
+  <fieldset data-g="shape" data-cat="mono" hidden>
     <legend>모노파일 · 강관 말뚝</legend>
     <div class="grid2">
       <div class="f"><label for="mD">하부 직경 D (m)</label><input id="mD" type="number" step="0.1"></div>
@@ -259,7 +271,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint" id="monoNote"></p>
   </fieldset>
-  <fieldset data-cat="mono" hidden>
+  <fieldset data-g="shape" data-cat="mono" hidden>
     <legend>트랜지션피스 (TP)</legend>
     <div class="grid2">
       <div class="f wide"><label for="mTP">연결 방식</label><select id="mTP"><option value="grout">그라우트 연결 (TP가 말뚝 바깥을 감쌈)</option><option value="bolt">볼트 연결 (말뚝 상단 플랜지)</option></select></div>
@@ -270,7 +282,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">TP 상단 = 터빈 하중 인터페이스. 그라우트 연결 길이는 1.5 × 말뚝 상단 직경으로 계산합니다. 2차 부재 중량 1,500 kN은 가정값입니다.</p>
   </fieldset>
-  <fieldset data-cat="jacket" hidden>
+  <fieldset data-g="shape" data-cat="jacket" hidden>
     <legend>자켓 · 형상</legend>
     <div class="grid2">
       <div class="f"><label for="jWb">하단 다리 간격 (m, 인접 다리 중심)</label><input id="jWb" type="number" step="0.5"></div>
@@ -284,7 +296,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint" id="jacketNote"></p>
   </fieldset>
-  <fieldset data-cat="jacket" hidden>
+  <fieldset data-g="shape" data-cat="jacket" hidden>
     <legend>자켓 · 부재 (강관)</legend>
     <div class="grid2">
       <div class="f"><label for="jLD">다리 외경 (m)</label><input id="jLD" type="number" step="0.05"></div>
@@ -301,7 +313,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">브레이스는 밀폐(부력 있음)로 봅니다. 해양생물 두께 50 mm는 가정값입니다(현장 설계기준서 값으로 바꾸세요). 부재 검토는 NORSOK N-004(γ<sub>M</sub> 1.15)입니다.</p>
   </fieldset>
-  <fieldset data-cat="jacket" hidden>
+  <fieldset data-g="shape" data-cat="jacket" hidden>
     <legend>자켓 · 트랜지션피스 · 말뚝</legend>
     <div class="grid2">
       <div class="f"><label for="jWtp">TP 중량 (kN)</label><input id="jWtp" type="number" step="50"></div>
@@ -316,7 +328,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">말뚝은 다리마다 1본, 연직 항타로 봅니다. TP 3,500 kN·2차 부재 800 kN은 가정값입니다. 석션버킷은 다음 단계에서 추가합니다. 보호공 외경 5D·두께 1.0 m와 세굴 깊이 1.3D(DNV 경험값)는 가정값입니다.</p>
   </fieldset>
-  <fieldset data-cat="mono jacket" hidden>
+  <fieldset data-g="soil" data-cat="mono jacket" hidden>
     <legend>지반 · 말뚝 해석</legend>
     <div class="grid2">
       <div class="f wide"><label for="soilPre">지층 자료</label><select id="soilPre"></select></div>
@@ -327,7 +339,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <p class="hint" id="soilNote"></p>
     <div class="dl" style="margin-top:6px"><button class="btn small" type="button" id="soilOpen">지층 표 열기 · 고치기</button></div>
   </fieldset>
-  <fieldset data-cat="mono" hidden>
+  <fieldset data-g="soil" data-cat="mono" hidden>
     <legend>설치 · 세굴 · 해양생물</legend>
     <div class="grid2">
       <div class="f wide"><label for="mInst">설치 방식</label><select id="mInst"><option value="drive">항타</option><option value="drill">드릴드 (암반 천공 후 삽입·그라우트)</option><option value="ddd">항타-천공-항타 (일부 구간 천공)</option></select></div>
@@ -341,7 +353,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">세굴 깊이 S = 1.3D는 DNV 평형 세굴 경험값(가정)입니다. 해양생물 50 mm는 가정값이며 MSL+2 m 아래에 붙는다고 봅니다. 천공 여유 0.15 m도 가정값입니다.</p>
   </fieldset>
-  <fieldset data-cat="grav">
+  <fieldset data-g="shape" data-cat="grav">
     <legend>기둥 · 샤프트 / 상부</legend>
     <div class="grid2">
       <div class="f wide"><label for="shp">단면 형상</label><select id="shp"><option value="circ">원형</option><option value="hex">육각형 (속 빈 단면)</option></select></div>
@@ -362,7 +374,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <button class="btn small" type="button" id="ringAdd" style="margin-top:6px">링 추가</button>
     <p class="hint" id="ringNote"></p>
   </fieldset>
-  <fieldset data-cat="grav">
+  <fieldset data-g="shape" data-cat="grav">
     <legend>속채움 · 재료</legend>
     <div class="grid2">
       <div class="f"><label for="zf1">격실 채움 상단 높이</label><input id="zf1" type="number" step="0.1"></div>
@@ -372,7 +384,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">모래는 포화단위중량(예: 19), 물 밸러스트는 해수 단위중량(10.1)을 넣으세요. 격실 = 벽과 기둥 사이.</p>
   </fieldset>
-  <fieldset>
+  <fieldset data-g="env">
     <legend>설치 위치 · 수위 (DL 기준)</legend>
     <div class="grid2">
       <div class="f" data-cat="grav"><label for="zbDL">저판 하면 표고</label><input id="zbDL" type="number" step="0.1"></div>
@@ -384,7 +396,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint" data-cat="grav">설계조위 = 약최고고조위 + 폭풍해일고. 기본값(DL(+)2.0 m)은 예시이니 현장 조위 자료로 바꾸세요.</p>
   </fieldset>
-  <fieldset>
+  <fieldset data-g="turb">
     <legend>터빈</legend>
     <div class="grid2">
       <div class="f wide"><label for="turb">터빈 선택</label><select id="turb"></select></div>
@@ -421,7 +433,7 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="dl"><button class="btn primary small" type="button" id="teSave">터빈 저장</button><button class="btn small" type="button" id="teCancel">닫기</button><span class="note" id="teMsg"></span></div>
     </div>
   </fieldset>
-  <fieldset>
+  <fieldset data-g="env">
     <legend>풍 · 파랑 · 조류</legend>
     <div class="grid2">
       <div class="f"><label for="Uref">기준 풍속 (10분 평균, m/s)</label><input id="Uref" type="number" step="0.01"></div>
@@ -440,7 +452,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">기준 풍속·파고·주기·조류 유속 기본값은 예시(가정)입니다. 현장 설계 조건(해양조사, 설계기준서)으로 바꾸세요. 항력계수는 표면 거칠기와 높이별 직경으로 계산합니다(하중 탭에 산정 과정).</p>
   </fieldset>
-  <fieldset>
+  <fieldset data-g="soil">
     <legend>지반 · 지진 · 검토 기준</legend>
     <div class="grid2">
       <div class="f wide" data-cat="grav"><label for="gBase">저판 지지 (고유진동수용)</label><select id="gBase"><option value="spr">지반 스프링 (원형 기초 탄성식)</option><option value="fix">고정 (경암)</option></select></div>
@@ -465,7 +477,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <p class="hint">지반 분류별 PGA는 지진구역 I(Z = 0.11), 내진 I등급 기준 값입니다(KDS 17 10 00, 현장에 맞게 확인). 지반조사 전에는 k<sub>h</sub> 0.077(= 0.154/2) 가정값을 씁니다. 동수압은 지반과 무관하게 수심과 구조물 형상으로 계산합니다.</p>
     <p class="hint" data-cat="grav">안전율은 항만 및 어항 설계기준(케이슨) 수준의 기본값입니다. 허용지지력·마찰계수·유효접지율은 지반조사 결과와 발주처 기준으로 바꾸세요.</p>
   </fieldset>
-  <fieldset data-cat="grav">
+  <fieldset data-g="mem" data-cat="grav">
     <legend>부재설계 · 철근</legend>
     <div class="dl" style="clear:both;margin:0 0 6px">
       <button class="btn primary small" type="button" id="btnRbF">부재설계 + 진동수 동시 자동 수정</button>
@@ -487,7 +499,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint">KDS 14 20 강도설계법. 터빈 ULS 하중은 제작사 하중계수가 들어 있다고 보고 1.0을 곱합니다. 저판 반력은 1.2 × 지반반력 − 0.9 × 자중으로 봅니다.</p>
   </fieldset>
-  <fieldset data-cat="grav">
+  <fieldset data-g="mem" data-cat="grav">
     <legend>예인 · 시공</legend>
     <div class="grid2">
       <div class="f"><label for="dTow">예인 경로 수심</label><input id="dTow" type="number" step="0.5"></div>
