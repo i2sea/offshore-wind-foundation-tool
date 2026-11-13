@@ -127,6 +127,10 @@ main{min-width:0;display:flex;flex-direction:column;gap:12px}
 .sheet svg{display:block;width:100%;height:auto}
 #rbWrap.zoom svg,#genWrap.zoom svg,#genDWrap.zoom svg,#rbDWrap.zoom svg{width:2400px;max-width:none}
 .sheet .cap{font-size:12px;font-weight:600;padding:8px 10px 0;color:var(--muted)}
+.sechead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.zbar{display:flex;gap:4px;align-items:center;padding:6px 8px 0;font-size:12px;color:var(--muted)}
+.zbar span{min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
+#secWrap{max-height:80vh;overflow:auto;position:relative}
 #view3d{position:relative;height:600px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;overflow:hidden}
 #view3d canvas{display:block;width:100%;height:100%}
 .ctl3d{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:10px;font-size:13px}
@@ -547,7 +551,7 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="legend" data-cat="mono jacket" hidden><span><i style="background:var(--steel)"></i>강재</span><span><i style="background:var(--grout)"></i>그라우트</span><span><i style="background:var(--rock)"></i>세굴방지공</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--soil)"></i>지반</span></div>
       <div class="legend" data-cat="grav"><span><i style="background:var(--conc)"></i>콘크리트</span><span><i style="background:var(--fill)"></i>속채움</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--grout)"></i>그라우팅</span><span><i style="background:var(--soil)"></i>지반</span></div>
       <div class="drw">
-        <div class="sheet" id="secWrap"><div class="cap" id="capSec">정면 단면도</div><div id="svgSec"></div><input id="dimEdit" type="number" step="any" aria-label="치수 수정" hidden></div>
+        <div class="sheet" style="overflow:visible"><div class="sechead"><div class="cap" id="capSec">정면 단면도</div><div class="zbar" role="group" aria-label="정면 단면도 확대"><button type="button" class="btn small" id="secZo" aria-label="축소">−</button><span id="secZv">100%</span><button type="button" class="btn small" id="secZi" aria-label="확대">+</button><button type="button" class="btn small" id="secZf">맞춤</button></div></div><div id="secWrap"><div id="svgSec"></div><input id="dimEdit" type="number" step="any" aria-label="치수 수정" hidden></div></div>
         <div class="sheet"><div class="cap">평면도</div><div id="svgPlan"></div></div>
       </div>
       <div data-cat="grav" style="margin-top:14px">
@@ -3811,6 +3815,12 @@ document.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()
 }));
 
 [["genDZoom","genDWrap"],["rbDZoom","rbDWrap"]].forEach(([b,w])=>$(b).addEventListener("click",()=>{ const e=$(w); e.classList.toggle("zoom"); $(b).textContent=e.classList.contains("zoom")?"맞춰 보기":"크게 보기"; }));
+/* 정면 단면도 확대: 버튼으로만 (휠 확대 없음), 확대 후 스크롤로 이동 */
+{ const ZL=[1,1.5,2,3,4,6]; let zi=0;
+  const setZ=i=>{ const w=$("secWrap"), cx=(w.scrollLeft+w.clientWidth/2)/w.scrollWidth, cy=(w.scrollTop+w.clientHeight/2)/w.scrollHeight; zi=Math.max(0,Math.min(ZL.length-1,i));
+    $("svgSec").style.width=ZL[zi]*100+"%"; $("secZv").textContent=Math.round(ZL[zi]*100)+"%"; $("secZo").disabled=zi===0; $("secZi").disabled=zi===ZL.length-1;
+    w.scrollLeft=cx*w.scrollWidth-w.clientWidth/2; w.scrollTop=cy*w.scrollHeight-w.clientHeight/2; $("dimEdit").hidden=true; };
+  $("secZi").addEventListener("click",()=>setZ(zi+1)); $("secZo").addEventListener("click",()=>setZ(zi-1)); $("secZf").addEventListener("click",()=>setZ(0)); setZ(0); }
 $("genZoom").addEventListener("click",()=>{ const w=$("genWrap"); w.classList.toggle("zoom"); $("genZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 $("rbZoom").addEventListener("click",()=>{ const w=$("rbWrap"); w.classList.toggle("zoom"); $("rbZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 

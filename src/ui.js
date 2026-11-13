@@ -1710,5 +1710,11 @@ document.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()
 }));
 
 [["genDZoom","genDWrap"],["rbDZoom","rbDWrap"]].forEach(([b,w])=>$(b).addEventListener("click",()=>{ const e=$(w); e.classList.toggle("zoom"); $(b).textContent=e.classList.contains("zoom")?"맞춰 보기":"크게 보기"; }));
+/* 정면 단면도 확대: 버튼으로만 (휠 확대 없음), 확대 후 스크롤로 이동 */
+{ const ZL=[1,1.5,2,3,4,6]; let zi=0;
+  const setZ=i=>{ const w=$("secWrap"), cx=(w.scrollLeft+w.clientWidth/2)/w.scrollWidth, cy=(w.scrollTop+w.clientHeight/2)/w.scrollHeight; zi=Math.max(0,Math.min(ZL.length-1,i));
+    $("svgSec").style.width=ZL[zi]*100+"%"; $("secZv").textContent=Math.round(ZL[zi]*100)+"%"; $("secZo").disabled=zi===0; $("secZi").disabled=zi===ZL.length-1;
+    w.scrollLeft=cx*w.scrollWidth-w.clientWidth/2; w.scrollTop=cy*w.scrollHeight-w.clientHeight/2; $("dimEdit").hidden=true; };
+  $("secZi").addEventListener("click",()=>setZ(zi+1)); $("secZo").addEventListener("click",()=>setZ(zi-1)); $("secZf").addEventListener("click",()=>setZ(0)); setZ(0); }
 $("genZoom").addEventListener("click",()=>{ const w=$("genWrap"); w.classList.toggle("zoom"); $("genZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
 $("rbZoom").addEventListener("click",()=>{ const w=$("rbWrap"); w.classList.toggle("zoom"); $("rbZoom").textContent=w.classList.contains("zoom")?"맞춰 보기":"크게 보기"; });
