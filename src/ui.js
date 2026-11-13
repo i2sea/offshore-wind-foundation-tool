@@ -399,8 +399,12 @@ function secPrims(R){
   if(P.Dp>0&&P.tp>0) both([[cw,P.ztop-P.tp],[Math.max(P.Dp/2,cw),P.ztop-P.tp],[Math.max(P.Dp/2,cw),P.ztop],[cw,P.ztop]],"CONC");
   const RG=ringList(P);
   RG.forEach(r=>{ both([[r.D/2-r.t,r.z],[r.D/2,r.z],[r.D/2,r.z+r.h],[r.D/2-r.t,r.z+r.h]],"CONC");
-    o.push({t:"line",L:"DIM",x1:r.D/2,z1:r.z+r.h,x2:r.D/2+1.2,z2:r.z+r.h+1.0});
-    o.push({t:"text",L:"DIM",x:r.D/2+1.3,z:r.z+r.h+1.0,h:fs*.72,s:`${r.no} 상세 ${String.fromCharCode(65+RG.indexOf(r))}`}); });
+    const hung=P.type==="caisson"&&r.z+r.h>=P.cH-P.ctt-0.05&&r.z>P.cts+0.05;  // 상판에 매단 링: 위는 상판·치수가 있으므로 번호를 링 아래로
+    const z0=hung?r.z:r.z+r.h, zl=hung?r.z-1.0-fs*.5:r.z+r.h+1.0;
+    const outer=r.D/2>=(P.type==="caisson"?P.cDw/2-P.ctw:P.Dw/2-P.tw)-0.05, xa=outer?r.D/2-r.t:r.D/2, sg=outer?-1:1;  // 외벽에 붙은 링은 오른쪽 치수선과 겹치지 않게 안쪽으로 인출
+    if(outer&&!hung){ const zm=r.z+r.h/2; o.push({t:"line",L:"DIM",x1:xa,z1:zm,x2:xa-1.6,z2:zm}); o.push({t:"text",L:"DIM",x:xa-1.7,z:zm-fs*.25,h:fs*.72,s:`${r.no} 상세 ${String.fromCharCode(65+RG.indexOf(r))}`,anchor:"end"}); return; }
+    o.push({t:"line",L:"DIM",x1:xa,z1:z0,x2:xa+sg*1.2,z2:hung?r.z-1.0:zl});
+    o.push({t:"text",L:"DIM",x:xa+sg*1.3,z:zl,h:fs*.72,s:`${r.no} 상세 ${String.fromCharCode(65+RG.indexOf(r))}`,...(outer?{anchor:"end"}:{})}); });
   if(RG.length){ const zl=zHW+fs*(2.6+1.05*RG.length);  // 설계조위 표기 위 빈 곳
     o.push({t:"text",L:"TXT",x:xL+.3,z:zl,h:fs*.78,s:"보강 링 (외경 × 두께, 높이, 하단 높이)"});
     RG.forEach((r,i)=>o.push({t:"text",L:"DIM",x:xL+.3,z:zl-fs*(1.1+1.05*i),h:fs*.72,num:1,s:`${r.no} Ø${fx(r.D*1000,0)} × ${fx(r.t*1000,0)}, h ${fx(r.h*1000,0)}, z ${fx(r.z*1000,0)}`})); }
@@ -430,7 +434,7 @@ function secPrims(R){
   const hdim=(r,z,key,above)=>{ o.push({t:"line",L:"DIM",x1:-r,z1:z,x2:r,z2:z}); [-r,r].forEach(x=>o.push({t:"line",L:"DIM",x1:x-.5,z1:z-.5,x2:x+.5,z2:z+.5}));
     o.push({t:"text",L:"DIM",x:0,z:z+(above?.4:-fs*.95),h:fs*.82,s:fx(r*2000,0),key,anchor:"middle",num:1}); };
   hdim(R.Rbase,-P.tg-1.6,P.type==="caisson"?"cDs":"Db",false);
-  if(Math.abs(R.Rwide-R.Rbase)>1e-6) hdim(R.Rwide,wt+.6,P.type==="caisson"?"cDw":"Dw",true);
+  if(Math.abs(R.Rwide-R.Rbase)>1e-6) hdim(R.Rwide,wt+Math.max(.6,fs*.9),P.type==="caisson"?"cDw":"Dw",true);
   if(P.type==="cone") hdim(P.Dt/2,z2+2.2,"Dt",true);
   if(P.Dp>0) hdim(Math.max(P.Dp/2,cw),P.ztop+1.4,"Dp",true);
   o.push({t:"text",L:"MUT",x:cw+.6,z:(Math.max(z2,wt)+P.ztop)/2,h:fs*.78,s:P.type==="caisson"?"샤프트":"기둥"});
