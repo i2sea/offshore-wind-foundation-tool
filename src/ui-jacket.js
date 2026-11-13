@@ -63,7 +63,7 @@ Object.assign(FIXN,{jSc:["세굴 대책",""],jStub:["해저면 위 다리 하단
 function jkProj(R){ const b=(R.P.jDir||0)*PI/180, ux=Math.cos(b), uy=Math.sin(b); return n=>n.x*ux+n.y*uy; } // 파랑 방향으로 본 입면 (가로 = 파랑 방향)
 function jkSecPrims(R){
   const P=R.P, g=R.g, o=[], X=n=>{ const b=(P.jDir||0)*PI/180; return -n.x*Math.sin(b)+n.y*Math.cos(b); }; // 파랑 방향에 직각인 면을 정면으로
-  const Rb=g.Rz(g.zb)+P.jPD, xL=-Rb-30, xR=Rb+34, zT=g.yIf+12, zB=P.sbDL-P.jPL-4, fs=Math.max(1.4,(zT-zB)/48), sb=P.sbDL;
+  const Rb=g.Rz(g.zb)+P.jPD, xL=-Rb-30, xR=Rb+(P.Hw>0?52:34), zT=g.yIf+12, zB=P.sbDL-P.jPL-4, fs=Math.max(1.4,(zT-zB)/48), sb=P.sbDL;
   o.push({t:"poly",L:"WATER",pts:[[xL,sb],[xL,P.hwl],[xR,P.hwl],[xR,sb]]});
   o.push({t:"poly",L:"SOIL",pts:[[xL,zB],[xL,sb],[xR,sb],[xR,zB]]});
   /* 말뚝 (점선) */
@@ -84,6 +84,7 @@ function jkSecPrims(R){
   o.push({t:"line",L:"CEN",x1:0,z1:zB+1,x2:0,z2:zT-0.5});
   /* 수위 */
   const wls=[[P.hwl,`설계조위 ${dl(P.hwl)}`],...(Math.abs(P.msl-P.hwl)>0.05?[[P.msl,`MSL ${dl(P.msl)}`]]:[])];
+  waveDraw(o,P,Rb+24,xR-1,P.hwl,0,fs,false);
   o.push({t:"line",L:"WL",x1:Rb+1,z1:R.crestDL,x2:xR-1,z2:R.crestDL,dash:1}); o.push({t:"text",L:"WL",x:Rb+6.5,z:R.crestDL+fs*0.35,h:fs*0.8,s:`설계 파봉 ${dl(R.crestDL)}`});
   { let last=R.crestDL; wls.forEach(([y,t])=>{ o.push({t:"line",L:"WL",x1:Rb+1,z1:y,x2:xR-1,z2:y}); o.push({t:"tri",L:"WL",x:Rb+4.5,z:y,s:fs*0.6}); const ty=Math.min(y+fs*0.35,last-fs*1.05); o.push({t:"text",L:"WL",x:Rb+6.5,z:ty,h:fs*0.8,s:t}); last=ty; }); }
   /* 왼쪽 표고 */

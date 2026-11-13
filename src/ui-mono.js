@@ -105,7 +105,7 @@ function monoProfile(g,P,y0,y1,inner){ // 한쪽 벽 윤곽: 바깥 위로, 안�
 function monoSecPrims(R){
   const P=R.P, g=R.g, o=[], q=R.qty;
   const Rsc=g.prot?q.Dsc/2:q.Dsb0/2+1.73*R.S+1, Rw=Math.max(Rsc,g.DTP/2)+4;
-  const xL=-Rw-30, xR=Rw+34, zT=R.yIf+6, zB=g.yToe-5;
+  const xL=-Rw-30, xR=Rw+(P.Hw>0?52:34), zT=R.yIf+6, zB=g.yToe-5;
   const fs=Math.max(1.4,(zT-zB)/46);
   const both=(pts,L,ex)=>{ o.push({t:"poly",pts,L,...ex}); o.push({t:"poly",pts:pts.map(p=>[-p[0],p[1]]),L,...ex}); };
   const sb=P.sbDL, r0=q.Dsb0/2;
@@ -126,6 +126,7 @@ function monoSecPrims(R){
   o.push({t:"line",L:"CEN",x1:0,z1:zB+1,x2:0,z2:zT-0.5});
   // 수위 (글자는 겹치지 않게 아래로 밀어 씀)
   const wls=[[P.hwl,`설계조위 ${dl(P.hwl)}`],...(Math.abs(P.msl-P.hwl)>0.05?[[P.msl,`MSL ${dl(P.msl)}`]]:[]),...(Math.abs(P.hwl)>0.05&&Math.abs(P.msl)>0.05?[[0,"약최저저조위 DL 0.000"]]:[])];
+  waveDraw(o,P,Rw+24,xR-1,P.hwl,0,fs,false);
   o.push({t:"line",L:"WL",x1:Rw+1,z1:R.crestDL,x2:xR-1,z2:R.crestDL,dash:1}); o.push({t:"text",L:"WL",x:Rw+6.5,z:R.crestDL+fs*0.35,h:fs*0.8,s:`설계 파봉 ${dl(R.crestDL)}`});
   { let lastW=R.crestDL; wls.forEach(([y,t])=>{ o.push({t:"line",L:"WL",x1:Rw+1,z1:y,x2:xR-1,z2:y}); o.push({t:"tri",L:"WL",x:Rw+4.5,z:y,s:fs*0.6});
     const ty=Math.min(y+fs*0.35,lastW-fs*1.05); o.push({t:"text",L:"WL",x:Rw+6.5,z:ty,h:fs*0.8,s:t}); lastW=ty; }); }

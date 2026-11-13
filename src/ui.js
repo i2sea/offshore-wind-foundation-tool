@@ -347,11 +347,27 @@ function renderWarns(){
 function wallIn(P,z){ if(P.type==="caisson") return P.cDw/2-P.ctw; const z1=P.tb+P.hw; return z<=z1?P.Dw/2-P.tw:(P.Dw/2+(P.Dt/2-P.Dw/2)*(z-z1)/P.hk-P.tkh); }
 /* 보강 링 목록 (유효한 것만, 번호 ①②…) */
 function ringList(P){ return (P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0).map((r,i)=>({...r,no:String.fromCharCode(0x2460+Math.min(i,19))})); }
+/* 설계파 표시(정면도 오른쪽): 파형 스케치(2차 성분으로 파봉 뾰족), 파봉·파곡 선, 파고 치수, 제원. zHW = 그림 좌표의 설계조위, off = 표고(DL) − 그림 좌표 */
+function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb-xa>6)) return;
+  const W=P.waveRef, ec=H/2, zc=zHW+ec, zt=zHW-(H-ec), a=H/2, b=Math.min(H*0.08,ec*0.3), n=60, Lw=(xb-xa)/1.25, pts=[];
+  for(let i=0;i<=n;i++){ const x=xa+(xb-xa)*i/n, th=2*Math.PI*(x-xa-Lw*0.35)/Lw; pts.push([x,zHW+a*Math.cos(th)+b*Math.cos(2*th)]); }
+  // 파형이 정확히 파봉·파곡에 닿도록 맞춤
+  const mx=Math.max(...pts.map(p=>p[1])), mn=Math.min(...pts.map(p=>p[1])); pts.forEach(p=>{ p[1]=zt+(p[1]-mn)*(zc-zt)/(mx-mn); });
+  o.push({t:"poly",open:1,L:"WL",pts,w:.18});
+  const xc=xa+Lw*0.35;
+  if(crestLine!==false) o.push({t:"line",L:"WL",x1:xa,z1:zc,x2:xb,z2:zc,dash:1});
+  o.push({t:"line",L:"WL",x1:xa,z1:zt,x2:xb,z2:zt,dash:1});
+  if(crestLine!==false) o.push({t:"text",L:"WL",x:xb,z:zc+fs*0.35,h:fs*.75,s:`파봉 ${dl(zc+off)}`,anchor:"end"});
+  o.push({t:"text",L:"WL",x:xb,z:zt-fs*1.05,h:fs*.75,s:`파곡 ${dl(zt+off)}`,anchor:"end"});
+  const xd=xc; o.push({t:"line",L:"DIM",x1:xd,z1:zt,x2:xd,z2:zc}); [zc,zt].forEach(z=>o.push({t:"line",L:"DIM",x1:xd-fs*.35,z1:z-fs*.35,x2:xd+fs*.35,z2:z+fs*.35}));
+  const lab=[`설계파 H = ${fx(H,2)} m, T = ${fx(P.Tw,1)} s`]; if(W) lab.push(`${W.title||"설계파 산정 보고서"}${W.reportNo?` (${W.reportNo})`:""} 첨부`);
+  if(W&&W.crest>0&&Math.abs(W.crest-ec)>0.05) lab.push(`보고서 파봉고 정수면 +${fx(W.crest,2)} m (계산은 H/2)`);
+  lab.forEach((t,i)=>o.push({t:"text",L:"DIM",x:xb,z:zc+fs*(1.5+1.05*(lab.length-1-i)),h:fs*.75,s:t,anchor:"end"})); }
 function secPrims(R){
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
   const zHW=P.hwl-P.zbDL, zMS=P.msl-P.zbDL, zLW=-P.zbDL, zSB=P.sbDL-P.zbDL;
-  const xL=-Rmax-26, xR=Rmax+22, zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+3);
+  const xL=-Rmax-26, xR=Rmax+(P.Hw>0?40:22), zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+3);  // 오른쪽에 설계파 그림 자리
   const fs=Math.max(1.4,(zT-zB)/44);
   const both=(pts,L,extra)=>{ o.push({t:"poly",pts,L,...extra}); o.push({t:"poly",pts:pts.map(p=>[-p[0],p[1]]),L,...extra}); };
   // 지반
@@ -392,6 +408,7 @@ function secPrims(R){
   // 수위
   const wl=(z,lab,dash)=>{ o.push({t:"line",L:"WL",x1:xL,z1:z,x2:-Rmax-1,z2:z,dash}); o.push({t:"tri",L:"WL",x:xL+3,z,s:0.9}); o.push({t:"text",L:"WL",x:xL+.3,z:z+1.3,h:fs*.85,s:lab}); };
   wl(zHW,`설계조위 ${dl(P.hwl)}`,false);
+  waveDraw(o,P,Rmax+16,xR-1,zHW,P.zbDL,fs);
   if(Math.abs(zMS-zHW)>fs*1.6) wl(zMS,`MSL ${dl(P.msl)}`,true);
   if(Math.abs(zLW-zMS)>fs*1.6&&Math.abs(zLW-zHW)>fs*1.6) wl(zLW,`약최저저조위 ${dl(0)}`,true);
   o.push({t:"text",L:"TXT",x:xL+.3,z:zSB-fs*1.4,h:fs*.85,s:`해저면 ${dl(P.sbDL)}`});
