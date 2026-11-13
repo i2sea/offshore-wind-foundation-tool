@@ -97,7 +97,7 @@ function memberForces(R){
   // 4) 기둥 하단 (하부 구조 상단 z2)
   const cs=R.colSec, g=R.TL.gu, zs=cs.z;
   const Mt=g?g.M+g.H*(R.zIf-zs):0, Ht=g?g.H:0, Vt=g?g.V:R.Wt;
-  const colA=PI*(R.rso**2-R.rsi**2), Wabove=P.gc*(colA*(P.ztop-zs)+Math.max(0,PI*((P.Dp/2)**2-R.rso**2))*P.tp);
+  const colA=PI*(R.rso**2-R.rsi**2), Wabove=P.gc*(colA*(P.ztop-zs)+(P.Dp>0&&P.tp>0?Math.max(0,PI*((P.Dp/2)**2-R.rso**2))*P.tp:0)+(R.topRing?R.topRing.V:0));
   const dH=P.hwl-P.zbDL, Uab=gw*PI*R.rso**2*Math.max(0,Math.min(dH,P.ztop)-zs);
   const Menv=cs.wM+cs.vM+cs.cM, Henv=cs.wF+cs.vF+cs.cF;
   const col={z:zs,Mt,Ht,Vt,Wabove,Uab,Menv,Henv,Mu:Mt+P.gE*Menv,Vu:Ht+P.gE*Henv,Pu:Vt+0.9*(Wabove-Uab),ro:R.rso,ri:R.rsi,cs};

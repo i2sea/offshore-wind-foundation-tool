@@ -370,8 +370,13 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f" data-shp="hex"><label for="hhn">모서리 헌치 (다리 길이)</label><input id="hhn" type="number" step="0.05"></div>
       <div class="f"><label for="zc0">기둥 하단 높이</label><input id="zc0" type="number" step="0.1"></div>
       <div class="f"><label for="ztop">구조물 상단 높이</label><input id="ztop" type="number" step="0.1"></div>
-      <div class="f"><label for="Dp">상부 플랫폼 외경</label><input id="Dp" type="number" step="0.1"></div>
-      <div class="f"><label for="tp">플랫폼 두께</label><input id="tp" type="number" step="0.05"></div>
+      <div class="f wide"><label for="topR">상단 타워 받침</label><select id="topR"><option value="1">내측 링 (벽이 안쪽으로 두꺼워짐)</option><option value="0">없음</option></select></div>
+      <div class="f" data-topr="1"><label for="trB">링 폭 (기둥 외면에서 안쪽)</label><input id="trB" type="number" step="0.05"></div>
+      <div class="f" data-topr="1"><label for="trT">링 직선부 높이</label><input id="trT" type="number" step="0.05"></div>
+      <div class="f" data-topr="1"><label for="trH">링 경사부 높이</label><input id="trH" type="number" step="0.05"></div>
+      <div class="f" data-topr="1"><label>경사 구배 (수평 : 수직)</label><output id="trSlope" class="calc">–</output></div>
+      <div class="f"><label for="Dp">바깥 플랫폼 외경 (0 = 없음)</label><input id="Dp" type="number" step="0.1"></div>
+      <div class="f"><label for="tp">바깥 플랫폼 두께</label><input id="tp" type="number" step="0.05"></div>
     </div>
     <p class="hint" id="shpNote">높이는 모두 저판 하면 기준입니다.</p>
     <div class="sub">보강 링 (외경 · 두께 · 높이 · 하단 높이)</div>
@@ -626,7 +631,7 @@ const DEF={
   // 케이슨형
   cDs:36,cts:1.0,cDw:34,ctw:0.5,cH:10,ctt:0.5,cnr:12,ctr:0.3,
   // 기둥(샤프트)
-  shp:"circ",Dc:7.0,tc:0.6,ha:4.0,hth:0.40,hhn:0.80,zc0:1.0,ztop:60,Dp:12,tp:0.5,
+  shp:"circ",Dc:7.0,tc:0.6,ha:4.0,hth:0.40,hhn:0.80,zc0:1.0,ztop:60,Dp:0,tp:0.5,topR:1,trB:1.5,trT:2.0,trH:1.8,
   rings:[],ringAuto:"1",
   zf1:20,zf2:35,gf:19,gc:24.5,
   // 위치·수위
@@ -703,6 +708,13 @@ function buildParts(P){
   if(S.hex) parts.push({k:"col",nm:colNm+" (육각)",z0:P.zc0,z1:P.ztop,ro:()=>rso,ri:()=>rsi,V:(S.hex.Ao-S.hex.Ai)*(P.ztop-P.zc0),
       f:`(${fmt(S.hex.Ao)} − ${fmt(S.hex.Ai)}) × ${fmt(P.ztop-P.zc0)}  (육각 외곽 − 내부, 모서리 헌치 포함)`});
   else parts.push({k:"col",nm:colNm,z0:P.zc0,z1:P.ztop,ro:()=>rso,ri:()=>rsi,V:ann(P.Dc,P.tc)*(P.ztop-P.zc0),f:`π/4 × (${P.Dc}² − ${fmt(P.Dc-2*P.tc)}²) × ${fmt(P.ztop-P.zc0)}`});
+  /* 상단 내측 링(타워 받침): 기둥 벽이 꼭대기에서 안쪽으로 두꺼워짐. 위 직선부 trT(안쪽 면 수직), 아래 경사부 trH(벽 안쪽 면까지 경사) */
+  let topRing=null;
+  if(P.topR&&P.trB>0&&P.trT>0){ const rr=Math.max(0,rso-P.trB); if(rr<rsi-1e-6){ const hh=Math.max(0,P.trH||0), zA=P.ztop-P.trT, z0=zA-hh;
+    const riZ=z=>z>=zA||hh<=0?rr:rsi-(rsi-rr)*(z-z0)/hh, V1=PI*(rsi*rsi-rr*rr)*P.trT, V2=hh>0?PI*hh*(rsi*rsi-(rr*rr+rr*rsi+rsi*rsi)/3):0;
+    topRing={rr,rsi,zA,z0,trT:P.trT,hh,V:V1+V2,slope:hh>0?(rsi-rr)/hh:0};
+    parts.push({k:"topR",nm:"상단 내측 링 (타워 받침)",z0,z1:P.ztop,ro:()=>rsi,ri:riZ,V:V1+V2,
+      f:`π(${fmt(rsi)}² − ${fmt(rr)}²) × ${P.trT}${hh>0?` + π × ${hh} × (${fmt(rsi)}² − (${fmt(rr)}² + ${fmt(rr)}×${fmt(rsi)} + ${fmt(rsi)}²)/3)`:""}`}); } }
   if(P.Dp>0&&P.tp>0) parts.push({k:"plat",nm:(P.type==="caisson"?"⑥":"⑤")+" 상부 플랫폼",z0:P.ztop-P.tp,z1:P.ztop,ro:()=>Math.max(P.Dp/2,rso),ri:()=>rso,V:Math.max(0,PI*((P.Dp/2)**2-rso**2))*P.tp,f:`π × (${fmt(P.Dp/2)}² − ${fmt(rso)}²) × ${P.tp}`});
   (P.rings||[]).forEach((r,i)=>{ if(!(r.D>0&&r.t>0&&r.h>0)) return;
     parts.push({k:"ring"+i,nm:`보강 링 ${i+1}`,z0:r.z,z1:r.z+r.h,ro:()=>r.D/2,ri:()=>Math.max(0,r.D/2-r.t),V:ann(r.D,r.t)*r.h,f:`π/4 × (${r.D}² − ${fmt(Math.max(0,r.D-2*r.t))}²) × ${r.h}`}); });
@@ -710,7 +722,7 @@ function buildParts(P){
   { const rad=parts.find(q=>q.k==="rad"); if(rad){ const h0=P.cts, h1=P.cH-P.ctt, r0=rso, r1=P.cDw/2-P.ctw; let dV=0;
       (P.rings||[]).forEach(r=>{ if(!(r.D>0&&r.t>0&&r.h>0)) return; const dr=Math.min(r1,r.D/2)-Math.max(r0,r.D/2-r.t), dz=Math.min(h1,r.z+r.h)-Math.max(h0,r.z); if(dr>0&&dz>0) dV+=P.cnr*P.ctr*dr*dz; });
       if(dV>1e-9){ rad.V-=dV; rad.f+=` − 보강 링 겹침 ${fmt(dV)} m³`; } } }
-  return {parts,z2,wideTop,Rbase,Rwide,S};
+  return {parts,z2,wideTop,Rbase,Rwide,S,topRing};
 }
 
 /* 반경 x 위치의 링 연직철근이 (아래 링을 거쳐) 저판까지 곧게 내려갈 수 있는지 */
@@ -792,7 +804,7 @@ function waveRefWarns(P){ const W=P.waveRef, o=[]; if(!W) return o; const d=P.hw
 function compute(P){
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};
   const warns=[];
-  const {parts,z2,wideTop,Rbase,Rwide,S}=buildParts(P);
+  const {parts,z2,wideTop,Rbase,Rwide,S,topRing}=buildParts(P);
   const rso=S.ro, rsi=S.ri;
   if(P.type==="cone"){
     if(P.Dw>P.Db+1e-9) warns.push("원통 외경이 저판 직경보다 큽니다.");
@@ -973,7 +985,7 @@ function compute(P){
      N = 터빈 연직 + 기둥·플랫폼 자중(수중부는 수중단위중량), H·M = 터빈 + 풍·파랑(단면별 최대 위상)·조류·지진
      σ = N/A ± M/Z (압축 +), 기둥 속채움 하중은 내부 바닥으로 전달된다고 보고 제외 */
   const colD=(()=>{ const zb=Math.max(z2,P.zc0), zt0=P.ztop, n=60, Ac=PI*(rso*rso-rsi*rsi), Ic=PI/4*(rso**4-rsi**4), Zc=Ic/rso;
-    const Aplat=P.Dp>0&&P.tp>0?Math.max(0,PI*((P.Dp/2)**2-rso**2))*P.tp:0, Wpl=Aplat*P.gc, zPl=zt0-P.tp/2;
+    const Aplat=(P.Dp>0&&P.tp>0?Math.max(0,PI*((P.Dp/2)**2-rso**2))*P.tp:0)+(topRing?topRing.V:0), Wpl=Aplat*P.gc, zPl=topRing?zt0-(topRing.trT+topRing.hh)/2:zt0-P.tp/2;
     const zsec=[]; for(let i=0;i<=n;i++) zsec.push(zb+(zt0-zb)*i/n);
     const defs=[["LC1","H",tgs,{cur:"n"}],["LC2","H",tgu,{wind:1,wave:1,cur:"e"}],["LC3","L",tgu,{wind:1,wave:1,cur:"e"}],["LC4","H",tgs,{cur:"n",eq:1}]];
     const lc={};
@@ -1017,7 +1029,7 @@ function compute(P){
     if(flt.fb<=0.5) warns.push("예인 상태 건현이 0.5 m 이하입니다.");
   }
   const grout=Abase*P.tg, pad=P.padN*P.padB**2*P.padH;
-  return {P,parts:partRows,z2,wideTop,Rbase,Rwide,S,rso,rsi,zmax,Vgross,Vc,overlap:Vgross-Vc,zcC,Wc,Vf1,Vf2,Vf,Wf,zcF,Cap1,Cap2,
+  return {P,topRing,parts:partRows,z2,wideTop,Rbase,Rwide,S,rso,rsi,zmax,Vgross,Vc,overlap:Vgross-Vc,zcC,Wc,Vf1,Vf2,Vf,Wf,zcF,Cap1,Cap2,
     inst,T,TL,Wt,zIf,zt,freq,wind,wave,cur,cdTbl,colSec,colD,eq,LC,flt,grout,pad,warns,Re,dz,N,envAt,reAt};
 }
 /* 예인 높이별 흘수·GM 표 */
@@ -1130,7 +1142,7 @@ function memberForces(R){
   // 4) 기둥 하단 (하부 구조 상단 z2)
   const cs=R.colSec, g=R.TL.gu, zs=cs.z;
   const Mt=g?g.M+g.H*(R.zIf-zs):0, Ht=g?g.H:0, Vt=g?g.V:R.Wt;
-  const colA=PI*(R.rso**2-R.rsi**2), Wabove=P.gc*(colA*(P.ztop-zs)+Math.max(0,PI*((P.Dp/2)**2-R.rso**2))*P.tp);
+  const colA=PI*(R.rso**2-R.rsi**2), Wabove=P.gc*(colA*(P.ztop-zs)+(P.Dp>0&&P.tp>0?Math.max(0,PI*((P.Dp/2)**2-R.rso**2))*P.tp:0)+(R.topRing?R.topRing.V:0));
   const dH=P.hwl-P.zbDL, Uab=gw*PI*R.rso**2*Math.max(0,Math.min(dH,P.ztop)-zs);
   const Menv=cs.wM+cs.vM+cs.cM, Henv=cs.wF+cs.vF+cs.cF;
   const col={z:zs,Mt,Ht,Vt,Wabove,Uab,Menv,Henv,Mu:Mt+P.gE*Menv,Vu:Ht+P.gE*Henv,Pu:Vt+0.9*(Wabove-Uab),ro:R.rso,ri:R.rsi,cs};
@@ -2115,12 +2127,12 @@ const fx=(v,n=3)=>isFinite(v)?Number(v).toLocaleString("ko-KR",{minimumFractionD
 const dl=v=>`DL(${v>=0?"+":"−"})${fx(Math.abs(v),3)}`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
-const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH","ctt","cnr","ctr","Dc","tc","ha","hth","hhn","zc0","ztop","Dp","tp",
+const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH","ctt","cnr","ctr","Dc","tc","ha","hth","hhn","zc0","ztop","Dp","tp","trB","trT","trH","trB","trT","trH",
   "zf1","zf2","gf","gc","zbDL","sbDL","hwl","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
   "mu","qa","tilt","aeff","fck","fy","cov","kcr","phiF","gH","gE","fsO1","fsS1","fsO2","fsS2","fsO3","fsS3","qf3","dTow","ukc","gmMin","zcut","zbal","Wadd","zadd","padN","padB","padH",
   "mD","mDt","mzA","mzB","mtop","mL","mz1","mz2","mt1","mt2","mt3","mca","mfy","mgM","mgs","mgE","mtTP","mgap","mWsec","mgg","mDrG","mDrL","mScK","mScT","mScS","mmg","mRot","mFSc","mFSu",
   "jWb","jWt","jN","jRat","jTPh","jStub","jDir","jLD","jLt","jBrD","jBrt","jMbD","jMbt","jMg","jfy","jgM","jgE","jWtp","jWsec","jPD","jPt","jPL","jScK","jScT","jScS"];
-const SEL=["ringAuto","shp","turb","crest","hydro","sgc","surf","mTP","mInst","mSc","soilPre","jHz","jFlood","jSc","gBase"];
+const SEL=["topR","ringAuto","shp","turb","crest","hydro","sgc","surf","mTP","mInst","mSc","soilPre","jHz","jFlood","jSc","gBase"];
 const LS="gbs-tool-v3";
 let ST={...DEF}; // 현재 상태 (rings, customT, type 포함)
 try{ localStorage.removeItem("gbs-tool-v1"); localStorage.removeItem("gbs-tool-v2"); }catch(e){}
@@ -2138,7 +2150,7 @@ function fillTurbSel(){
   $("turb").value=ST.turb;
 }
 function setInputs(o){
-  ST={...DEF,...o}; if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null;
+  ST={...DEF,...o}; if(o&&o!==DEF&&o.topR==null&&Object.keys(o).length>20) ST.topR=0; if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null;
   ST.rb=Object.fromEntries(MEMB.map(m=>[m[0],{...(DEF_RB[m[0]]),...((o.rb||{})[m[0]]||{})}]));
   NUM.forEach(k=>{ if(ST[k]!==undefined) $(k).value=ST[k]; });
   fillTurbSel(); fillSoilSel(); SEL.forEach(k=>{ if(k!=="turb") $(k).value=String(ST[k]); }); $("waveSrc").value=ST.waveSrc||""; wvNote();
@@ -2153,7 +2165,7 @@ function drawRb(){
 function readInputs(){
   NUM.forEach(k=>{ const v=parseFloat($(k).value); ST[k]=isFinite(v)?v:0; });
   ST.sgc=$("sgc").value; ST.surf=$("surf").value; ST.shp=$("shp").value; ST.turb=$("turb").value; ST.crest=+$("crest").value; ST.hydro=+$("hydro").value; ST.mTP=$("mTP").value; ST.mInst=$("mInst").value; ST.mSc=$("mSc").value; ST.soilPre=$("soilPre").value; ST.jHz=$("jHz").value; ST.jFlood=$("jFlood").value; ST.jSc=$("jSc").value; ST.gBase=$("gBase").value;
-  ST.waveSrc=$("waveSrc").value.trim();
+  ST.waveSrc=$("waveSrc").value.trim(); ST.topR=+$("topR").value;
   ST.rings=ST.rings.map(r=>({D:+r.D||0,t:+r.t||0,h:+r.h||0,z:+r.z||0}));
   MEMB.forEach(([k])=>{ const b=$("rb_"+k+"_bar"); if(b) ST.rb[k]={bar:b.value,s:Math.max(50,parseFloat($("rb_"+k+"_s").value)||200)}; });
   return JSON.parse(JSON.stringify(ST));
@@ -2185,6 +2197,7 @@ function airGapHtml(P,topDL,nm){ const A=airCrest(P), ok=topDL>=A.needDL-1e-6;
 필요 상단 = 파봉 + 여유고 ${fx(A.gap,2)} m(가정) = ${dl(A.needDL)}  ${ok?"≤":">"}  ${nm} ${dl(topDL)}  → <span class="chip ${ok?"ok":"bad"}">${ok?"O.K":"N.G"}</span></div>`; }
 function waveSrcHtml(P){ if(!P.waveSrc&&!P.waveRef) return ""; const W=P.waveRef;
   return `<p>설계파는 ${P.waveSrc?esc(P.waveSrc):"설계파 파일"}에서 정한 값을 쓴다${W?` — 유의파고 H<sub>1/3</sub> ${W.Hs?fx(W.Hs,2)+" m":"–"}, 최대파고 H<sub>max</sub> ${fx(W.Hmax,2)} m, 주기 ${fx(W.T,2)} s${W.depth?`, 산정 수심 ${fx(W.depth,2)} m`:""}${W.Hb?`, 쇄파 한계 ${fx(W.Hb,2)} m`:""}${W.crest?`, 파봉고(정수면 위) ${fx(W.crest,2)} m`:""}${W.dir?`, 파향 ${esc(W.dir)}`:""}${W.note?` (${esc(W.note)})`:""}`:""}. 산정 과정은 첨부 보고서 참조.</p>`; }
+$("topR").addEventListener("change",()=>{ ST.topR=+$("topR").value; document.querySelectorAll("[data-topr]").forEach(el=>el.hidden=String(ST.topR)!=="1"); });
 /* 입력 묶음 탭: 형상 / 수위·풍·파랑 / 터빈 / 지반·기준 / 부재·시공 / 전체 */
 let IG=(()=>{ try{ return localStorage.getItem("gbs-ig")||"shape"; }catch(e){ return "shape"; } })();
 function igApply(){ const fs=[...document.querySelectorAll("#frm fieldset[data-g]")];
@@ -2204,6 +2217,7 @@ function applyType(){
   document.querySelectorAll("[data-for-tp]").forEach(el=>el.hidden=el.dataset.forTp!==$("mTP").value);
   document.querySelectorAll("[data-for-inst]").forEach(el=>el.hidden=!el.dataset.forInst.split(" ").includes($("mInst").value));
   document.querySelectorAll("[data-for-sc]").forEach(el=>el.hidden=el.dataset.forSc!==$("mSc").value);
+  document.querySelectorAll("[data-topr]").forEach(el=>el.hidden=String(ST.topR)!=="1");
   igApply();
   document.querySelectorAll("[data-for-jsc]").forEach(el=>el.hidden=el.dataset.forJsc!==$("jSc").value);
   document.querySelectorAll("[data-shp]").forEach(f=>f.hidden=f.dataset.shp!==$("shp").value);
@@ -2325,6 +2339,7 @@ function run(){
   if(P.type==="cone"){ const s=Math.sqrt(1+((P.Dw-P.Dt)/2/P.hk)**2); $("tkNote").textContent=`원추 벽 법선두께 = ${fx(P.tkh/s,3)} m (수평 ${P.tkh} ÷ ${fx(s,3)}), 경사 1 : ${fx(P.hk/((P.Dw-P.Dt)/2),3)}`; }
   if(jack){ $("jacketNote").textContent=jacketNote(); $("soilNote").textContent=soilNote(); }
   else if(mono){ $("monoNote").textContent=monoNote(); $("soilNote").textContent=soilNote(); } else $("shpNote").textContent=R.S.hex?`육각: 맞변 ${fx(R.S.hex.flats,2)} m, 꼭짓점 ${fx(R.S.hex.corners,2)} m, 면적이 같은 원 외경 ${fx(2*R.rso,3)} m (부력·파랑에 사용). 높이는 저판 하면 기준.`:"높이는 모두 저판 하면 기준입니다.";
+  if(!mono&&!jack){ const T=R.topRing; $("trSlope").textContent=T?(T.hh>0?`1 : ${fx(1/T.slope,2)} (링 안지름 Ø${fx(2*T.rr,2)} m, 경사 수평 ${fx(T.rsi-T.rr,2)} m)`:`경사부 없음 (링 안지름 Ø${fx(2*T.rr,2)} m)`):(P.topR?"링 폭이 벽두께보다 작아 링 없음":"–"); }
   renderSummary(); renderWarns();
   dirty={gen:1,rbd:1,m3d:1,load:1,stab:1,mem:1,flt:1,wt:1,qty:1,strs:1,calc:1,mchk:1,mpy:1}; if((mono||jack)&&!$("soilEd").innerHTML) drawSoil();
   renderTab(curTab);
@@ -2514,6 +2529,8 @@ function secPrims(R){
   // 기둥: 육각은 맞변 폭으로 표시
   both([[ci,P.zc0],[cw,P.zc0],[cw,P.ztop],[ci,P.ztop]],"CONC");
   if(P.Dp>0&&P.tp>0) both([[cw,P.ztop-P.tp],[Math.max(P.Dp/2,cw),P.ztop-P.tp],[Math.max(P.Dp/2,cw),P.ztop],[cw,P.ztop]],"CONC");
+  if(R.topRing){ const T=R.topRing, xr=cw-P.trB; both([[xr,P.ztop],[ci,P.ztop],[ci,T.z0],[xr,T.zA]],"CONC");
+    o.push({t:"line",L:"DIM",x1:xr,z1:T.zA-T.hh/2,x2:cw+3,z2:T.zA-T.hh/2-2}); o.push({t:"text",L:"DIM",x:cw+3.2,z:T.zA-T.hh/2-2-fs*.25,h:fs*.72,s:"상단 내측 링"}); }
   const RG=ringList(P);
   RG.forEach(r=>{ both([[r.D/2-r.t,r.z],[r.D/2,r.z],[r.D/2,r.z+r.h],[r.D/2-r.t,r.z+r.h]],"CONC");
     const hung=P.type==="caisson"&&r.z+r.h>=P.cH-P.ctt-0.05&&r.z>P.cts+0.05;  // 상판에 매단 링: 위는 상판·치수가 있으므로 번호를 링 아래로
@@ -2567,6 +2584,7 @@ function planPrims(R){
     o.push({t:"poly",L:"LINE",pts:hx(a)}); o.push({t:"poly",L:"LINE",pts:hx(ai)}); }
   else { o.push({t:"circle",L:"LINE",x:0,z:0,r:P.Dc/2}); o.push({t:"circle",L:"LINE",x:0,z:0,r:P.Dc/2-P.tc}); }
   if(P.Dp>0) o.push({t:"circle",L:"HID",x:0,z:0,r:P.Dp/2});
+  if(R.topRing) o.push({t:"circle",L:"HID",x:0,z:0,r:R.topRing.rr});
   // 보강 링: 저판 위 내부라 숨은선, 번호는 우상 방향
   const RG=ringList(P);
   RG.forEach((r,i)=>{ o.push({t:"circle",L:"HID",x:0,z:0,r:r.D/2}); o.push({t:"circle",L:"HID",x:0,z:0,r:r.D/2-r.t});
@@ -3162,6 +3180,7 @@ function build3D(){
     const g=new THREE.ExtrudeGeometry(sh,{depth:P.ztop-P.zc0,bevelEnabled:false}); g.rotateX(-PI/2); g.translate(0,P.zc0,0); grp.add(new THREE.Mesh(g,mC)); }
   else ring(R.rsi,R.rso,P.zc0,P.ztop,mC);
   if(P.Dp>0&&P.tp>0) ring(R.rso,Math.max(P.Dp/2,R.rso),P.ztop-P.tp,P.ztop,mC);
+  if(R.topRing){ const T=R.topRing; ring(T.rr,T.rsi,T.zA,P.ztop,mC); if(T.hh>0) lathe([[T.rsi,T.z0],[T.rsi,T.zA],[T.rr,T.zA],[T.rsi,T.z0]],mC); }
   (P.rings||[]).forEach(r=>{ if(r.D>0&&r.t>0&&r.h>0) ring(r.D/2-r.t,r.D/2,r.z,r.z+r.h,mC); });
   if($("fill3d").checked){ const zb0=P.type==="caisson"?P.cts:P.tb, zt=Math.min(P.zf1,P.type==="caisson"?P.cH-P.ctt:R.z2);
     if(zt>zb0){ const pts=[[R.rso,zb0]]; for(let i=0;i<=24;i++){ const z=zb0+(zt-zb0)*i/24; pts.push([wallIn(P,z)-0.02,z]); } pts.push([R.rso,zt],[R.rso,zb0]); lathe(pts,mF); }

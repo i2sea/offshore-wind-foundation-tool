@@ -370,8 +370,13 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f" data-shp="hex"><label for="hhn">모서리 헌치 (다리 길이)</label><input id="hhn" type="number" step="0.05"></div>
       <div class="f"><label for="zc0">기둥 하단 높이</label><input id="zc0" type="number" step="0.1"></div>
       <div class="f"><label for="ztop">구조물 상단 높이</label><input id="ztop" type="number" step="0.1"></div>
-      <div class="f"><label for="Dp">상부 플랫폼 외경</label><input id="Dp" type="number" step="0.1"></div>
-      <div class="f"><label for="tp">플랫폼 두께</label><input id="tp" type="number" step="0.05"></div>
+      <div class="f wide"><label for="topR">상단 타워 받침</label><select id="topR"><option value="1">내측 링 (벽이 안쪽으로 두꺼워짐)</option><option value="0">없음</option></select></div>
+      <div class="f" data-topr="1"><label for="trB">링 폭 (기둥 외면에서 안쪽)</label><input id="trB" type="number" step="0.05"></div>
+      <div class="f" data-topr="1"><label for="trT">링 직선부 높이</label><input id="trT" type="number" step="0.05"></div>
+      <div class="f" data-topr="1"><label for="trH">링 경사부 높이</label><input id="trH" type="number" step="0.05"></div>
+      <div class="f" data-topr="1"><label>경사 구배 (수평 : 수직)</label><output id="trSlope" class="calc">–</output></div>
+      <div class="f"><label for="Dp">바깥 플랫폼 외경 (0 = 없음)</label><input id="Dp" type="number" step="0.1"></div>
+      <div class="f"><label for="tp">바깥 플랫폼 두께</label><input id="tp" type="number" step="0.05"></div>
     </div>
     <p class="hint" id="shpNote">높이는 모두 저판 하면 기준입니다.</p>
     <div class="sub">보강 링 (외경 · 두께 · 높이 · 하단 높이)</div>
