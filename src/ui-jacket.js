@@ -33,7 +33,7 @@ function jacketWarnInfo(w){
   const P=R.P, r1=v=>Math.round(v*100)/100;
   if(["scaled","noTL","noFref"].includes(w.k)) return monoWarnInfo(w);
   if(w.k==="jTop"){ const v=r1(R.yIf-(w.crestDL+R.P.airGap)); return {tip:"자켓 상단(TP 하단)이 파봉에 걸리면 TP가 큰 파랑하중을 받습니다. TP 높이를 줄여 자켓 상단을 올리거나, 터빈 인터페이스 높이를 확인하세요.",
-    fixes:v>=1?[{label:"수정 (자켓 상단을 파봉 + 1.5 m로)",patch:{jTPh:v}}]:[{label:"선택 터빈의 인터페이스 높이 확인 (터빈 편집)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]}; }
+    fixes:v>=1?[{label:`수정 (자켓 상단을 파봉 + ${R.P.airGap} m로)`,patch:{jTPh:v}}]:[{label:`TP 상단(인터페이스)을 올림: ${dl(Math.ceil((w.crestDL+R.P.airGap+1)*2)/2)}`,patch:{yIfD:Math.ceil((w.crestDL+R.P.airGap+1)*2)/2}}]}; }
   if(w.k==="jBat") return {tip:"자켓은 보통 아래가 넓습니다(경사 다리).",fixes:[{label:"수정 (상·하단 간격 바꾸기)",patch:{jWb:P.jWt,jWt:P.jWb}}]};
   if(w.k==="jDtB"){ const v=Math.ceil(P.jBrD*1000/60/5)*5; return {tip:"브레이스가 얇으면 접합부 펀칭 전단과 국부좌굴에 불리합니다. D/t 20~60이 보통입니다.",fixes:[{label:"수정 (D/t ≤ 60)",patch:{jBrt:v}}]}; }
   if(w.k==="jDtL"){ const v=Math.ceil(P.jLD*1000/60/5)*5; return {tip:"다리가 얇으면 국부좌굴에 불리합니다.",fixes:[{label:"수정 (D/t ≤ 60)",patch:{jLt:v}}]}; }
@@ -83,10 +83,9 @@ function jkSecPrims(R){
   { const a=Math.max(2.5,P.jLD*2); o.push({t:"line",L:"HID",x1:-a,z1:g.yIf,x2:-a*0.85,z2:zT-1}); o.push({t:"line",L:"HID",x1:a,z1:g.yIf,x2:a*0.85,z2:zT-1}); o.push({t:"text",L:"MUT",x:0,z:zT-2.4,h:fs*0.8,s:"타워 (터빈 하중에 포함)",anchor:"middle"}); }
   o.push({t:"line",L:"CEN",x1:0,z1:zB+1,x2:0,z2:zT-0.5});
   /* 수위 */
-  const wls=[[P.hwl,`설계조위 ${dl(P.hwl)}`],...(Math.abs(P.msl-P.hwl)>0.05?[[P.msl,`MSL ${dl(P.msl)}`]]:[])];
+  const wls=waterLevels(P).map(v=>[v.y,v.lab]);
   waveDraw(o,P,Rb+24,xR-1,P.hwl,0,fs,false);
-  o.push({t:"line",L:"WL",x1:Rb+1,z1:R.crestDL,x2:xR-1,z2:R.crestDL,dash:1}); o.push({t:"text",L:"WL",x:Rb+6.5,z:R.crestDL+fs*0.35,h:fs*0.8,s:`설계 파봉 ${dl(R.crestDL)}`});
-  { let last=R.crestDL; wls.forEach(([y,t])=>{ o.push({t:"line",L:"WL",x1:Rb+1,z1:y,x2:xR-1,z2:y}); o.push({t:"tri",L:"WL",x:Rb+4.5,z:y,s:fs*0.6}); const ty=Math.min(y+fs*0.35,last-fs*1.05); o.push({t:"text",L:"WL",x:Rb+6.5,z:ty,h:fs*0.8,s:t}); last=ty; }); }
+  drawLevels(o,[{z:R.crestDL,lab:`설계 파봉 ${dl(R.crestDL)}`,dash:1},...wls.map(([y,t],i)=>({z:y,lab:t,dash:i>0}))],Rb+1.5,Rb+17,xR-1,fs);
   /* 왼쪽 표고 */
   const lab=[[g.yIf,`인터페이스 ${dl(g.yIf)}`],[g.zt,`자켓 상단 ${dl(g.zt)}`],...g.lev.slice(1,-1).map((z,i)=>[z,`${i+2}단 ${dl(z)}`]),[g.zb,`다리 하단 ${dl(g.zb)}`],[sb,`원지반 ${dl(sb)}`],...(R.qty.prot?[]:[[sb-R.pile.S,`세굴면 ${dl(sb-R.pile.S)}`]]),[sb-P.jPL,`말뚝 선단 ${dl(sb-P.jPL)}`]];
   lab.sort((a,b)=>b[0]-a[0]); let last=1e9; lab.forEach(([y,s])=>{ const yy=Math.min(y,last-fs*1.15); o.push({t:"line",L:"DIM",x1:-Rb,z1:y,x2:xL+1,z2:yy}); o.push({t:"text",L:"DIM",x:xL+1,z:yy+fs*0.25,h:fs*0.72,s,num:1}); last=yy; });
@@ -149,7 +148,7 @@ function build3DJacket(){
 /* ---------- 탭 내용 ---------- */
 function htmlJkLoad(){
   const P=R.P, g=R.g, t=R.T, TL=R.TL, ld=R.ld, W=ld.wave;
-  let h=`<h3>1. 터빈 하중</h3><p>${esc(t.name)}: ${t.MW} MW, 허브 MSL+${t.hub} m${t.rotor?`, 로터 Ø${t.rotor} m`:""}, 인터페이스 MSL+${t.ifz} m. ${esc(t.src||"")}</p>
+  let h=`<h3>1. 터빈 하중</h3><p>${esc(t.name)}: ${t.MW} MW, 허브 MSL+${t.hub} m${t.rotor?`, 로터 Ø${t.rotor} m`:""}, 인터페이스 = TP 상단 MSL+${t.ifz} m (하중표 기준 높이 MSL+${t.ifzLoad} m). ${esc(t.src||"")}</p>
   <div class="eq">인터페이스 표고 = ${dl(g.yIf)} (TP 중앙 절점에 작용),  하중 방향 = 파랑 방향 ${P.jDir||0}°
 해저면 모멘트 = M + H × (${dl(g.yIf)} − ${dl(P.sbDL)}) = M + H × ${fx(R.arm,2)}</div>`;
   h+=TL.uls?turbTablesHtml(TL,t):`<p class="warn">이 터빈은 하중표가 없어 터빈 수평력·모멘트가 빠집니다.</p>`;

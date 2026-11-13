@@ -30,7 +30,7 @@
   color-scheme:dark }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.5}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.5;word-break:keep-all;overflow-wrap:break-word}
 .wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 32px;max-width:1560px;margin:0 auto}
 header.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
 header.top h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
@@ -364,7 +364,8 @@ svg [data-k]:hover{fill:var(--bad)}
     <div class="grid2">
       <div class="f wide"><label for="shp">단면 형상</label><select id="shp"><option value="circ">원형</option><option value="hex">육각형 (속 빈 단면)</option></select></div>
       <div class="f" data-shp="circ"><label for="Dc">외경 D<sub>c</sub></label><input id="Dc" type="number" step="0.1"></div>
-      <div class="f" data-shp="circ"><label for="tc">벽두께 t<sub>c</sub></label><input id="tc" type="number" step="0.05"></div>
+      <div class="f" data-shp="circ"><label for="tc">벽두께 하단 t<sub>c</sub></label><input id="tc" type="number" step="0.05"></div>
+      <div class="f" data-shp="circ"><label for="tcT">벽두께 상단 (0 = 하단과 같음)</label><input id="tcT" type="number" step="0.05"></div>
       <div class="f" data-shp="hex"><label for="ha">육각 한 변 a</label><input id="ha" type="number" step="0.05"></div>
       <div class="f" data-shp="hex"><label for="hth">벽두께</label><input id="hth" type="number" step="0.05"></div>
       <div class="f" data-shp="hex"><label for="hhn">모서리 헌치 (다리 길이)</label><input id="hhn" type="number" step="0.05"></div>
@@ -398,9 +399,14 @@ svg [data-k]:hover{fill:var(--bad)}
   <fieldset data-g="env">
     <legend>설치 위치 · 수위 (DL 기준)</legend>
     <div class="grid2">
-      <div class="f" data-cat="grav"><label for="zbDL">저판 하면 표고</label><input id="zbDL" type="number" step="0.1"></div>
       <div class="f"><label for="sbDL">원지반(해저면) 표고</label><input id="sbDL" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="zbAuto">저판 하면 표고 정하기</label><select id="zbAuto"><option value="1">해저면 − 근입 깊이 (자동)</option><option value="0">직접 입력</option></select></div>
+      <div class="f" data-cat="grav" data-zba="1"><label for="emb">근입 깊이 (해저면 → 저판 하면, m)</label><input id="emb" type="number" step="0.1"></div>
+      <div class="f" data-cat="grav"><label for="zbDL">저판 하면 표고</label><input id="zbDL" type="number" step="0.1"></div>
+      <div class="f" data-ifd="1"><label for="yIfD">TP 상단 = 터빈 인터페이스 표고</label><input id="yIfD" type="number" step="0.1" title="타워 하단 플랜지 표고(DL). 터빈 하중은 이 높이에 작용"></div>
       <div class="f"><label for="hwl">설계조위</label><input id="hwl" type="number" step="0.01"></div>
+      <div class="f"><label for="dhw">설계고조위 (H.W.L)</label><input id="dhw" type="number" step="0.01"></div>
+      <div class="f"><label for="dlw">설계저조위 (L.W.L, 저수위 조합 LC3)</label><input id="dlw" type="number" step="0.01"></div>
       <div class="f"><label for="msl">평균해면 MSL</label><input id="msl" type="number" step="0.01"></div>
       <div class="f"><label for="gw">해수 단위중량 (kN/m³)</label><input id="gw" type="number" step="0.01"></div>
       <div class="f" data-cat="grav"><label for="tg">저판 하부 그라우팅 두께</label><input id="tg" type="number" step="0.05"></div>
@@ -418,7 +424,7 @@ svg [data-k]:hover{fill:var(--bad)}
     </div>
     <p class="hint" id="turbNote"></p>
     <div class="dl" style="margin-top:6px"><button class="btn small primary" type="button" id="tImpBtn">터빈 파일 가져오기</button><button class="btn small" type="button" id="tExp">선택 터빈 파일로 저장</button><button class="btn small" type="button" id="tExpAll">추가한 터빈 모두 저장</button><input type="file" id="tImp" accept=".json,application/json" multiple hidden></div>
-    <div class="dl" style="margin-top:6px"><button class="btn small" type="button" id="tNew">새 터빈 추가</button><button class="btn small" type="button" id="tDup">선택 터빈 복제해서 편집</button><button class="btn small" type="button" id="tDel" hidden>이 터빈 삭제</button></div>
+    <div class="dl" style="margin-top:6px"><button class="btn small" type="button" id="tNew">새 터빈 추가</button><button class="btn small" type="button" id="tDup">선택 터빈 편집</button><button class="btn small" type="button" id="tCopy">복제</button><button class="btn small" type="button" id="tDel" hidden>이 터빈 삭제</button></div>
     <p class="hint">터빈 자료(제원·하중표)는 도구에 넣지 않고 터빈 파일(.json)로 따로 관리합니다. 기본 목록은 공개 기준 터빈(DTU 10MW·IEA 15MW, 하중표 없음)뿐입니다. 제작사 터빈은 "터빈 파일 가져오기"로 불러오면 이 브라우저에 남습니다.</p>
     <div class="tedit" id="tEdit" hidden>
       <div class="grid2">
@@ -426,7 +432,7 @@ svg [data-k]:hover{fill:var(--bad)}
         <div class="f"><label for="te_MW">정격출력 (MW)</label><input id="te_MW" type="number" step="0.1"></div>
         <div class="f"><label for="te_hub">허브높이 (MSL+ m)</label><input id="te_hub" type="number" step="0.1"></div>
         <div class="f"><label for="te_rotor">로터직경 (m)</label><input id="te_rotor" type="number" step="0.1"></div>
-        <div class="f"><label for="te_ifz">하중 인터페이스 (MSL+ m)</label><input id="te_ifz" type="number" step="0.1"></div>
+        <div class="f"><label for="te_ifz">하중표 기준 높이 (인터페이스, MSL+ m)</label><input id="te_ifz" type="number" step="0.1"></div>
         <div class="f"><label for="te_rna">RNA 중량 (t)</label><input id="te_rna" type="number" step="1"></div>
         <div class="f"><label for="te_tower">타워 중량 (t)</label><input id="te_tower" type="number" step="1"></div>
         <div class="f"><label for="te_W">총중량 직접입력 (kN, 0=자동)</label><input id="te_W" type="number" step="10"></div>

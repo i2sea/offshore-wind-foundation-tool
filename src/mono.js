@@ -176,6 +176,7 @@ function computeMono(P){
   const AC=airCrest(P), crestDL=AC.crestDL, gapA=AC.gap;
   if(T.scaled) warns.push({k:"scaled",msg:`선택한 터빈(${T.name})의 하중표는 ${T.scaled.base||"기준 터빈"} 하중을 축척해 추정한 값입니다 (수평력 ×${T.scaled.sF.toFixed(2)}, 모멘트 ×${T.scaled.sM.toFixed(2)}).`});
   waveRefWarns(P).forEach(m=>warns.push({k:"wvRef",msg:m}));
+  { const w=ifBaseWarn(T); if(w) warns.push({k:"ifBase",msg:w}); }
   if(!TL.gu) warns.push({k:"noTL",msg:`선택한 터빈(${T.name})에 하중표가 없습니다. 터빈 하중 없이 계산합니다. 제작사 하중표를 넣으세요.`});
   if(yIf<crestDL+gapA) warns.push({k:"ifLow",msg:`터빈 인터페이스 ${dlS(yIf)}가 설계 파봉 ${dlS(crestDL)} + 여유고 ${gapA} m보다 낮습니다.`,crestDL});
   if(yIf<=P.mtop+1) warns.push({k:"tpLen",msg:`말뚝 상단 ${dlS(P.mtop)}이 터빈 인터페이스 ${dlS(yIf)}보다 높거나 1 m 안쪽입니다. 트랜지션피스가 들어갈 자리가 없습니다.`});

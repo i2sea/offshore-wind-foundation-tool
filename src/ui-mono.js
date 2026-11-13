@@ -41,8 +41,8 @@ function monoWarnInfo(w){
   const P=R.P, g=R.g, r1=v=>Math.round(v*100)/100;
   if(w.k==="noTL") return {tip:"하중표가 없으면 터빈의 수평력·모멘트가 빠져 해저면 단면력이 실제보다 작게 나옵니다. 제작사 인터페이스 하중(ULS·SLS 12행)을 넣어야 합니다.",
     fixes:[{label:"하중표가 든 터빈 파일 가져오기",act:()=>$("tImp").click()},{label:"선택 터빈 복제해서 하중표 입력",act:()=>$("tDup").click()}]};
-  if(w.k==="ifLow") return {tip:`TP 상단(= 터빈 인터페이스)이 설계 파봉 ${dl(w.crestDL)}에 여유고 ${R.P.airGap} m를 더한 ${dl(w.crestDL+R.P.airGap)}보다 낮으면 파도가 타워 하단 플랜지와 작업 플랫폼을 칩니다. 터빈 하중 인터페이스 높이가 맞게 들어갔는지 먼저 확인하세요.`,
-    fixes:[{label:"선택 터빈의 인터페이스 높이 확인·수정 (터빈 편집 열기)",act:()=>{ $("tDup").click(); $("te_ifz").focus(); }}]};
+  if(w.k==="ifLow") return {tip:`TP 상단(= 터빈 인터페이스)이 설계 파봉 ${dl(w.crestDL)}에 여유고 ${R.P.airGap} m를 더한 ${dl(w.crestDL+R.P.airGap)}보다 낮으면 파도가 타워 하단 플랜지와 작업 플랫폼을 칩니다. TP 상단 표고(= 인터페이스)는 '수위·풍·파랑' 탭의 설치 위치에서 정합니다.`,
+    fixes:[{label:`TP 상단(인터페이스)을 파봉 + 여유고로: ${dl(Math.ceil((w.crestDL+R.P.airGap)*2)/2)}`,patch:{yIfD:Math.ceil((w.crestDL+R.P.airGap)*2)/2}}]};
   if(w.k==="tpLen"){ const v=r1(R.yIf-3); return {tip:"말뚝 상단은 TP 상단(터빈 인터페이스)보다 충분히 아래여야 TP가 들어갑니다.",fixes:[{label:"수정 (TP 길이 3 m 확보)",patch:{mtop:v}}]}; }
   if(w.k==="tpLow"){ const v=r1(Math.min(R.yIf-2,P.sbDL+2+g.Lov)); return {tip:`그라우트 연결 길이(1.5 × 말뚝 상단 직경 = ${fx(g.Lov,2)} m)만큼 TP가 말뚝을 감싸 내려옵니다. 말뚝 상단이 낮으면 TP 하단이 해저면에 닿습니다. 말뚝 상단을 올리거나 볼트 연결로 바꾸세요.`,
     fixes:[{label:"수정 (TP 하단을 해저면 2 m 위로)",patch:{mtop:v}},{label:"수정 (볼트 연결이면 TP 하단 = 말뚝 상단)",patch:{mTP:"bolt"}}]}; }
@@ -125,11 +125,9 @@ function monoSecPrims(R){
   { const a=g.DTP/2*0.85; o.push({t:"line",L:"HID",x1:-a,z1:R.yIf,x2:-a*0.9,z2:zT-1}); o.push({t:"line",L:"HID",x1:a,z1:R.yIf,x2:a*0.9,z2:zT-1}); o.push({t:"text",L:"MUT",x:0,z:zT-2.2,h:fs*0.8,s:"타워 (터빈 하중에 포함)",anchor:"middle"}); }
   o.push({t:"line",L:"CEN",x1:0,z1:zB+1,x2:0,z2:zT-0.5});
   // 수위 (글자는 겹치지 않게 아래로 밀어 씀)
-  const wls=[[P.hwl,`설계조위 ${dl(P.hwl)}`],...(Math.abs(P.msl-P.hwl)>0.05?[[P.msl,`MSL ${dl(P.msl)}`]]:[]),...(Math.abs(P.hwl)>0.05&&Math.abs(P.msl)>0.05?[[0,"약최저저조위 DL 0.000"]]:[])];
+  const wls=waterLevels(P).map(v=>[v.y,v.lab]);
   waveDraw(o,P,Rw+24,xR-1,P.hwl,0,fs,false);
-  o.push({t:"line",L:"WL",x1:Rw+1,z1:R.crestDL,x2:xR-1,z2:R.crestDL,dash:1}); o.push({t:"text",L:"WL",x:Rw+6.5,z:R.crestDL+fs*0.35,h:fs*0.8,s:`설계 파봉 ${dl(R.crestDL)}`});
-  { let lastW=R.crestDL; wls.forEach(([y,t])=>{ o.push({t:"line",L:"WL",x1:Rw+1,z1:y,x2:xR-1,z2:y}); o.push({t:"tri",L:"WL",x:Rw+4.5,z:y,s:fs*0.6});
-    const ty=Math.min(y+fs*0.35,lastW-fs*1.05); o.push({t:"text",L:"WL",x:Rw+6.5,z:ty,h:fs*0.8,s:t}); lastW=ty; }); }
+  drawLevels(o,[{z:R.crestDL,lab:`설계 파봉 ${dl(R.crestDL)}`,dash:1},...wls.map(([y,t],i)=>({z:y,lab:t,dash:i>0}))],Rw+1.5,Rw+17,xR-1,fs);
   // 왼쪽 표고
   const lv=(y,s,x)=>{ const xx=-(x||0)-0.3; o.push({t:"line",L:"DIM",x1:xx,z1:y,x2:xL+1,z2:y}); o.push({t:"text",L:"DIM",x:xL+1,z:y+fs*0.25,h:fs*0.72,s,num:1}); };
   const lab=[[R.yIf,`TP 상단 = 인터페이스 ${dl(R.yIf)}`,g.DTP/2],[P.mtop,`말뚝 상단 ${dl(P.mtop)}`,g.Dtop/2+(g.grout?P.mgap+g.tTP:0)],...(g.grout?[[g.yTP0,`TP 하단 ${dl(g.yTP0)}`,g.DTP/2]]:[]),
@@ -208,8 +206,8 @@ function turbTablesHtml(TL,t){
 }
 function htmlMonoLoad(){
   const P=R.P, t=R.T, TL=R.TL, W=R.wind, V=R.wave, C=R.cur, E=R.eq, fq=R.freq, g=R.g;
-  let h=`<h3>1. 터빈 하중</h3><p>${esc(t.name)}: ${t.MW} MW, 허브 MSL+${t.hub} m${t.rotor?`, 로터 Ø${t.rotor} m`:""}, 하중 인터페이스 MSL+${t.ifz} m. ${esc(t.src||"")}</p>
-  <div class="eq">인터페이스 표고 y<sub>if</sub> = ${t.ifz} + ${dl(P.msl)} = ${dl(R.yIf)}  (TP 상단)
+  let h=`<h3>1. 터빈 하중</h3><p>${esc(t.name)}: ${t.MW} MW, 허브 MSL+${t.hub} m${t.rotor?`, 로터 Ø${t.rotor} m`:""}, 인터페이스 = TP 상단 MSL+${t.ifz} m (하중표 기준 높이 MSL+${t.ifzLoad} m). ${esc(t.src||"")}</p>
+  <div class="eq">인터페이스 표고 y<sub>if</sub> = TP 상단 = ${dl(R.yIf)}
 해저면 (단면력 기준) y<sub>ML</sub> = ${dl(P.sbDL)}${g.prot?" (세굴방지공 설치, 세굴 없음)":` − 세굴 S ${fx(R.S,3)} = ${dl(R.yML)}`}
 터빈 하중 팔길이 = y<sub>if</sub> − y<sub>ML</sub> = ${fx(R.armIf,3)} m,  해저면 모멘트 = M + H × ${fx(R.armIf,3)}
 터빈+타워 총중량 W<sub>t</sub> = ${fx(R.Wt,1)} kN</div>`;

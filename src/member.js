@@ -168,6 +168,12 @@ function rebarDetail(R,M){
   const Lc=P.ztop-P.zc0, c=M.cL, tie=c.tie||distRB(R.rso-R.rsi);
   add("C1","기둥","축방향 주철근 (내·외 2단)",rb.cL,c.nb,Lc+tb-cv+la(B("cL").d)-0.1,"L");
   add("C2","기둥",c.tie?"띠철근 (전단 보강, 내·외면)":"원주 배력철근 (내·외면)",tie,2*(Lc/(tie.s/1000)+1),PI*(R.rso+R.rsi)+2*la(BARS[tie.bar].d),"O");
+  // 상단 내측 링 (타워 받침): P1 원주 철근(안쪽 면, 직선부 + 경사부), P2 연직 U형(외면 ~ 안쪽 면, 기둥 벽에 정착)
+  if(R.topRing){ const T=R.topRing, w=P.trB, dr=distRB(w), d=BARS[dr.bar].d/1000, hT=T.trT+T.hh, Ld=la(BARS[dr.bar].d);
+    const n1=hT/(dr.s/1000)+1, D1=2*(T.rr+cv+d/2);
+    add("P1","상단 내측 링","원주 철근 (안쪽 면)",dr,n1,PI*D1+Ld,"O",{type:"O",D:D1,lap:Ld,note:"안쪽 면, 직선부·경사부 전체 높이, 겹침 40d"});
+    const a=hT-cv+Ld, a2=Math.max(0.3,T.trT-2*cv), b=w-2*cv-d, n2=2*PI*(T.rr+cv)/(dr.s/1000);
+    add("P2","상단 내측 링","연직 U형 (외면 ~ 안쪽 면)",dr,n2,a+a2+b,"U",{type:"U",a,a2,b,note:`바깥 다리 = 링 높이 ${Math.round(hT*1000)} − 피복 + 정착 40d (기둥 벽으로), 안쪽 다리 = 직선부 − 2 × 피복, 폭 = 링 폭 − 2 × 피복`}); }
   return {rows:out,dists:{slab:dS,wall:dW},tie};
 }
 function rebarQty(R,M){
