@@ -1312,7 +1312,7 @@ function genNotes(R){
   const qty=[["콘크리트",`${fx(R.Vc,1)} m³`,`${fx(R.Wc,0)} kN`],["속채움",`${fx(R.Vf,1)} m³`,`${fx(R.Wf,0)} kN`],["철근",`${fx(M.qty.tot/1000,1)} t`,`${fx(M.qty.perM3,0)} kg/m³`]];
   return {notes,cond,res,qty};
 }
-function genSheetPrims(R){
+function genSheetPrims(R,noBot){
   const P=R.P;
   const sp=secPrims(R), [sx0,sz0,sx1,sz1]=sp.box;
   let sc=SCALES[SCALES.length-1]; for(const s of SCALES){ const k=s/1000; if((sx1-sx0)/k<=232&&(sz1-sz0)/k<=262){ sc=s; break; } }
@@ -1356,10 +1356,18 @@ function genSheetPrims(R){
   const mks=detailMakers(R,false), secBot=(sz0+dz)/k, notesBot=z/k, regs=[];
   { const h=secBot-8-16; if(h>=40) regs.push({x:14,top:secBot-8,w:232,h}); }
   { const h=notesBot-6-(12+34+4); if(h>=40) regs.push({x:252,top:notesBot-6,w:156,h}); }
-  let left=[...mks], dsc=[];
-  regs.forEach(rg=>{ if(!left.length) return; const n=Math.min(left.length,Math.max(1,Math.floor(rg.w/40)));
+  const trM=mks.find(m=>m.topRing), nRg=ringSupport(P,R).length; let left=noBot?[...mks]:mks.filter(m=>!m.topRing), dsc=[], oS=o.length, o0=o.length;
+  regs.forEach((rg,ri)=>{ if(!left.length) return; const n=Math.min(left.length,Math.max(1,Math.floor(rg.w/40)));
     const asp=left.slice(0,n).map(m=>{ const c=m(0.5), [a,b,c2,d]=c.box; return Math.max(0.5,Math.min(2.5,(c2-a)/Math.max(0.1,d-b))); }), sa=asp.reduce((x,y)=>x+y,0);
-    let x=rg.x; for(let i=0;i<n&&left.length;i++){ const cw=rg.w*asp[i]/sa; const sc2=placeCell(o,left[0],x,rg.top,cw-3,rg.h,k,2.0,2); if(sc2){ dsc.push(sc2); left.shift(); } else break; x+=cw; } });
+    let x=rg.x; for(let i=0;i<n&&left.length;i++){ const cw=rg.w*asp[i]/sa; const sc2=placeCell(o,left[0],x,rg.top,cw-3,rg.h,k,2.0,2); if(sc2){ dsc.push(sc2); left.shift(); } else break; x+=cw; }
+    if(ri===0) o0=o.length; });
+  // 상단 내측 링 상세: 보강 링 상세와 같은 축척으로 단면도 아래 상세 줄 밑(바깥 아래 구석)에, 설명은 그림 오른쪽
+  if(trM&&!noBot){ const rs=dsc.slice(0,nRg), scT=rs.length?Math.max(...rs):0; let placed=0;
+    if(scT){ let zmin=Infinity; for(let i=oS;i<o0;i++){ const p=o[i]; if(!p) continue; const zs=[p.z,p.z1,p.z2,...(p.pts||[]).map(q=>q[1])].filter(v=>isFinite(v)); if(zs.length&&Math.min(...zs)<(secBot-6)*k) zmin=Math.min(zmin,...zs); }
+      const top=isFinite(zmin)?zmin/k-5:secBot-8, kT=scT/1000, cl=trM(2.0*kT), [a,b,c2,d]=cl.box, hNeed=(d-b)/kT+2.0*3.9+2, wNeed=(c2-a)/kT+4;
+      if(top-10.5>=hNeed&&wNeed<=150){ placeCell(o,trM,14,top,Math.max(wNeed+2,90),top-10.5,k,2.0,0,scT); dsc.push(scT); placed=1;
+        let zl=top-2.0*3.9-2.5, xl=14+wNeed+6; cl.lab.forEach(t=>wrapTxt(t,2.0*k,(232-wNeed-8)*k).forEach(ln=>{ o.push({t:"text",L:"STX",x:xl*k,z:zl*k,h:2.0*k,s:ln}); zl-=3.1; })); } }
+    if(!placed) return genSheetPrims(R,true); }
   return {o,box:[0,0,W,H],sc,scP,bg:1,over,mono:1,dLeft:left.length,dN:mks.length};
 }
 function drawGenSheet(){ const pr=genSheetPrims(R); $("svgGen").innerHTML=primsSVG(pr,"일반도"); $("genNote").textContent=`A3 도면, 단면도 1:${pr.sc}, 평면도 1:${pr.scP}${pr.dN?` · 상세 ${pr.dN-pr.dLeft}/${pr.dN}개 포함`:""}${pr.dLeft?" (자리가 없어 나머지는 아래 상세도에)":""}${pr.over?" · 주기가 길어 표제란과 겹칩니다":""}`;
@@ -1426,17 +1434,17 @@ function ringCell(R,g,th,rebar){
 }
 /* 상단 내측 링 배근 상세 (기둥 벽 단면, 오른쪽 반): x = 중심에서 반경, z = 저판 하면 기준 높이 */
 function topRingCell(R,th,det,rebar){ if(rebar===undefined) rebar=true; const P=R.P, T=R.topRing, o=[], cv=P.cov/1000, D=R.M.qty.detail.rows, p1=D.find(r=>r.mk==="P1"), p2=D.find(r=>r.mk==="P2"), d=rebar?BARS[p1.bar].d/1000:0;
-  const rso=R.rso, top=P.ztop, zb=T.z0-1.6, riA=z=>R.rsi+((R.rsiT!=null?R.rsiT:R.rsi)-R.rsi)*(z-P.zc0)/Math.max(1e-6,P.ztop-P.zc0), x0=T.rr-1.0;
+  const rso=R.rso, top=P.ztop, zb=T.z0-(rebar?1.6:0.8), riA=z=>R.rsi+((R.rsiT!=null?R.rsiT:R.rsi)-R.rsi)*(z-P.zc0)/Math.max(1e-6,P.ztop-P.zc0), x0=T.rr-1.0;
   const ln=(a,b,c,e)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:e,w:th*.16}), dot=(x,z)=>o.push({t:"dot",L:"RBD",x,z,r:th*.22});
   o.push({t:"poly",L:"CONC",pts:[[riA(zb),zb],[rso,zb],[rso,top],[T.rr,top],[T.rr,T.zA],[riA(T.z0),T.z0]],w:th*.05});
   o.push({t:"poly",open:1,L:"SHT",w:th*.06,pts:[[riA(zb)-th*.4,zb-th*.3],[(riA(zb)+rso)/2,zb+th*.3],[rso+th*.4,zb-th*.3]]});
   if(!rebar){ const riB=riA(zb), riT=riA(T.z0), tx=rso+th*4.5;
     dimH(o,T.rr,rso,top+th*1.4,th,mm(P.trB)); dimV(o,T.zA,top,T.rr-th*1.6,th,mm(T.trT)); if(T.hh>0) dimV(o,T.z0,T.zA,T.rr-th*1.6,th,mm(T.hh));
-    dimH(o,riB,rso,zb+th*1.2,th,mm(rso-riB)); dimV(o,zb,top,rso+th*1.6,th,mm(top-zb));
+    dimH(o,riB,rso,zb-th*1.3,th,mm(rso-riB)); dimV(o,zb,top,rso+th*1.6,th,mm(top-zb));
     if(T.hh>0){ const mx=(T.rr+riT)/2+th*0.5, mz=(T.zA+T.z0)/2; o.push({t:"text",L:"DIM",x:mx,z:mz,h:th*.8,s:`1 : ${fx(1/T.slope,2)}`}); }
-    o.push({t:"text",L:"TXT",x:(riB+rso)/2,z:zb-th*2.2,h:th*.85,s:"기둥 벽",anchor:"middle"});
+    o.push({t:"text",L:"TXT",x:(riB+rso)/2,z:zb-th*3.0,h:th*.85,s:"기둥 벽",anchor:"middle"});
     const lab=[`링 안지름 Ø${mm(2*T.rr)}, 링 폭 ${mm(P.trB)} (기둥 바깥면에서), 직선부 ${mm(T.trT)}`,T.hh>0?`경사부 높이 ${mm(T.hh)}, 수평 ${mm(T.rsi-T.rr)} (1 : ${fx(1/T.slope,2)})`:"경사부 없음",`콘크리트 ${fx(T.V,1)} m³ (기둥 벽 겹침 제외)`];
-    return {o,box:[x0-th*2,zb-th*3,tx+th*1.5,top+th*3],lab,title:`상세 ${det} — 기둥 상단 내측 링`}; }
+    return {o,box:[x0-th*2,zb-th*3.6,tx+th*1.5,top+th*3],lab,title:`상세 ${det} — 기둥 상단 내측 링`}; }
   // P2 U형
   const a=p2.seg.a, a2=p2.seg.a2||a, xo=rso-cv-d/2, xi=T.rr+cv+d/2, zt=top-cv-d/2; ln(xi,zt-a2,xi,zt); ln(xi,zt,xo,zt); ln(xo,zt,xo,zt-a);
   // P1 원주 철근 점: 안쪽 면 직선부 + 경사부
@@ -1563,7 +1571,7 @@ function placeCell(o,mk,sx,sz,sw,sh,sheetK,tmm,maxLab,fixSc){
 }
 function detailMakers(R,rebar){ const P=R.P, cais=P.type==="caisson", rg=ringSupport(P,R).map(g=>({...g,no:String.fromCharCode(0x2460+Math.min(g.i,19))}));
   const m=rg.map(g=>th=>ringCell(R,g,th,rebar)); if(cais&&P.cnr>=2&&!rebar){ m.push(th=>wallPlanCell(R,th)); m.push(th=>wallSecCell(R,th,false)); }
-  if(!rebar&&R.topRing){ const L=String.fromCharCode(65+rg.length+(cais&&P.cnr>=2?1:0)); m.push(th=>topRingCell(R,th,L,false)); }
+  if(!rebar&&R.topRing){ const L=String.fromCharCode(65+rg.length+(cais&&P.cnr>=2?1:0)), f=th=>topRingCell(R,th,L,false); f.topRing=1; m.push(f); }
   const nJ=cais&&P.cnr>=2&&rebar&&R.M.qty.detail.rows.some(r=>r.mk==="R1")?3:0; if(nJ){ const b=rg.length+1; ["col","wall","slab"].forEach((kd,j)=>m.push(th=>wallJointCell(R,th,kd,String.fromCharCode(65+b+j)))); }
   if(rebar&&R.topRing&&R.M.qty.detail.rows.some(r=>r.mk==="P1")){ const L=String.fromCharCode(65+rg.length+1+nJ); m.push(th=>topRingCell(R,th,L)); } return m; }
 /* 철근 가공도 한 칸 (종이 mm 기준, 모양은 축척 없이 그림) */
