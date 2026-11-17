@@ -457,7 +457,7 @@ function secPrims(R){
   // 터빈 인터페이스
   o.push({t:"text",L:"MUT",x:Math.max(P.Dp/2,cw)+1,z:R.zIf,h:fs*.7,s:`◀ 터빈 하중 작용 MSL+${R.T.ifz}`});
   // 치수
-  const xd=Rmax+3.5, xd2=Rmax+13;
+  const SC=R.fnd&&R.fnd.sc&&R.fnd.sc.on?R.fnd.sc:null, xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+9.5;
   const vdim=(za,zb,x,key,sh)=>{ if(zb-za<1e-6) return; o.push({t:"line",L:"DIM",x1:x,z1:za,x2:x,z2:zb});
     [za,zb].forEach(z=>{ o.push({t:"line",L:"DIM",x1:x-.5,z1:z-.5,x2:x+.5,z2:z+.5}); o.push({t:"line",L:"DIM",x1:x-1.4,z1:z,x2:x+.8,z2:z}); });
     const zm=(za+zb)/2, s=fx((zb-za)*1000,0);
@@ -472,6 +472,16 @@ function secPrims(R){
   if(Math.abs(R.Rwide-R.Rbase)>1e-6) hdim(R.Rwide,wt+Math.max(.6,fs*.9),P.type==="caisson"?"cDw":"Dw",true);
   if(P.type==="cone") hdim(P.Dt/2,z2+2.2,"Dt",true);
   if(P.Dp>0) hdim(Math.max(P.Dp/2,cw),P.ztop+1.4,"Dp",true);
+  /* 세굴방지공 치수 (왼쪽): 저판 가장자리 ~ 폭 끝(수평) ~ 비탈 끝, 피복석·필터층 두께, 비탈 경사 */
+  if(SC){ const zh=-P.tg-1.6, seg=(a,b,key,txt)=>{ o.push({t:"line",L:"DIM",x1:-b,z1:zh,x2:-a,z2:zh}); [a,b].forEach(x=>o.push({t:"line",L:"DIM",x1:-x-.5,z1:zh-.5,x2:-x+.5,z2:zh+.5}));
+      o.push({t:"text",L:"DIM",x:-(a+b)/2,z:zh-fs*.95,h:fs*.82,s:txt||fx((b-a)*1000,0),key,anchor:"middle",num:1}); };
+    seg(R.Rbase,SC.Ro,"scB"); seg(SC.Ro,SC.Re,null);
+    const xv=-(R.Rbase+Math.max(P.scB*0.55,2)), tk=z=>{ o.push({t:"line",L:"DIM",x1:xv-.5,z1:z-.5,x2:xv+.5,z2:z+.5}); };
+    o.push({t:"line",L:"DIM",x1:xv,z1:SC.zb,x2:xv,z2:SC.tA}); [SC.zb,SC.zF,SC.tA].forEach(tk);
+    o.push({t:"text",L:"DIM",x:xv-.6,z:(SC.zF+SC.tA)/2-fs*.3,h:fs*.72,s:fx((SC.tA-SC.zF)*1000,0),anchor:"end",num:1});
+    o.push({t:"text",L:"DIM",x:xv-.6,z:SC.zb-fs*.75,h:fs*.72,s:fx(P.scF*1000,0),key:"scF",anchor:"end",num:1});
+    o.push({t:"text",L:"MUT",x:-(SC.Ro+SC.Re)/2-.6,z:(SC.tA+SC.zb)/2+fs*.15,h:fs*.72,s:`1 : ${+SC.n.toFixed(2)}`,anchor:"end"});
+    o.push({t:"text",L:"MUT",x:-(R.Rbase+SC.Ro)/2,z:SC.tA+fs*1.1,h:fs*.72,s:"세굴방지공 (피복석 · 필터층)",anchor:"middle"}); }
   o.push({t:"text",L:"MUT",x:cw+.6,z:(Math.max(z2,wt)+P.ztop)/2,h:fs*.78,s:P.type==="caisson"?"샤프트":"기둥"});
   return {o,box:[xL,zB,xR,zT],fs};
 }
