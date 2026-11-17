@@ -7,7 +7,7 @@
 :root{
   --bg:#eef1f2; --panel:#ffffff; --sunk:#f6f8f8; --ink:#1a2226; --muted:#5b6970; --line:#d3dade;
   --accent:#1d5e88; --accent-ink:#ffffff; --accent-soft:#e2edf5;
-  --conc:#c9cfcf; --conc-line:#3a4448; --fill:#e6d3a3; --water:#cfe3f1; --water-line:#2f74a8; --soil:#b89a6a; --grout:#9aa3a6; --steel:#8fa3b0; --rock:#8c8478; --dim:#1d5e88;
+  --conc:#c9cfcf; --conc-line:#3a4448; --fill:#e6d3a3; --water:#cfe3f1; --water-line:#2f74a8; --soil:#b89a6a; --grout:#9aa3a6; --steel:#8fa3b0; --rock:#8c8478; --rfill:#b7ab95; --grav:#cdbfa6; --dim:#1d5e88;
   --l-wind:#7a5cc2; --l-wave:#1f7fb8; --l-cur:#2f8f6b;
   --ok:#2c7a4b; --ok-bg:#e3f2e8; --bad:#b3261e; --bad-bg:#fbe5e2; --warn:#8a5a00; --warn-bg:#fbf0d9;
   --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
@@ -17,14 +17,14 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#111618; --panel:#192024; --sunk:#151b1e; --ink:#e2e8ea; --muted:#94a3aa; --line:#2b353a;
   --accent:#6aa9d8; --accent-ink:#0d1418; --accent-soft:#1d2d38;
-  --conc:#4a5357; --conc-line:#c9d3d6; --fill:#6b5a35; --water:#16324a; --water-line:#6aa9d8; --soil:#6e5a3c; --grout:#5d676b; --steel:#5f7684; --rock:#5a544b; --dim:#6aa9d8;
+  --conc:#4a5357; --conc-line:#c9d3d6; --fill:#6b5a35; --water:#16324a; --water-line:#6aa9d8; --soil:#6e5a3c; --grout:#5d676b; --steel:#5f7684; --rock:#5a544b; --rfill:#6b6457; --grav:#5e5442; --dim:#6aa9d8;
   --l-wind:#b39ae8; --l-wave:#6ab8e8; --l-cur:#6fd0a8;
   --ok:#6fd096; --ok-bg:#183223; --bad:#ff8a80; --bad-bg:#3a1c19; --warn:#f0c060; --warn-bg:#382c12;
   color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#111618; --panel:#192024; --sunk:#151b1e; --ink:#e2e8ea; --muted:#94a3aa; --line:#2b353a;
   --accent:#6aa9d8; --accent-ink:#0d1418; --accent-soft:#1d2d38;
-  --conc:#4a5357; --conc-line:#c9d3d6; --fill:#6b5a35; --water:#16324a; --water-line:#6aa9d8; --soil:#6e5a3c; --grout:#5d676b; --steel:#5f7684; --rock:#5a544b; --dim:#6aa9d8;
+  --conc:#4a5357; --conc-line:#c9d3d6; --fill:#6b5a35; --water:#16324a; --water-line:#6aa9d8; --soil:#6e5a3c; --grout:#5d676b; --steel:#5f7684; --rock:#5a544b; --rfill:#6b6457; --grav:#5e5442; --dim:#6aa9d8;
   --l-wind:#b39ae8; --l-wave:#6ab8e8; --l-cur:#6fd0a8;
   --ok:#6fd096; --ok-bg:#183223; --bad:#ff8a80; --bad-bg:#3a1c19; --warn:#f0c060; --warn-bg:#382c12;
   color-scheme:dark }
@@ -63,6 +63,7 @@ fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 4px;m
 .igt{font:inherit;font-size:12px;padding:5px 9px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--muted);cursor:pointer}
 .igt[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
 fieldset.gOff{display:none}
+.fillrow{clear:both;margin:0 0 6px}.fillrow>b{display:block;font-size:12px;margin:2px 0 4px}
 legend{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:6px;float:left;width:100%}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;clear:both}
 .f{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -220,6 +221,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <button type="button" class="igt" data-g="env" aria-selected="false">수위·풍·파랑</button>
     <button type="button" class="igt" data-g="turb" aria-selected="false">터빈</button>
     <button type="button" class="igt" data-g="soil" aria-selected="false">지반·기준</button>
+    <button type="button" class="igt" data-g="fnd" data-cat="grav" aria-selected="false">기초</button>
     <button type="button" class="igt" data-g="mem" aria-selected="false">부재·시공</button>
     <button type="button" class="igt" data-g="all" aria-selected="false" title="모든 입력을 한 번에">전체</button>
   </div>
@@ -247,10 +249,11 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f"><label for="cDw">외벽 직경</label><input id="cDw" type="number" step="0.1"></div>
       <div class="f"><label for="ctw">외벽 두께</label><input id="ctw" type="number" step="0.05"></div>
       <div class="f"><label for="cH">케이슨 높이 (하면~상판 윗면)</label><input id="cH" type="number" step="0.1"></div>
-      <div class="f"><label for="ctt">상판 두께</label><input id="ctt" type="number" step="0.05"></div>
+      <div class="f"><label for="ctt">상판 두께 (0 = 개방형)</label><input id="ctt" type="number" step="0.05" min="0"></div>
       <div class="f"><label for="cnr">방사형 격벽 개수</label><input id="cnr" type="number" step="1"></div>
       <div class="f"><label for="ctr">격벽 두께</label><input id="ctr" type="number" step="0.05"></div>
     </div>
+    <p class="hint">상판 두께 0이면 위가 열린 개방형입니다. 상판 대신 방사형 격벽이 버팀벽으로 기둥을 잡고, 부재설계에서 기둥–격벽 접합부와 격벽을 검토합니다. 격벽 개수는 부재설계 탭에서 추천합니다.</p>
   </fieldset>
   <fieldset data-g="shape" data-cat="mono" hidden>
     <legend>모노파일 · 강관 말뚝</legend>
@@ -388,13 +391,27 @@ svg [data-k]:hover{fill:var(--bad)}
   </fieldset>
   <fieldset data-g="shape" data-cat="grav">
     <legend>속채움 · 재료</legend>
+    <div class="fillrow"><b>격실 (저판 위)</b>
+      <div class="grid2">
+        <div class="f"><label for="f1m">재료</label><select id="f1m"><option value="rock">사석</option><option value="sand">모래</option><option value="water">물 (해수)</option><option value="none">없음</option><option value="user">직접 입력</option></select></div>
+        <div class="f"><label for="zf1">채움 상단 높이 (저판 하면 기준)</label><input id="zf1" type="number" step="0.1"></div>
+        <div class="f"><label for="gf">포화 단위중량 (kN/m³)</label><input id="gf" type="number" step="0.1"></div>
+        <div class="f"><label for="phiF">내부마찰각 (°)</label><input id="phiF" type="number" step="1"></div>
+        <div class="f" data-cvt><label for="cvT">격실 위 피복석 두께 (0 = 없음)</label><input id="cvT" type="number" step="0.1" min="0"></div>
+      </div>
+    </div>
+    <div class="fillrow"><b>기둥 내부</b>
+      <div class="grid2">
+        <div class="f"><label for="f2m">재료</label><select id="f2m"><option value="rock">사석</option><option value="sand">모래</option><option value="water">물 (해수)</option><option value="none">없음</option><option value="user">직접 입력</option></select></div>
+        <div class="f"><label for="zf2">채움 상단 높이 (저판 하면 기준)</label><input id="zf2" type="number" step="0.1"></div>
+        <div class="f"><label for="gf2">포화 단위중량 (kN/m³)</label><input id="gf2" type="number" step="0.1"></div>
+        <div class="f"><label for="phi2">내부마찰각 (°)</label><input id="phi2" type="number" step="1"></div>
+      </div>
+    </div>
     <div class="grid2">
-      <div class="f"><label for="zf1">격실 채움 상단 높이</label><input id="zf1" type="number" step="0.1"></div>
-      <div class="f"><label for="zf2">기둥 내부 채움 상단 높이</label><input id="zf2" type="number" step="0.1"></div>
-      <div class="f"><label for="gf">속채움 단위중량 (kN/m³)</label><input id="gf" type="number" step="0.1"></div>
       <div class="f"><label for="gc">콘크리트 단위중량 (kN/m³)</label><input id="gc" type="number" step="0.1"></div>
     </div>
-    <p class="hint">모래는 포화단위중량(예: 19), 물 밸러스트는 해수 단위중량(10.1)을 넣으세요. 격실 = 벽과 기둥 사이.</p>
+    <p class="hint">재료를 고르면 단위중량·내부마찰각 기본값(가정)이 들어갑니다: 사석 20 kN/m³·40°, 모래 19·30°, 물 10.1. 바꾸면 '직접 입력'이 됩니다. 채움 높이가 격실 높이를 넘으면 격실 상단까지만 채웁니다. 개방형 케이슨은 사석 위에 피복석을 덮고(두께만큼 사석 상단이 내려감), 채우지 않은 격실 공간은 해수로 찹니다.</p>
   </fieldset>
   <fieldset data-g="env">
     <legend>설치 위치 · 수위 (DL 기준)</legend>
@@ -409,7 +426,6 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f"><label for="dlw">설계저조위 (L.W.L, 저수위 조합 LC3)</label><input id="dlw" type="number" step="0.01"></div>
       <div class="f"><label for="msl">평균해면 MSL</label><input id="msl" type="number" step="0.01"></div>
       <div class="f"><label for="gw">해수 단위중량 (kN/m³)</label><input id="gw" type="number" step="0.01"></div>
-      <div class="f" data-cat="grav"><label for="tg">저판 하부 그라우팅 두께</label><input id="tg" type="number" step="0.05"></div>
     </div>
     <p class="hint" data-cat="grav">설계조위 = 약최고고조위 + 폭풍해일고. 기본값(DL(+)2.0 m)은 예시이니 현장 조위 자료로 바꾸세요.</p>
   </fieldset>
@@ -484,7 +500,6 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f wide"><label for="hydro">지진 시 동수압 (수심·형상으로 계산)</label><select id="hydro"><option value="1">포함 (배제수 부가질량)</option><option value="0">제외</option></select></div>
       <div class="f" data-cat="grav"><label for="mu">저면 마찰계수 μ</label><input id="mu" type="number" step="0.05"></div>
       <div class="f" data-cat="grav"><label for="qa">허용지지력 (kN/m²)</label><input id="qa" type="number" step="50"></div>
-      <div class="f" data-cat="grav"><label for="tilt">시공 허용 기울기 (°)</label><input id="tilt" type="number" step="0.05"></div>
       <div class="f" data-cat="grav"><label for="aeff">극한 시 최소 유효접지율</label><input id="aeff" type="number" step="0.05"></div>
       <div class="f" data-cat="grav"><label for="fsO1">상시 전도 FS</label><input id="fsO1" type="number" step="0.1"></div>
       <div class="f" data-cat="grav"><label for="fsS1">상시 활동 FS</label><input id="fsS1" type="number" step="0.1"></div>
@@ -513,7 +528,6 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f"><label for="fy">철근 f<sub>y</sub> (MPa)</label><input id="fy" type="number" step="100"></div>
       <div class="f"><label for="cov">순피복 (mm, 해양 노출)</label><input id="cov" type="number" step="5"></div>
       <div class="f"><label for="kcr">균열 κ<sub>cr</sub> (건조 280, 그 외 210)</label><input id="kcr" type="number" step="10"></div>
-      <div class="f"><label for="phiF">속채움 내부마찰각 (°)</label><input id="phiF" type="number" step="1"></div>
       <div class="f"><label for="gH">토압 하중계수</label><input id="gH" type="number" step="0.05"></div>
       <div class="f"><label for="gE">환경하중 계수 (풍·파랑·조류)</label><input id="gE" type="number" step="0.05"></div>
     </div>
@@ -529,11 +543,47 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f"><label for="zbal">격실 물 밸러스트 상단 (0=없음)</label><input id="zbal" type="number" step="0.5"></div>
       <div class="f"><label for="Wadd">예인 시 추가중량 (kN)</label><input id="Wadd" type="number" step="10"></div>
       <div class="f"><label for="zadd">추가중량 작용 높이</label><input id="zadd" type="number" step="0.1"></div>
+      <div class="f" data-for-open><label for="fbMin">개방형 예인 건현 기준 (외벽 상단 − 흘수)</label><input id="fbMin" type="number" step="0.1"></div>
+      <div class="f" data-for-open><label for="dhRad">시공 중 이웃 격실 채움 높이 차</label><input id="dhRad" type="number" step="0.1"></div>
+    </div>
+    <p class="hint">예인 경로 수심 15 m, 개방형 건현 1.5 m, 이웃 격실 채움 높이 차 1.0 m는 가정값입니다. 예인 계획과 시공 순서에 맞춰 넣으세요.</p>
+  </fieldset>
+  <fieldset data-g="fnd" data-cat="grav">
+    <legend>기초 · 고르기 · 그라우트</legend>
+    <div class="grid2">
+      <div class="f"><label for="tgb">자갈 고르기층 두께</label><input id="tgb" type="number" step="0.05"></div>
+      <div class="f"><label for="gbW">고르기 여유폭 (저판 밖, 한쪽)</label><input id="gbW" type="number" step="0.5"></div>
+      <div class="f"><label for="gbTol">고르기 허용오차 (±)</label><input id="gbTol" type="number" step="0.01"></div>
+      <div class="f"><label for="tg">저판 하부 그라우트 두께</label><input id="tg" type="number" step="0.05"></div>
+      <div class="f wide"><label for="sk">그라우트 가두기</label><select id="sk"><option value="skirt">스커트 (저판 둘레 아래로 내린 벽)</option><option value="bag">그라우트 백 (가장자리 자루)</option><option value="none">없음</option></select></div>
+      <div class="f" data-for-sk><label for="skH">스커트 높이</label><input id="skH" type="number" step="0.05"></div>
+      <div class="f" data-for-sk><label for="skT">스커트 두께</label><input id="skT" type="number" step="0.05"></div>
+    </div>
+    <p class="hint">해외 GBS 방식: 준설 → 자갈 고르기 → 패드로 거치·수평 맞춤 → 스커트 안 빈틈을 그라우트로 채움. 그라우트 두께는 패드 높이 + 고르기 허용오차 이상. 값은 가정입니다.</p>
+  </fieldset>
+  <fieldset data-g="fnd" data-cat="grav">
+    <legend>거치 · 수평</legend>
+    <div class="grid2">
       <div class="f"><label for="padN">거치 패드 개수</label><input id="padN" type="number" step="1"></div>
       <div class="f"><label for="padB">패드 한 변</label><input id="padB" type="number" step="0.1"></div>
       <div class="f"><label for="padH">패드 높이</label><input id="padH" type="number" step="0.05"></div>
+      <div class="f"><label for="tilt">거치 수평 허용오차 (°)</label><input id="tilt" type="number" step="0.05"></div>
     </div>
-    <p class="hint">예인 경로 수심 15 m는 가정값. GM 기준값은 예인 계획에 맞춰 넣으세요.</p>
+    <p class="hint">허용오차 기울기는 안정검토에 추가 모멘트로 들어갑니다. 터빈 제작사 허용치(보통 0.25~0.5°)를 확인하세요.</p>
+  </fieldset>
+  <fieldset data-g="fnd" data-cat="grav">
+    <legend>세굴방지공 · 피복석</legend>
+    <div class="grid2">
+      <div class="f wide"><label for="scOn">세굴방지공</label><select id="scOn"><option value="1">설치 (필터층 + 피복석)</option><option value="0">없음</option></select></div>
+      <div class="f" data-for-gsc><label for="scB">폭 (저판 가장자리에서)</label><input id="scB" type="number" step="0.5"></div>
+      <div class="f" data-for-gsc><label for="scF">필터층 두께</label><input id="scF" type="number" step="0.05"></div>
+      <div class="f" data-for-gsc><label for="scA">피복석 두께</label><input id="scA" type="number" step="0.1"></div>
+      <div class="f"><label for="Ss">돌 비중</label><input id="Ss" type="number" step="0.01"></div>
+      <div class="f"><label for="gAr">피복석 포화 단위중량 (kN/m³)</label><input id="gAr" type="number" step="0.1"></div>
+      <div class="f"><label for="scAmp">구조물 둘레 유속 증폭</label><input id="scAmp" type="number" step="0.1"></div>
+      <div class="f"><label for="isbC">Isbash 계수 C</label><input id="isbC" type="number" step="0.01"></div>
+    </div>
+    <p class="hint">피복석 크기는 해저면 유속(선형파 수립자 속도 + 조류 × 증폭)으로 Isbash식에서 구하고 두께는 2층(2D) 이상으로 봅니다. 증폭 1.5, C 0.86(난류 큼), 비중 2.65, 단위중량 20 kN/m³는 가정입니다. 세굴 깊이와 권장 폭은 '기초 · 세굴' 탭에 나옵니다.</p>
   </fieldset>
 </form>
 </aside>
@@ -551,6 +601,7 @@ svg [data-k]:hover{fill:var(--bad)}
       <button class="tab" role="tab" data-cat="grav" data-t="stab" aria-selected="false">안정검토</button>
       <button class="tab" role="tab" data-cat="grav" data-t="mem" aria-selected="false">부재설계</button>
       <button class="tab" role="tab" data-cat="grav" data-t="flt" aria-selected="false">부유 안정</button>
+      <button class="tab" role="tab" data-cat="grav" data-t="fnd" aria-selected="false">기초 · 세굴</button>
       <button class="tab" role="tab" data-t="wt" aria-selected="false">자중 · 부력</button>
       <button class="tab" role="tab" data-cat="mono jacket" data-t="mchk" aria-selected="false" hidden>강관 단면</button>
       <button class="tab" role="tab" data-cat="mono jacket" data-t="mpy" aria-selected="false" hidden>말뚝 해석</button>
@@ -561,7 +612,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <div class="pane" data-p="gen">
       <p class="note" data-cat="grav" style="margin:0 0 8px">파란 치수 숫자를 누르면 그 자리에서 고칠 수 있습니다. Enter로 적용, Esc로 취소.</p>
       <div class="legend" data-cat="mono jacket" hidden><span><i style="background:var(--steel)"></i>강재</span><span><i style="background:var(--grout)"></i>그라우트</span><span><i style="background:var(--rock)"></i>세굴방지공</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--soil)"></i>지반</span></div>
-      <div class="legend" data-cat="grav"><span><i style="background:var(--conc)"></i>콘크리트</span><span><i style="background:var(--fill)"></i>속채움</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--grout)"></i>그라우팅</span><span><i style="background:var(--soil)"></i>지반</span></div>
+      <div class="legend" data-cat="grav"><span><i style="background:var(--conc)"></i>콘크리트</span><span><i style="background:var(--fill)"></i>모래</span><span><i style="background:var(--rfill)"></i>사석</span><span><i style="background:var(--rock)"></i>피복석</span><span><i style="background:var(--water)"></i>해수</span><span><i style="background:var(--grout)"></i>그라우트</span><span><i style="background:var(--grav)"></i>자갈 고르기·필터</span><span><i style="background:var(--soil)"></i>지반</span></div>
       <div class="drw">
         <div class="sheet" style="overflow:visible"><div class="sechead"><div class="cap" id="capSec">정면 단면도</div><div class="zbar" role="group" aria-label="정면 단면도 확대"><button type="button" class="btn small" id="secZo" aria-label="축소">−</button><span id="secZv">100%</span><button type="button" class="btn small" id="secZi" aria-label="확대">+</button><button type="button" class="btn small" id="secZf">맞춤</button></div></div><div id="secWrap"><div id="svgSec"></div><input id="dimEdit" type="number" step="any" aria-label="치수 수정" hidden></div></div>
         <div class="sheet"><div class="cap">평면도</div><div id="svgPlan"></div></div>
@@ -595,6 +646,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <div class="pane" data-p="stab" hidden><div class="rep" id="repStab"></div></div>
     <div class="pane" data-p="mem" hidden><div class="rep" id="repMem"></div></div>
     <div class="pane" data-p="flt" hidden><div class="rep" id="repFlt"></div></div>
+    <div class="pane" data-p="fnd" hidden><div class="rep" id="repFnd"></div></div>
     <div class="pane" data-p="wt" hidden><div class="rep" id="repWt"></div></div>
     <div class="pane" data-p="qty" hidden><div class="rep" id="repQty"></div></div>
     <div class="pane" data-p="strs" hidden><div class="rep" id="repStr"></div></div>

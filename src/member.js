@@ -11,7 +11,7 @@ const MEMB=[ // 키, 부재, 면·방향, 기본 철근
   ["cL","기둥 하단","축방향 주철근 (내·외 2단)","H25",300],
 ];
 const DEF_RB=Object.fromEntries(MEMB.map(m=>[m[0],{bar:m[3],s:m[4]}]));
-const MDEF={fck:45,fy:500,cov:75,phiF:30,gE:1.35,gH:1.6,kcr:210,rb:DEF_RB};
+const MDEF={fck:45,fy:500,cov:75,phiF:40,gE:1.35,gH:1.6,kcr:210,rb:DEF_RB};
 Object.assign(DEF,MDEF);
 
 function beta1(fck){ return fck<=28?0.85:Math.max(0.65,0.85-0.007*(fck-28)); }
@@ -76,19 +76,20 @@ function memberForces(R){
   // 1) 저판: 지반반력 최대 조합
   const gov=R.LC.reduce((a,b)=>b.qcheck>a.qcheck?b:a);
   const qSoil=gov.qcheck;
-  const hFill=Math.max(0,Math.min(P.zf1,cais?P.cH-P.ctt:z2)-tb);
-  const wDead=Math.max(0,P.gc-gw)*tb+Math.max(0,P.gf-gw)*hFill;
+  const FL=R.fill||{g1:P.gf,gcv:P.gf,hR:Math.max(0,Math.min(P.zf1,cais?P.cH-P.ctt:z2)-tb),hCv:0};
+  const hFill=FL.hR, hCv=FL.hCv, gsub1=Math.max(0,FL.g1-gw), gsubC=Math.max(0,FL.gcv-gw);
+  const wDead=Math.max(0,P.gc-gw)*tb+gsub1*hFill+gsubC*hCv;
   const qu=1.2*qSoil-0.9*wDead, qs=qSoil-wDead;
   const Lr=Rwi-rco, n=cais?Math.round(P.cnr):0, La=n>=2?2*PI*Rwi/n:Infinity, L=Math.min(Lr,La);
   const heel=Math.max(0,(cais?P.cDs:P.Db)/2-Rw);
   const qh=1.2*qSoil-0.9*Math.max(0,P.gc-gw)*tb, qhs=qSoil-Math.max(0,P.gc-gw)*tb;
-  const slab={gov:gov.id,qSoil,hFill,wDead,qu,qs,Lr,La,L,heel,
+  const slab={gov:gov.id,qSoil,hFill,hCv,gsub1,gsubC,wDead,qu,qs,Lr,La,L,heel,
     Msup:qu*L*L/12, Mmid:qu*L*L/24, Mheel:qh*heel*heel/2, V:Math.max(qu*L/2,qh*heel), Mss:qs*L*L/12, Mms:Math.max(qs*L*L/24,qhs*heel*heel/2), t:tb};
   // 2) 하부 벽체: 속채움 정지토압 (수중단위중량), 원주 인장 + 하단 연직 휨
-  const K0=1-Math.sin(P.phiF*PI/180), gsub=Math.max(0,P.gf-gw);
-  const p0s=K0*gsub*hFill, p0=P.gH*p0s, rm=Rw-tw/2;
+  const K0=1-Math.sin(P.phiF*PI/180), gsub=gsub1;
+  const p0s=K0*(gsub*hFill+gsubC*hCv), p0=P.gH*p0s, rm=Rw-tw/2;
   const bW=Math.pow(3*(1-nu*nu)/(rm*rm*tw*tw),0.25);
-  const wall={K0,gsub,h:hFill,p0,p0s,r:rm,t:tw,beta:bW,Tu:p0*rm,Ts:p0s*rm,Mu:p0/(2*bW*bW),Ms:p0s/(2*bW*bW)};
+  const wall={K0,gsub,gsubC,hR:hFill,hCv,h:hFill+hCv,p0,p0s,r:rm,t:tw,beta:bW,Tu:p0*rm,Ts:p0s*rm,Mu:p0/(2*bW*bW),Ms:p0s/(2*bW*bW)};
   // 3) 원추 (원추형만): 하단(z1) 기준
   let cone=null;
   if(!cais){ const z1=P.tb+P.hw, s=(P.Dw-P.Dt)/2/P.hk, tn=P.tkh/Math.sqrt(1+s*s), hc=Math.max(0,Math.min(P.zf1,z2)-z1), ps=K0*gsub*hc, pu=P.gH*ps, rc=P.Dw/2-P.tkh/2;
@@ -103,6 +104,43 @@ function memberForces(R){
   const col={z:zs,Mt,Ht,Vt,Wabove,Uab,Menv,Henv,Mu:Mt+P.gE*Menv,Vu:Ht+P.gE*Henv,Pu:Vt+0.9*(Wabove-Uab),ro:R.rso,ri:R.rsi,cs};
   return {slab,wall,cone,col};
 }
+/* 개방형 케이슨(상판 없음): 기둥을 잡아 주는 상판이 없으므로 방사형 격벽이 버팀벽으로 기둥 모멘트를 저판에 넘김 (가정, 단순 모형)
+   ① 기둥–격벽 접합면 연직 전단: 케이슨 상단 기둥 계수 모멘트 Mu를 기둥 외면(반경 r)의 격벽 n개가 연직력 짝으로 받음
+      F = Mu / (r · Σcos²θ), Σcos²θ = n/2 (n ≥ 3) → 전단마찰 Avf = F / (ϕ·μ·fy), ϕ 0.75, μ 1.4 (일체 타설),
+      상한 Vn ≤ min(0.2fck, 3.3 + 0.08fck, 11 MPa) × t × h
+   ② 격벽 하단 인발: 기둥 쪽 끝에서 F를 저판으로 — As = F / (0.85·fy)
+   ③ 면내 수평 전단: V = Vu / Σcos²θ ≤ ϕVc = 0.75 × (1/6)√fck × t × 0.8L
+   ④ 면외 휨 (시공 중 이웃 격실 채움 높이 차 Δh): p = K₀·γ'·Δh, 상단 자유 · 양옆(기둥·외벽) 고정 판을
+      min(캔틸레버 p·h²/2, 수평 고정보 p·L²/12)로 근사, 하중계수 γH
+   상판이 있는(폐합형) 케이슨은 상판·하부 슬래브 짝힘으로 전달된다고 보고 이 검토를 하지 않음 */
+function radOpen(P){ return P.type==="caisson"&&!(P.ctt>0)&&Math.round(P.cnr)>0&&P.ctr>0; }
+function radCheck(P,R,C,ctr,n){
+  const tb=P.cts, h=P.cH-tb, ro=R.rso, Lr=P.cDw/2-P.ctw-ro, fck=P.fck, fy=P.fy, FL=R.fill||{g1:P.gf,hR:0,hCv:0};
+  if(n<3) return {n,ctr,few:true,ok:false,tReq:Infinity};
+  const sc=n/2, Mu=C.Mu, Vu=C.Vu, F=Mu/(ro*sc);
+  const vMax=Math.min(0.2*fck,3.3+0.08*fck,11), phi=0.75, mu=1.4;
+  const VnMax=vMax*ctr*h*1e6/1000, okJ=phi*VnMax>=F, Avf=F*1000/(phi*mu*fy), avf=Avf/h, tReqJ=F/(phi*vMax*h*1000);
+  const jb=["H13","H16","H19","H22","H25","H29","H32"].map(bar=>({bar,s:Math.min(300,Math.floor(2*BARS[bar].A*1000/Math.max(avf,1e-9)/25)*25)})).find(x=>x.s>=125)||{bar:"H32",s:Math.max(100,Math.floor(2*BARS.H32.A*1000/Math.max(avf,1e-9)/25)*25)};
+  const AsT=F*1000/(0.85*fy), nT=b=>Math.ceil(AsT/BARS[b].A), tb_=["H25","H29","H32","H35"].find(b=>nT(b)<=Math.max(4,Math.floor(h/0.15)))||"H35";
+  const Vi=Vu/sc, dv=0.8*Lr, phiVc=0.75*(1/6)*Math.sqrt(fck)*ctr*dv*1e6/1000, okV=phiVc>=Vi, tReqV=Vi*1000/(0.75*(1/6)*Math.sqrt(fck)*dv*1e6);
+  const K0=1-Math.sin(P.phiF*PI/180), gs=Math.max(0,FL.g1-P.gw), dp=K0*gs*(P.dhRad||0), hf=FL.hR+FL.hCv;
+  const Mc=dp*hf*hf/2, Mb=dp*Lr*Lr/12, Ms=Math.min(Mc,Mb), Mu2=P.gH*Ms, Vu2=P.gH*dp*Math.min(hf,Lr/2);
+  const pickB=t=>{ let b=null; ["H13","H16","H19","H22","H25","H29"].forEach(bar=>[100,125,150,175,200,250,300].forEach(s=>{ const r=flexCheck(P,Mu2,Ms,Vu2,t,{bar,s}); if(r.ok){ const w=BARS[bar].w*1000/s; if(!b||w<b.w) b={rb:{bar,s},w,r}; } })); return b; };
+  const bB=pickB(ctr); let tReqB=ctr; if(!bB){ tReqB=Infinity; for(let t=ctr+0.05;t<=1.5+1e-9;t=Math.round((t+0.05)*100)/100) if(pickB(t)){ tReqB=t; break; } }
+  const okB=!!bB, tReq=Math.max(tReqJ,tReqV,okB?0:tReqB);
+  return {n,ctr,h,ro,Lr,sc,Mu,Vu,F,vMax,VnMax,phi,mu,okJ,Avf,avf,tReqJ,jb,AsT,tieBar:tb_,nTie:nT(tb_),Vi,dv,phiVc,okV,tReqV,K0,gs,dp,hf,Mc,Mb,Ms,Mu2,Vu2,bend:bB?bB.r:null,rbB:bB?bB.rb:null,okB,tReqB,tReq,ok:okJ&&okV&&okB};
+}
+/* 격벽 개수 추천: 개수를 바꿔 같은 조건으로 다시 계산 → 부재(기둥 제외)·격벽 검토를 모두 만족하는 가장 적은 개수 */
+function radCountTable(P0){
+  const ns=[...new Set([4,6,8,10,12,16,Math.round(P0.cnr)])].filter(n=>n>=3).sort((a,b)=>a-b);
+  const rows=ns.map(n=>{ const P={...P0,cnr:n,fast:1}, R=compute(P), o=optimizeRebar(R), F=memberForces(R);
+    const failO=o.fail.filter(f=>f!=="기둥 하단"&&f!=="격벽"), open=radOpen(P), rc=open?radCheck(P,R,F.col,P.ctr,n):null;
+    let tMin=null; if(open){ if(rc.ok) tMin=P.ctr; else for(let t=Math.max(0.3,Math.round(Math.ceil(rc.tReq*20)/20*100)/100);t<=1.5+1e-9;t=Math.round((t+0.05)*100)/100){ if(radCheck(P,R,F.col,t,n).ok){ tMin=t; break; } } }
+    const M=memberDesign(R,o.rb), Rw=P.cDw/2-P.ctw;
+    return {n,ok:!failO.length&&(!rc||rc.ok),failO,rc,tMin,Vc:R.Vc,steel:M.qty.tot/1000,La:2*PI*Rw/n,cur:n===Math.round(P0.cnr)}; });
+  const best=rows.find(r=>r.ok)||null;
+  return {rows,best,open:radOpen(P0)};
+}
 function memberDesign(R,rb){
   const P=R.P, F=memberForces(R), rbs=rb||P.rb||DEF_RB, out={F,rb:rbs,items:[]};
   const S=F.slab, W=F.wall, K=F.cone, C=F.col;
@@ -112,7 +150,8 @@ function memberDesign(R,rb){
   out.wV=flexCheck(P,W.Mu,W.Ms,W.p0*1/(2*W.beta),W.t,rbs.wV);
   if(K){ out.kH=hoopCheck(P,K.Tu,K.Ts,K.tn,rbs.kH); out.kM=flexCheck(P,K.Mu,K.Ms,K.p0/(2*K.beta),K.tn,rbs.kM); }
   out.cL=colCheck(P,C.Pu,C.Mu,C.Vu,C.ro,C.ri,rbs.cL);
-  out.ok=["sT","sB","wH","wV","kH","kM","cL"].every(k=>!out[k]||out[k].ok);
+  out.rad=radOpen(P)?radCheck(P,R,C,P.ctr,Math.round(P.cnr)):null;
+  out.ok=["sT","sB","wH","wV","kH","kM","cL","rad"].every(k=>!out[k]||out[k].ok);
   out.qty=rebarQty(R,out);
   return out;
 }
@@ -142,11 +181,15 @@ function rebarDetail(R,M){
     add("K2","원추","자오선 내측 주철근",rb.kM,2*PI*(Rw-P.tkh+cv)/(rb.kM.s/1000)*0.75,slant+2*la(B("kM").d),"I");
     add("K3","원추","자오선 외측 배력철근",dK,2*PI*(Rw-cv)/(dK.s/1000)*0.75,slant+2*la(BARS[dK.bar].d),"I");
   } else {
-    const n=Math.round(P.cnr), Lr=Rwi-R.rso, hr=P.cH-P.ctt-P.cts, dR=distRB(P.ctr), dT=distRB(P.ctt);
-    if(n>0){ add("R1","방사형 격벽","수평 배력 (양면)",dR,n*2*(hr/(dR.s/1000)+1),Lr+2*la(BARS[dR.bar].d),"I",{type:"I",a:Lr+2*la(BARS[dR.bar].d),note:`격벽 길이 ${Math.round(Lr*1000)} + 양 끝 정착 40d`});
-      add("R2","방사형 격벽","연직 배력 (양면)",dR,n*2*(Lr/(dR.s/1000)+1),hr+2*la(BARS[dR.bar].d),"I",{type:"I",a:hr+2*la(BARS[dR.bar].d),note:`격벽 높이 ${Math.round(hr*1000)} + 위·아래 정착 40d`}); }
-    const At=PI*(Rwi**2-R.rso**2);
-    add("T1","케이슨 상판","상·하면 (X·Y 2방향)",dT,4*(2*Rwi/(dT.s/1000)),At/(2*Rwi),"I");
+    const n=Math.round(P.cnr), Lr=Rwi-R.rso, hr=P.cH-P.ctt-P.cts, dR0=distRB(P.ctr), op=P.ctt>0?0:1, rd=M.rad;
+    const dR1=rd&&rd.rbB&&BARS[rd.rbB.bar].w*1000/rd.rbB.s>BARS[dR0.bar].w*1000/dR0.s?rd.rbB:dR0;
+    if(n>0){ add("R1","방사형 격벽",dR1===dR0?"수평 배력 (양면)":"수평 주철근 (양면, 이웃 격실 채움 차 면외 휨)",dR1,n*2*(hr/(dR1.s/1000)+1),Lr+2*la(BARS[dR1.bar].d),"I",{type:"I",a:Lr+2*la(BARS[dR1.bar].d),note:`격벽 길이 ${Math.round(Lr*1000)} + 양 끝 정착 40d`});
+      const hv=op?hr-cv+la(BARS[dR0.bar].d):hr+2*la(BARS[dR0.bar].d);
+      add("R2","방사형 격벽","연직 배력 (양면)",dR0,n*2*(Lr/(dR0.s/1000)+1),hv,"I",{type:"I",a:hv,note:op?`격벽 높이 ${Math.round(hr*1000)} − 위 피복 + 아래 정착 40d (상단 자유)`:`격벽 높이 ${Math.round(hr*1000)} + 위·아래 정착 40d`});
+      if(rd&&rd.jb){ const Lj=2*la(BARS[rd.jb.bar].d); add("R3","방사형 격벽","기둥 접합면 연결철근 (전단마찰, 양면 수평)",rd.jb,n*2*(hr/(rd.jb.s/1000)+1),Lj,"I",{type:"I",a:Lj,note:"기둥 벽과 격벽에 각각 정착 40d"});
+        const Lt=hr-cv+tb-cv+la(BARS[rd.tieBar].d); add("R4","방사형 격벽","하단 인발 철근 (기둥 쪽 끝, 저판 정착)",{bar:rd.tieBar,s:150},n*rd.nTie,Lt,"L",{type:"L",a:Lt-la(BARS[rd.tieBar].d),b:la(BARS[rd.tieBar].d),note:"격벽 높이 + 저판 하부철근 위까지 + 갈고리"}); } }
+    if(P.ctt>0){ const dT=distRB(P.ctt), At=PI*(Rwi**2-R.rso**2);
+      add("T1","케이슨 상판","상·하면 (X·Y 2방향)",dT,4*(2*Rwi/(dT.s/1000)),At/(2*Rwi),"I"); }
   }
   // 보강 링: 강도 부재로 보지 않고 최소철근(배력) + 닿는 부재와 연결철근
   //   G·1 원주 (내·외면), G·2 연직 (내·외면, 저판까지 닿으면 하부철근 위까지 내려 갈고리 40d), G·3 옆 부재 연결철근 (수평, 0.3 m 격자, 양쪽 정착 la)
@@ -197,6 +240,7 @@ function optimizeRebar(R){
   else { best.kH=(P.rb||DEF_RB).kH; best.kM=(P.rb||DEF_RB).kM; }
   { let b=null; ["H25","H29","H32","H35"].forEach(bar=>COL_SP.forEach(s=>{ const r=colCheck(P,F.col.Pu,F.col.Mu,F.col.Vu,F.col.ro,F.col.ri,{bar,s}); if(r.ok){ const wt=r.Ast; if(!b||wt<b.wt) b={rb:{bar,s},wt}; } }));
     best.cL=b?b.rb:{bar:"H35",s:100}; if(!b) fail.push("기둥 하단"); }
+  if(radOpen(P)&&!radCheck(P,R,F.col,P.ctr,Math.round(P.cnr)).ok) fail.push("격벽");
   return {rb:best,fail};
 }
 /* 최적 제원: 직경·하부 높이 격자 탐색 (콘크리트 최소) */
@@ -227,7 +271,7 @@ function evalSize(P,opt){
 
 /* 최적 배근 + 필요하면 두께 조정 (저판 전단, 벽체·원추) */
 /* 두께 자동 조정 상한 (실무 범위, 넘으면 제원 변경 필요로 알림) */
-const THK_MAX={tb:3.0,cts:3.0,tw:1.0,ctw:1.0,tkh:1.0};
+const THK_MAX={tb:3.0,cts:3.0,tw:1.0,ctw:1.0,tkh:1.0,ctr:1.5};
 function optimizeAll(P0,adjust,noCol){
   let P={...P0}; const log=[], lim=[];
   const done=(R,o)=>({P:{...P,rb:o.rb},fail:o.fail,log,lim});
@@ -241,6 +285,7 @@ function optimizeAll(P0,adjust,noCol){
     if(!m.sT.ok||!m.sB.ok){ const k=cais?"cts":"tb"; up(k,Math.max(m.sT.tReq,m.sB.tReq,P[k]+0.1),cais?"하부 슬래브 두께":"저판 두께",THK_MAX[k]); }
     if(!m.wH.ok||!m.wV.ok){ const k=cais?"ctw":"tw"; up(k,P[k]+0.1,cais?"외벽 두께":"원통 벽두께",THK_MAX[k]); }
     if(m.kH&&(!m.kH.ok||!m.kM.ok)) up("tkh",P.tkh+0.1,"원추 벽두께",THK_MAX.tkh);
+    if(m.rad&&!m.rad.ok&&isFinite(m.rad.tReq)) up("ctr",Math.max(m.rad.tReq,P.ctr+0.05),"격벽 두께",THK_MAX.ctr);
     if(!m.cL.ok&&!noCol) up("tc",P.tc+0.1,"기둥 벽두께",Math.floor(0.4*P.Dc/2*20)/20);
     if(!ch||(noCol&&o.fail.every(f=>f==="기둥 하단"))) return done(R,o);
   }
@@ -263,7 +308,7 @@ function optimizeMember(P0,noCol){
       if(P[kb]+1<=DIM_MAX.base+1e-9){ bump(kb,1,cais?"하부 슬래브 직경":"저판 직경"); bump(kw,1,cais?"케이슨 외벽 직경":"원통 외경"); ch=true; } }
     if(!ch) break;
     // 두께는 원래 값에서 다시 시작해 필요한 만큼만 키움
-    ["tb","cts","tw","ctw","tkh","tc"].forEach(k=>P[k]=P0[k]);
+    ["tb","cts","tw","ctw","tkh","tc","ctr"].forEach(k=>P[k]=P0[k]);
     r=optimizeAll(P,true,noCol);
   }
   return {...r,dims};

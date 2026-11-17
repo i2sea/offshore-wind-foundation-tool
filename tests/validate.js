@@ -2,7 +2,7 @@
 // (현장 자료로 기존 계산서 값을 재현하는 검증은 저장소 밖의 비공개 자료 폴더에 따로 있습니다.)
 const fs=require("fs"), path=require("path"), vm=require("vm");
 const src=["engine.js","member.js","mono.js","pile.js","jacket.js"].map(f=>fs.readFileSync(path.join(__dirname,"..","src",f),"utf8")).join("\n").replace(/^if\(typeof module!=="undefined"\).*$/m,"");
-const ctx={Math,console}; vm.createContext(ctx); vm.runInContext(src+"\nthis.E={compute,DEF,mfCM,waveNumber,froyaU0,froya,memberDesign,optimizeAll,optimizeMember,optimizeMemberFreq,computeMono,computePile,pileFE,sandCoef,beamFreq,monoFreq,TURB_PRESETS,computeJacket,frameAssemble,frameSolve,tubCheck,compute};",ctx);
+const ctx={Math,console}; vm.createContext(ctx); vm.runInContext(src+"\nthis.E={upgradeP,fndCalc,radCheck,radCountTable,memberForces,compute,DEF,mfCM,waveNumber,froyaU0,froya,memberDesign,optimizeAll,optimizeMember,optimizeMemberFreq,computeMono,computePile,pileFE,sandCoef,beamFreq,monoFreq,TURB_PRESETS,computeJacket,frameAssemble,frameSolve,tubCheck,compute};",ctx);
 const E=ctx.E; let fail=0;
 const near=(name,got,exp,tol)=>{ const ok=Math.abs(got-exp)<=tol; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} ${name}: ${got.toFixed(3)} (기대 ${exp} ± ${tol})`); };
 /* 터빈 하중 이동 · 파랑 */
@@ -38,4 +38,16 @@ near("작은 ka에서 C_M → 2.0 (Morison 극한)",E.mfCM(0.01).CM,2.0,0.001);
 for(const ty of ["jk4","jk3"]){ const J=E.computeJacket({...E.DEF,type:ty}); J.LC.forEach(l=>near(`자켓 ${ty} ${l.id} 반력 연직 합계 = 하중 V (kN)`,l.sumV,l.V,Math.max(1,Math.abs(l.V)*0.005))); }
 /* 부재설계 + 진동수 동시 자동 수정 (기본 예시) */
 { const o=E.optimizeMemberFreq({...E.DEF}), Rq=E.compute(o.P), M=E.memberDesign(Rq,o.P.rb), ok=M.ok&&Rq.freq.ok!==false; console.log(`${ok?"OK  ":"FAIL"} 기본 예시 부재설계+진동수 동시 수정: 부재 ${M.ok?"O.K":"N.G"}, f ${Rq.freq.f.toFixed(3)} Hz`); if(!ok) fail++; }
+/* 속채움 두 구역 · 개방형 케이슨 · 기초 */
+{ const P={...E.DEF,type:"caisson"}, R=E.compute(P), F=R.fill;
+  near("속채움 중량 = 사석 + 피복석 + 기둥 모래 + 격실 해수 (kN)",R.Wf,F.Vf1*F.g1+F.Vcv*F.gcv+F.Vf2*F.g2+F.Vw1*P.gw,1e-6);
+  near("피복석 두께만큼 사석 상단이 내려감 (z)",F.zr,P.cH-P.cvT,1e-9);
+  const Q=E.compute({...P,f1m:"none"}); near("개방형 · 속채움 없음 → 격실은 해수 (kN)",Q.fill.Ww1,Q.fill.Vw1*P.gw,1e-6); if(!(Q.fill.Vw1>0)){ fail++; console.log("FAIL 개방형 격실 해수 체적 0"); }
+  const S=R.fnd.sc, C=P.isbC, D=S.Ub**2/(2*9.81*S.Dl*C*C); near("Isbash 소요 지름 U²/(2gΔC²) (m)",S.ar.D,D,1e-9);
+  near("해저면 파랑 수립자 속도 πH/T/sinh(kd) (m/s)",S.Um0,Math.PI*P.Hw/P.Tw/Math.sinh(S.k*S.ds),1e-9);
+  const C2=E.memberForces(R).col, r=E.radCheck(P,R,C2,P.ctr,12); near("격벽 접합면 연직 전단 F = Mu/(r·n/2) (kN)",r.F,C2.Mu/(R.rso*6),1e-6);
+  near("패드 압력 = (γc−γw)(Vc+V스커트)/(n·B²) (kN/m²)",R.fnd.qPad,(P.gc-P.gw)*(R.Vc+R.fnd.Vsk)/(P.padN*P.padB**2),1e-6);
+  const T=E.radCountTable(P); console.log(`${T.best?"OK  ":"FAIL"} 격벽 개수 추천: ${T.best?T.best.n+"개":"없음"} (${T.rows.map(x=>x.n+(x.ok?"○":"×")).join(" ")})`); if(!T.best) fail++; }
+{ const old={...E.DEF,type:"caisson",ctt:0.5,gf:19,phiF:30}; delete old.f1m; delete old.sk; const u=E.upgradeP(old);
+  const ok=u.f1m==="user"&&u.gf2===19&&u.phi2===30&&u.cvT===0&&u.sk==="none"&&u.scOn==="0"; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 예전 설계 파일: 두 구역에 같은 단위중량·φ, 피복석·스커트·세굴방지공 없음`); }
 console.log(fail?`\n${fail}개 실패`:"\n모두 통과"); process.exit(fail?1:0);

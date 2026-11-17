@@ -265,7 +265,8 @@ function gravFreq(P,G0){
     mg.forEach(s=>{ if(s[0]>st+1e-12){ const a=PI*(s[0]**2-st**2), jj=a*(s[0]**2+st**2)/4; if(colOn&&s[0]<=rsi+1e-9){ g2+=a; j2+=jj; } else { g1+=a; j1+=jj; } } st=Math.max(st,s[1]); });
     const raE=Math.min(ra,g1); A+=raE; g1-=raE;
     let mc=A*P.gc/G, mf=0, jf=0;
-    if(z<=zf1){ mf+=g1*P.gf/G; jf+=j1*P.gf/G; } if(z<=P.zf2){ mf+=g2*P.gf/G; jf+=j2*P.gf/G; }
+    const FL=G0.fill; if(FL){ const w1=z<=FL.zr?FL.g1:z<=FL.zcv?FL.gcv:(FL.open&&z<=G0.z2?P.gw:0); mf+=g1*w1/G; jf+=j1*w1/G; if(z<=P.zf2){ mf+=g2*FL.g2/G; jf+=j2*FL.g2/G; } }
+    else { if(z<=zf1){ mf+=g1*P.gf/G; jf+=j1*P.gf/G; } if(z<=P.zf2){ mf+=g2*P.gf/G; jf+=j2*P.gf/G; } }
     const ma=z<dH?PI*re*re*rw:0;  // 부가질량 (배제수, C_a = 1)
     Mc+=mc*h; Mf+=mf*h; Ma+=ma*h;
     els.push({L:h,EI:Ec*I,m:mc+mf+ma}); const jr=(J*P.gc/G+jf)*h/2; rl.push([e,jr],[e+1,jr]); }

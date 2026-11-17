@@ -5,11 +5,11 @@ const dl=v=>`DL(${v>=0?"+":"−"})${fx(Math.abs(v),3)}`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
 const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH","ctt","cnr","ctr","Dc","tc","tcT","ha","hth","hhn","zc0","ztop","Dp","tp","trB","trT","trH","trB","trT","trH",
-  "zf1","zf2","gf","gc","zbDL","sbDL","emb","yIfD","hwl","dhw","dlw","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
+  "zf1","zf2","gf","gc","gf2","phi2","cvT","dhRad","fbMin","tgb","gbW","gbTol","skH","skT","scB","scF","scA","Ss","gAr","scAmp","isbC","zbDL","sbDL","emb","yIfD","hwl","dhw","dlw","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
   "mu","qa","tilt","aeff","fck","fy","cov","kcr","phiF","gH","gE","fsO1","fsS1","fsO2","fsS2","fsO3","fsS3","qf3","dTow","ukc","gmMin","zcut","zbal","Wadd","zadd","padN","padB","padH",
   "mD","mDt","mzA","mzB","mtop","mL","mz1","mz2","mt1","mt2","mt3","mca","mfy","mgM","mgs","mgE","mtTP","mgap","mWsec","mgg","mDrG","mDrL","mScK","mScT","mScS","mmg","mRot","mFSc","mFSu",
   "jWb","jWt","jN","jRat","jTPh","jStub","jDir","jLD","jLt","jBrD","jBrt","jMbD","jMbt","jMg","jfy","jgM","jgE","jWtp","jWsec","jPD","jPt","jPL","jScK","jScT","jScS"];
-const SEL=["zbAuto","topR","ringAuto","shp","turb","crest","hydro","sgc","surf","mTP","mInst","mSc","soilPre","jHz","jFlood","jSc","gBase"];
+const SEL=["f1m","f2m","sk","scOn","zbAuto","topR","ringAuto","shp","turb","crest","hydro","sgc","surf","mTP","mInst","mSc","soilPre","jHz","jFlood","jSc","gBase"];
 const LS="gbs-tool-v3";
 let ST={...DEF}; // 현재 상태 (rings, customT, type 포함)
 try{ localStorage.removeItem("gbs-tool-v1"); localStorage.removeItem("gbs-tool-v2"); }catch(e){}
@@ -27,6 +27,7 @@ function fillTurbSel(){
   $("turb").value=ST.turb;
 }
 function setInputs(o){
+  o=o===DEF?o:upgradeP(o||{});
   ST={...DEF,...o}; if(o&&o!==DEF&&o.zbAuto==null&&Object.keys(o).length>20){ ST.zbAuto="0"; } if(o&&o.emb==null) ST.emb=+((ST.sbDL-ST.zbDL)||0).toFixed(3); if(o.ringAuto==null&&(o.rings||[]).length) ST.ringAuto="0"; ST.rings=(o.rings||[]).map(r=>({...r})); ST.soil=(o.soil||DEF.soil).map(l=>({...l})); ST.customT=mergeT(libGet(),o.customT||[]); turbMiss=null; if(o&&o.dhw==null) ST.dhw=ST.hwl; if(o&&o.dlw==null) ST.dlw=0; if(o&&o.yIfD==null){ const t0=turbineRaw(ST); ST.yIfD=+(t0.ifz+ST.msl).toFixed(3); }
   ST.rb=Object.fromEntries(MEMB.map(m=>[m[0],{...(DEF_RB[m[0]]),...((o.rb||{})[m[0]]||{})}]));
   NUM.forEach(k=>{ if(ST[k]!==undefined) $(k).value=ST[k]; });
@@ -42,6 +43,7 @@ function drawRb(){
 function readInputs(){
   NUM.forEach(k=>{ const v=parseFloat($(k).value); ST[k]=isFinite(v)?v:0; });
   ST.sgc=$("sgc").value; ST.surf=$("surf").value; ST.shp=$("shp").value; ST.turb=$("turb").value; ST.crest=+$("crest").value; ST.hydro=+$("hydro").value; ST.mTP=$("mTP").value; ST.mInst=$("mInst").value; ST.mSc=$("mSc").value; ST.soilPre=$("soilPre").value; ST.jHz=$("jHz").value; ST.jFlood=$("jFlood").value; ST.jSc=$("jSc").value; ST.gBase=$("gBase").value;
+  ["f1m","f2m","sk","scOn"].forEach(k=>ST[k]=$(k).value);
   ST.waveSrc=$("waveSrc").value.trim(); ST.zbAuto=$("zbAuto").value; if(ST.zbAuto==="1"&&!["mono1","monoT","jk3","jk4"].includes(ST.type)){ ST.zbDL=+(ST.sbDL-ST.emb).toFixed(3); $("zbDL").value=ST.zbDL; } ST.topR=+$("topR").value;
   ST.rings=ST.rings.map(r=>({D:+r.D||0,t:+r.t||0,h:+r.h||0,z:+r.z||0}));
   MEMB.forEach(([k])=>{ const b=$("rb_"+k+"_bar"); if(b) ST.rb[k]={bar:b.value,s:Math.max(50,parseFloat($("rb_"+k+"_s").value)||200)}; });
@@ -74,6 +76,10 @@ function airGapHtml(P,topDL,nm){ const A=airCrest(P), ok=topDL>=A.needDL-1e-6;
 필요 상단 = 파봉 + 여유고 ${fx(A.gap,2)} m(가정) = ${dl(A.needDL)}  ${ok?"≤":">"}  ${nm} ${dl(topDL)}  → <span class="chip ${ok?"ok":"bad"}">${ok?"O.K":"N.G"}</span></div>`; }
 function waveSrcHtml(P){ if(!P.waveSrc&&!P.waveRef) return ""; const W=P.waveRef;
   return `<p>설계파는 ${P.waveSrc?esc(P.waveSrc):"설계파 파일"}에서 정한 값을 쓴다${W?` — 유의파고 H<sub>1/3</sub> ${W.Hs?fx(W.Hs,2)+" m":"–"}, 최대파고 H<sub>max</sub> ${fx(W.Hmax,2)} m, 주기 ${fx(W.T,2)} s${W.depth?`, 산정 수심 ${fx(W.depth,2)} m`:""}${W.Hb?`, 쇄파 한계 ${fx(W.Hb,2)} m`:""}${W.crest?`, 파봉고(정수면 위) ${fx(W.crest,2)} m`:""}${W.dir?`, 파향 ${esc(W.dir)}`:""}${W.note?` (${esc(W.note)})`:""}`:""}. 산정 과정은 첨부 보고서 참조.</p>`; }
+/* 속채움 재료: 고르면 γ·φ 기본값(가정), γ·φ를 손으로 바꾸면 '직접 입력' */
+[["f1m","gf","phiF","zf1"],["f2m","gf2","phi2","zf2"]].forEach(([m,g,f])=>{
+  $(m).addEventListener("change",()=>{ const d=FILLMAT[$(m).value]; if(d&&d.g!=null){ $(g).value=d.g; $(f).value=d.phi; } });
+  [g,f].forEach(k=>$(k).addEventListener("input",()=>{ const d=FILLMAT[$(m).value]; if(d&&d.g!=null&&(Math.abs(parseFloat($(g).value)-d.g)>1e-9||Math.abs(parseFloat($(f).value)-d.phi)>1e-9)) $(m).value="user"; })); });
 $("zbAuto").addEventListener("change",()=>{ ST.zbAuto=$("zbAuto").value; applyType(); });
 $("topR").addEventListener("change",()=>{ ST.topR=+$("topR").value; document.querySelectorAll("[data-topr]").forEach(el=>el.hidden=String(ST.topR)!=="1"); });
 /* 수위 표 그리기: 왼쪽에 글자 묶음(위에서부터 차례로), 오른쪽에 수위선(▽), 글자와 선은 짧은 인출선으로 연결 — 수위가 촘촘해도 글자가 선과 겹치지 않음 */
@@ -105,6 +111,8 @@ function applyType(){
   document.querySelectorAll("[data-for-inst]").forEach(el=>el.hidden=!el.dataset.forInst.split(" ").includes($("mInst").value));
   document.querySelectorAll("[data-for-sc]").forEach(el=>el.hidden=el.dataset.forSc!==$("mSc").value);
   document.querySelectorAll("[data-topr]").forEach(el=>el.hidden=String(ST.topR)!=="1");
+  { const open=ST.type==="caisson"&&!(parseFloat($("ctt").value)>0); document.querySelectorAll("[data-for-open],[data-cvt]").forEach(el=>el.hidden=!open);
+    document.querySelectorAll("[data-for-sk]").forEach(el=>el.hidden=$("sk").value!=="skirt"); document.querySelectorAll("[data-for-gsc]").forEach(el=>el.hidden=$("scOn").value!=="1"); }
   { const gv=!["mono1","monoT","jk3","jk4"].includes(ST.type); document.querySelectorAll("[data-ifd]").forEach(el=>el.hidden=gv); document.querySelectorAll("[data-zba]").forEach(el=>el.hidden=!gv||String(ST.zbAuto)!=="1");
     const zi=$("zbDL"); zi.readOnly=gv&&String(ST.zbAuto)==="1"; zi.classList.toggle("fromFile",zi.readOnly); zi.title=zi.readOnly?"해저면 − 근입 깊이로 자동 계산":""; }
   igApply();
@@ -142,8 +150,8 @@ function syncKh(){ const g=parseFloat($("sgc").value); $("kh").readOnly=isFinite
 function syncKs(){ const v=$("surf").value, m={conc:3,mg:20,st:0.05}; $("ks").readOnly=!!m[v]; if(m[v]) $("ks").value=m[v]; }
 $("surf").addEventListener("change",syncKs); $("surf").addEventListener("input",syncKs);
 let runT=null; function schedRun(){ clearTimeout(runT); runT=setTimeout(run,catOf(ST.type)==="mono"?150:0); }
-$("frm").addEventListener("input",e=>{ if(e.target.id.startsWith("rg_")||e.target.id.startsWith("te_")||e.target.id==="soilPre") return; if(e.target.id.startsWith("rb_")) $("rbRes").hidden=true; if(["shp","mTP","mInst","mSc","jSc"].includes(e.target.id)) applyType(); schedRun(); });
-$("frm").addEventListener("change",e=>{ if(e.target.id==="soilPre"){ applySoilPre(); return; } if(e.target.tagName==="SELECT"&&!e.target.id.startsWith("te_")){ if(["shp","mTP","mInst","mSc","jSc"].includes(e.target.id)) applyType(); run(); } });
+$("frm").addEventListener("input",e=>{ if(e.target.id.startsWith("rg_")||e.target.id.startsWith("te_")||e.target.id==="soilPre") return; if(e.target.id.startsWith("rb_")) $("rbRes").hidden=true; if(["shp","mTP","mInst","mSc","jSc","ctt"].includes(e.target.id)) applyType(); schedRun(); });
+$("frm").addEventListener("change",e=>{ if(e.target.id==="soilPre"){ applySoilPre(); return; } if(e.target.tagName==="SELECT"&&!e.target.id.startsWith("te_")){ if(["shp","mTP","mInst","mSc","jSc","sk","scOn"].includes(e.target.id)) applyType(); run(); } });
 
 /* ---------- 터빈 편집 ---------- */
 let teId=null, teBase=null;
@@ -231,7 +239,7 @@ function run(){
   else if(mono){ $("monoNote").textContent=monoNote(); $("soilNote").textContent=soilNote(); } else $("shpNote").textContent=R.S.hex?`육각: 맞변 ${fx(R.S.hex.flats,2)} m, 꼭짓점 ${fx(R.S.hex.corners,2)} m, 면적이 같은 원 외경 ${fx(2*R.rso,3)} m (부력·파랑에 사용). 높이는 저판 하면 기준.`:"높이는 모두 저판 하면 기준입니다.";
   if(!mono&&!jack){ const T=R.topRing; $("trSlope").textContent=T?(T.hh>0?`1 : ${fx(1/T.slope,2)} (링 안지름 Ø${fx(2*T.rr,2)} m, 경사 수평 ${fx(T.rsi-T.rr,2)} m)`:`경사부 없음 (링 안지름 Ø${fx(2*T.rr,2)} m)`):(P.topR?"링 폭이 벽두께보다 작아 링 없음":"–"); }
   renderSummary(); renderWarns();
-  dirty={gen:1,rbd:1,m3d:1,load:1,stab:1,mem:1,flt:1,wt:1,qty:1,strs:1,calc:1,mchk:1,mpy:1}; if((mono||jack)&&!$("soilEd").innerHTML) drawSoil();
+  dirty={gen:1,rbd:1,m3d:1,load:1,stab:1,mem:1,flt:1,fnd:1,wt:1,qty:1,strs:1,calc:1,mchk:1,mpy:1}; if((mono||jack)&&!$("soilEd").innerHTML) drawSoil();
   renderTab(curTab);
 }
 function renderTab(t){
@@ -245,6 +253,7 @@ function renderTab(t){
   else if(t==="stab") $("repStab").innerHTML=htmlStab();
   else if(t==="mem") $("repMem").innerHTML=htmlMember();
   else if(t==="flt"){ if(!R.tow) R.tow=towTable(R.P); $("repFlt").innerHTML=htmlFlt(); }
+  else if(t==="fnd") $("repFnd").innerHTML=htmlFnd();
   else if(t==="wt") $("repWt").innerHTML=htmlWt();
   else if(t==="qty") $("repQty").innerHTML=htmlQty();
   else if(t==="strs") $("repStr").innerHTML=htmlStress();
@@ -384,26 +393,35 @@ function secPrims(R){
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
   const zHW=P.hwl-P.zbDL, zMS=P.msl-P.zbDL, zLW=-P.zbDL, zSB=P.sbDL-P.zbDL;
-  const xL=-Rmax-26, xR=Rmax+(P.Hw>0?40:22), zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+3);  // 오른쪽에 설계파 그림 자리
+  const F=R.fnd||{}, scW=F.sc&&F.sc.on?P.scB+2*P.scA:0, xL=-Rmax-26-scW, xR=Rmax+(P.Hw>0?40:22)+scW, zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+(P.tgb||0)+3);  // 오른쪽에 설계파 그림 자리
   const fs=Math.max(1.4,(zT-zB)/44);
   const both=(pts,L,extra)=>{ o.push({t:"poly",pts,L,...extra}); o.push({t:"poly",pts:pts.map(p=>[-p[0],p[1]]),L,...extra}); };
-  // 지반
-  const pit=-P.tg, xr=R.Rbase+1;
+  // 지반 (준설 바닥 = 그라우트 + 자갈 고르기층 아래)
+  const pit=-P.tg-(P.tgb||0), xr=R.Rbase+Math.max(1,P.gbW||0);
+  o.push({t:"poly",L:"WATER",pts:[[xL,Math.min(zSB,pit)],[xL,zHW],[xR,zHW],[xR,Math.min(zSB,pit)]]});
   if(zSB>pit+1e-6){ const s=zSB-pit; o.push({t:"poly",L:"SOIL",pts:[[xL,zB],[xL,zSB],[-xr-s,zSB],[-xr,pit],[xr,pit],[xr+s,zSB],[xR,zSB],[xR,zB]]}); }
   else o.push({t:"poly",L:"SOIL",pts:[[xL,zB],[xL,zSB],[xR,zSB],[xR,zB]]});
-  o.push({t:"poly",L:"WATER",pts:[[xL,Math.max(zSB,pit)],[xL,zHW],[xR,zHW],[xR,Math.max(zSB,pit)]]});
-  o.push({t:"poly",L:"GROUT",pts:[[-R.Rbase,pit],[R.Rbase,pit],[R.Rbase,0],[-R.Rbase,0]]});
+  if(P.tgb>0) o.push({t:"poly",L:"GRAV",pts:[[-xr,pit],[xr,pit],[xr,-P.tg],[-xr,-P.tg]]});
+  o.push({t:"poly",L:"GROUT",pts:[[-R.Rbase,-P.tg],[R.Rbase,-P.tg],[R.Rbase,0],[-R.Rbase,0]]});
+  if(F.sk) both([[R.Rbase-P.skT,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,0],[R.Rbase-P.skT,0]],"CONC");
+  // 세굴방지공: 필터층(해저면 위) + 피복석 (저판 앞굽 위까지 덮음)
+  if(F.sc&&F.sc.on){ const zb=Math.max(zSB,-P.tg), zF=zb+P.scF, zA=zF+P.scA, zt=(P.type==="caisson"?P.cts:P.tb), Rw=R.Rwide, Rb=R.Rbase, Ro=Rb+P.scB, tA=Math.max(zA,zt+P.scA);
+    both([[Rb,zb],[Ro+2*P.scA,zb],[Ro+2*P.scA,zF],[Rb,zF]],"GRAV");
+    both([[Rw,zt],[Rw,tA],[Rb+Math.max(0,tA-zA)*2,tA],[Rb+Math.max(0,tA-zA)*2,zA],[Ro,zA],[Ro+2*P.scA,zF],[Rb,zF],[Rb,zt]],"ROCK"); }
   const cw=R.S.hex?R.S.hex.flats/2:rso, ci=R.S.hex?R.S.hex.flats/2-P.hth:rsi;
   // 속채움
-  const zb0=P.type==="caisson"?P.cts:P.tb, ztopF=Math.min(P.zf1,P.type==="caisson"?P.cH-P.ctt:z2);
-  if(ztopF>zb0){ const pts=[[cw,zb0]]; const n=40; for(let i=0;i<=n;i++){ const z=zb0+(ztopF-zb0)*i/n; pts.push([wallIn(P,z),z]); } pts.push([cw,ztopF]); both(pts,"FILL"); }
-  if(P.zf2>P.zc0) o.push({t:"poly",L:"FILL",pts:[[-ci,P.zc0],[ci,P.zc0],[ci,Math.min(P.zf2,P.ztop)],[-ci,Math.min(P.zf2,P.ztop)]]});
+  const FL=R.fill||{zr:P.zf1,zcv:P.zf1,m1:"sand",m2:"sand"}, LM=m=>m==="rock"?"RFIL":m==="water"?"WATER":"FILL";
+  const zb0=P.type==="caisson"?P.cts:P.tb, zTopC=P.type==="caisson"?P.cH-P.ctt:z2;
+  const band=(za,zb_,L)=>{ za=Math.max(za,zb0); zb_=Math.min(zb_,zTopC); if(zb_<=za+1e-6) return; const pts=[[cw,za]]; const n=40; for(let i=0;i<=n;i++){ const z=za+(zb_-za)*i/n; pts.push([wallIn(P,z),z]); } pts.push([cw,zb_]); both(pts,L); };
+  if(FL.m1!=="none") band(zb0,FL.zr,LM(FL.m1));
+  if(FL.cvOn) band(FL.zr,FL.zcv,"ROCK");
+  if(P.zf2>P.zc0&&FL.m2!=="none") o.push({t:"poly",L:LM(FL.m2),pts:[[-ci,P.zc0],[ci,P.zc0],[ci,Math.min(P.zf2,P.ztop)],[-ci,Math.min(P.zf2,P.ztop)]]});
   // 콘크리트
   if(P.type==="caisson"){
     const Rw=P.cDw/2, Rwi=Rw-P.ctw;
     o.push({t:"poly",L:"CONC",pts:[[-P.cDs/2,0],[P.cDs/2,0],[P.cDs/2,P.cts],[-P.cDs/2,P.cts]]});
     both([[Rwi,P.cts],[Rw,P.cts],[Rw,P.cH],[Rwi,P.cH]],"CONC");
-    both([[cw,P.cH-P.ctt],[Rwi,P.cH-P.ctt],[Rwi,P.cH],[cw,P.cH]],"CONC");
+    if(P.ctt>0) both([[cw,P.cH-P.ctt],[Rwi,P.cH-P.ctt],[Rwi,P.cH],[cw,P.cH]],"CONC");
     if(P.cnr>0) both([[cw,P.cts],[Rwi,P.cts],[Rwi,P.cH-P.ctt],[cw,P.cH-P.ctt]],"RAD");
   }else{
     const Rw=P.Dw/2, Rt=P.Dt/2, z1=P.tb+P.hw;
@@ -484,7 +502,7 @@ function planPrims(R){
   if(P.type==="caisson") lab(P.cDw/2-P.ctw,-145,`격벽 ${Math.round(P.cnr)}개`); else lab(P.Dw/2-P.tw,-145,`Ø${fx((P.Dw-2*P.tw)*1000,0)} 원통 내경`);
   return {o,box:[-Rmax-13,-Rmax-2-(RG.length?1.2+RG.length*fs*1.05:0),Rmax+13,Rmax+2],fs};
 }
-const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" stroke-linejoin="round"`,CFIL:`fill="var(--conc)" stroke="var(--conc)" stroke-width=".02"`,FILL:`fill="var(--fill)"`,WATER:`fill="var(--water)" opacity=".75"`,
+const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" stroke-linejoin="round"`,CFIL:`fill="var(--conc)" stroke="var(--conc)" stroke-width=".02"`,FILL:`fill="var(--fill)"`,RFIL:`fill="var(--rfill)"`,GRAV:`fill="var(--grav)" stroke="var(--conc-line)" stroke-width=".04"`,WATER:`fill="var(--water)" opacity=".75"`,
   SOIL:`fill="var(--soil)" opacity=".55"`,GROUT:`fill="var(--grout)" stroke="var(--conc-line)" stroke-width=".06"`,RAD:`fill="none" stroke="var(--conc-line)" stroke-width=".06" stroke-dasharray=".6 .35"`,
   LINE:`fill="none" stroke="var(--conc-line)" stroke-width=".08"`,HID:`fill="none" stroke="var(--conc-line)" stroke-width=".06" stroke-dasharray=".7 .35"`,
   SHT:`fill="none" stroke="#222" stroke-width=".1"`,STEEL:`fill="var(--steel)" stroke="var(--conc-line)" stroke-width=".05" stroke-linejoin="round"`,ROCK:`fill="var(--rock)" opacity=".7"`,PLUG:`fill="var(--soil)" opacity=".3"`,SHC:`fill="#f4f6f6" stroke="#999" stroke-width=".05"`};
@@ -713,7 +731,8 @@ function htmlFlt(){
   h+=`<div class="eq">콘크리트 W<sub>c</sub> = ${fx(f.Vct,3)} × ${P.gc} = ${fx(f.WcT,1)} kN (도심 z = ${fx(f.zcT,3)} m)${f.Vb>0?`
 물 밸러스트 W<sub>b</sub> = ${fx(f.Vb,3)} × ${P.gw} = ${fx(f.Wb,1)} kN (도심 z = ${fx(f.zcB,3)} m)`:""}
 부유 중량 W = ${fx(f.W,1)} kN (${fx(f.W/9.81,0)} t),  필요 배수량 ∇ = W / γ<sub>w</sub> = ${fx(f.V,3)} m³
-흘수 T = ${fx(f.T,3)} m,  건현 = ${fx(f.fb,3)} m</div>`;
+흘수 T = ${fx(f.T,3)} m,  건현 (예인 상단까지) = ${fx(f.fb,3)} m
+${P.type==="caisson"?`케이슨 상단 건현 = 케이슨 높이 − 흘수 = ${fx(f.wideTop,2)} − ${fx(f.T,3)} = ${fx(f.fbW,3)} m${f.open?` ≥ 개방형 기준 ${P.fbMin} m (가정) → ${f.okFB?'<span class="ok-t">O.K</span>':'<span class="bad-t">N.G</span>'} (위가 열려 있어 넘는 파도가 격실로 들어감)`:" (상판이 있어 판정하지 않음)"}`:""}</div>`;
   h+=`<table class="t" style="max-width:600px"><tbody>
   <tr><td class="l">수선 위치</td><td class="${f.zone==="wide"?"ok-t":"bad-t"}">${zoneName(f.zone)} (넓은 구간 상단 z = ${fx(f.wideTop,2)} m)</td></tr>
   <tr><td class="l">여유수심 = ${P.dTow} − ${fx(f.T,3)}</td><td class="n">${fx(f.clr,3)} m ${f.okT?"≥":"<"} ${P.ukc} m → ${f.okT?"O.K":"N.G"}</td></tr></tbody></table>`;
@@ -729,6 +748,51 @@ GM = ${fx(f.GM,3)} m  ${f.okGM?"≥":"<"} ${P.gmMin} m → ${f.okGM?"O.K":"N.G"}
   h+=`</tbody></table></div><p class="note">현재 입력의 밸러스트·추가중량 조건 그대로 상단 높이만 바꾼 결과입니다. 바람 경사 모멘트와 대각 복원성은 예인 계획이 정해지면 추가합니다.</p>`;
   return h;
 }
+const matNm=m=>(FILLMAT[m]||FILLMAT.user).nm;
+function htmlFillTbl(){ const P=R.P, F=R.fill;
+  let h=`<h3>2. 속채움</h3><div class="tblwrap"><table class="t"><thead><tr><th>구분</th><th>재료</th><th>범위 z (m)</th><th>체적 (m³)</th><th>단위중량 (kN/m³)</th><th>중량 (kN)</th></tr></thead><tbody>`;
+  const zb=P.type==="caisson"?P.cts:P.tb;
+  h+=`<tr><td class="l">격실 (내부 공간 ${fx(R.Cap1,1)} m³)</td><td>${matNm(F.m1)}</td><td class="n">${F.m1==="none"?"—":`${fx(zb,2)} ~ ${fx(Math.max(zb,F.zr),2)}`}</td><td class="n">${fx(F.Vf1,2)}</td><td class="n">${fx(F.g1,1)}</td><td class="n">${fx(F.W1,1)}</td></tr>`;
+  if(F.cvOn) h+=`<tr><td class="l">격실 위 피복석</td><td>피복석</td><td class="n">${fx(F.zr,2)} ~ ${fx(F.zcv,2)}</td><td class="n">${fx(F.Vcv,2)}</td><td class="n">${fx(F.gcv,1)}</td><td class="n">${fx(F.Wcv,1)}</td></tr>`;
+  if(F.Vw1>0) h+=`<tr><td class="l">격실 나머지 (개방형, 해수로 참)</td><td>해수</td><td class="n">${fx(F.zcv>zb?F.zcv:zb,2)} ~ ${fx(R.z2,2)}</td><td class="n">${fx(F.Vw1,2)}</td><td class="n">${fx(P.gw,2)}</td><td class="n">${fx(F.Ww1,1)}</td></tr>`;
+  h+=`<tr><td class="l">기둥 내부 (내부 공간 ${fx(R.Cap2,1)} m³)</td><td>${matNm(F.m2)}</td><td class="n">${F.m2==="none"?"—":`${fx(P.zc0,2)} ~ ${fx(Math.min(P.zf2,P.ztop),2)}`}</td><td class="n">${fx(F.Vf2,2)}</td><td class="n">${fx(F.g2,1)}</td><td class="n">${fx(F.W2,1)}</td></tr>`;
+  h+=`<tr class="tot"><td class="l" colspan="3">합계 (중량 도심 z = ${fx(R.zcF,3)} m)</td><td class="n">${fx(R.Vf+F.Vw1,2)}</td><td></td><td class="n">${fx(R.Wf,1)}</td></tr></tbody></table></div>`;
+  return h; }
+function htmlFnd(){
+  const P=R.P, F=R.fnd, S=F.sc, ok=b=>b?'<span class="ok-t">O.K</span>':'<span class="bad-t">N.G</span>';
+  let h=`<h3>1. 시공 순서 (해외 GBS 방식)</h3><p>준설 → 자갈 고르기층 → 패드로 거치·수평 맞춤 → 스커트 안 빈틈 그라우트 → 세굴방지공(필터층 + 피복석) → 속채움.</p>`;
+  h+=`<h3>2. 고르기층 · 그라우트 · 스커트</h3><div class="eq">고르기 범위 반경 = 저판 반경 + 여유폭 = ${fx(R.Rbase,3)} + ${P.gbW} = ${fx(F.Rg,3)} m,  체적 = π × ${fx(F.Rg,3)}² × ${P.tgb} = ${fx(F.Vgb,2)} m³
+그라우트 소요 두께 = 패드 높이 + 고르기 허용오차 = ${P.padH} + ${P.gbTol} = ${fx(F.tgReq,2)} m  →  입력 ${P.tg} m ${ok(P.tg>=F.tgReq-1e-9)}
+그라우트 체적 = π × ${fx(R.Rbase,3)}² × ${P.tg} = ${fx(F.Vgr,2)} m³ (저판 밑, ${P.sk==="skirt"?"스커트 안":P.sk==="bag"?"그라우트 백 안":"가두기 없음"})${F.sk?`
+스커트: 높이 ${P.skH} m ≥ 그라우트 두께 + 근입 0.2 m(가정) = ${fx(P.tg+0.2,2)} m ${ok(P.skH>=P.tg+0.2-1e-9)},  콘크리트 ${fx(F.Vsk,2)} m³, 수중 중량 ${fx(F.Wsk,1)} kN (안정검토 연직력에 포함)`:""}</div>`;
+  h+=`<h3>3. 거치 (그라우트 전)</h3><div class="eq">거치 직후 수중 중량 (속채움 전, 격실 침수) W' = (γc − γw) × (V<sub>c</sub>${F.Vsk>0?" + V<sub>스커트</sub>":""}) = (${P.gc} − ${P.gw}) × ${fx(R.Vc+F.Vsk,2)} = ${fx(F.Wsub0,1)} kN
+패드 압력 q = W' / (n × B²) = ${fx(F.Wsub0,1)} / (${P.padN} × ${P.padB}²) = ${fx(F.qPad,1)} kN/m² ≤ 단기 허용 q<sub>a</sub> × ${P.qf3} = ${fx(F.qPadA,0)} kN/m² ${ok(F.okPad)}
+그라우트 주입 들림 한계 p<sub>lim</sub> = W' / A<sub>저판</sub> = ${fx(F.Wsub0,1)} / ${fx(PI*R.Rbase**2,1)} = ${fx(F.pLim,1)} kN/m²  →  주입 압력 관리값 p<sub>lim</sub> / 1.5 = ${fx(F.pAllow,1)} kN/m² (가정)
+거치 수평 허용오차 ${P.tilt}° → 구조물 상단 위치 오차 = ${fx(P.ztop,2)} × tan ${P.tilt}° = ${fx(F.dTop*1000,0)} mm (안정검토에 추가 모멘트로 반영)</div>
+  <p class="note">패드 단기 허용은 허용지지력에 지진 시 할증(${P.qf3})을 곱한 가정값입니다. 그라우트가 굳기 전까지는 패드만 하중을 받으므로 거치 후 바로 그라우트를 넣는 순서로 봅니다.</p>`;
+  h+=`<h3>4. 해저면 유속</h3><div class="eq">수심 d = 설계조위 − 해저면 = ${fx(P.hwl,2)} − (${fx(P.sbDL,2)}) = ${fx(S.ds,2)} m,  파장 L = ${fx(S.L,1)} m, k = ${fx(S.k,5)}
+해저면 파랑 수립자 속도 U<sub>m</sub> = πH/T · 1/sinh(kd) = π × ${P.Hw}/${P.Tw} / sinh(${fx(S.k*S.ds,3)}) = ${fx(S.Um0,3)} m/s
+조류 (극치, 수심 평균 1/7승) U<sub>c</sub> = 7/8 × ${P.Uce} = ${fx(S.ucAvg,3)} m/s
+구조물 둘레 설계 유속 U = ${P.scAmp} (증폭, 가정) × (${fx(S.Um0,3)} + ${fx(S.ucAvg,3)}) = ${fx(S.Ub,3)} m/s</div>`;
+  h+=`<h3>5. 세굴 깊이 (세굴방지공이 없을 때)</h3><div class="eq">Sumer & Fredsøe (2001), 파랑 + 흐름, 원형 구조물 지름 D = ${fx(S.Dst,2)} m
+KC = U<sub>m</sub>·T / D = ${fx(S.Um0,3)} × ${P.Tw} / ${fx(S.Dst,2)} = ${fx(S.KC,3)},  U<sub>cw</sub> = U<sub>c</sub> / (U<sub>c</sub> + U<sub>m</sub>) = ${fx(S.Ucw,3)}
+A = 0.03 + 0.75·U<sub>cw</sub><sup>2.6</sup> = ${fx(S.A,4)},  B = 6·exp(−4.7·U<sub>cw</sub>) = ${fx(S.B,3)}
+S = ${S.KC>S.B?`1.3·D·[1 − exp(−A(KC − B))] = ${fx(S.S,2)} m`:`0 (KC ${fx(S.KC,2)} &lt; B ${fx(S.B,2)} — 말굽와류 세굴은 거의 없음)`}
+권장 폭 = max(1.5 × S × cot 30°, 5 m) (가정) = ${fx(S.Brec,1)} m</div>
+  <p class="note">지름이 큰 중력식 기초는 KC가 작아 구조물 앞 말굽와류 세굴보다 가장자리(모서리) 세굴이 문제입니다. 위 식은 참고값이며, 실시설계에서 수리모형시험이나 수치해석으로 세굴 깊이와 범위를 확인하세요.</p>`;
+  h+=`<h3>6. 피복석 크기 (Isbash)</h3><div class="eq">U = C·√(2gΔD) → D = U² / (2gΔC²),  Δ = ρ<sub>s</sub>/ρ<sub>w</sub> − 1 = ${P.Ss} / ${fx(P.gw/9.81,4)} − 1 = ${fx(S.Dl,3)},  C = ${P.isbC} (가정)</div>
+  <div class="tblwrap"><table class="t"><thead><tr><th>위치</th><th>설계 유속 U (m/s)</th><th>소요 지름 D (m)</th><th>개당 중량 (t)</th><th>소요 두께 2D (m)</th><th>입력 두께 (m)</th><th>판정</th></tr></thead><tbody>
+  <tr><td class="l">세굴방지공 (해저면)</td><td class="n">${fx(S.Ub,3)}</td><td class="n">${fx(S.ar.D,3)}</td><td class="n">${fx(S.ar.W,3)}</td><td class="n">${fx(S.ar.t2,2)}</td><td class="n">${S.on?P.scA:"없음"}</td><td>${S.on?ok(S.okT):"—"}</td></tr>
+  ${F.cv?`<tr><td class="l">격실 위 피복석 (해저면 위 ${fx(F.cv.zTop,2)} m)</td><td class="n">${fx(F.cv.U,3)}</td><td class="n">${fx(F.cv.D,3)}</td><td class="n">${fx(F.cv.W,3)}</td><td class="n">${fx(F.cv.t2,2)}</td><td class="n">${F.cv.t}</td><td>${ok(F.cv.ok)}</td></tr>`:""}
+  </tbody></table></div>
+  ${F.cv?`<div class="eq">격실 위 유속 = 파랑 πH/T·cosh(kz)/sinh(kd) + 조류 U·(z/d)<sup>1/7</sup> = ${fx(F.cv.uw,3)} + ${fx(F.cv.uc,3)} = ${fx(F.cv.U,3)} m/s (격실 안은 외벽이 막아 증폭 없음, 가정)</div>`:""}
+  <p class="note">개당 중량 = ρ<sub>s</sub>·π/6·D³. 피복석은 2층 이상(두께 2D)으로 깝니다. 필터층은 피복석 D15 / 필터 D85 ≤ 5 (필터 규칙)를 만족하는 입도로 정합니다.</p>`;
+  if(S.on) h+=`<h3>7. 세굴방지공 판정</h3><div class="tblwrap"><table class="t"><thead><tr><th>항목</th><th>입력</th><th>기준</th><th>판정</th></tr></thead><tbody>
+  <tr><td class="l">피복석 두께</td><td class="n">${P.scA} m</td><td class="n">≥ ${fx(S.ar.t2,2)} m</td><td>${ok(S.okT)}</td></tr>
+  <tr><td class="l">폭 (저판 가장자리에서)</td><td class="n">${P.scB} m</td><td class="n">≥ ${fx(S.Brec,1)} m</td><td>${ok(S.okB)}</td></tr>
+  <tr><td class="l">필터층</td><td class="n">${P.scF} m</td><td class="l">입도 필터 규칙</td><td>—</td></tr></tbody></table></div>
+  <div class="eq">수량: 필터층 π × (${fx(S.Ro,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF} = ${fx(S.Vfi,1)} m³,  피복석 π × (${fx(S.Ro,3)}² − ${fx(R.Rwide,3)}²) × ${P.scA} = ${fx(S.Var,1)} m³ (저판 앞굽 위 포함)</div>`;
+  return h; }
 function htmlWt(){
   const P=R.P, I=R.inst;
   let h=`<h3>1. 콘크리트 체적 및 자중</h3><div class="tblwrap"><table class="t"><thead><tr><th>부재</th><th>산식 (m)</th><th>범위 z (m)</th><th>체적 (m³)</th><th>도심 z (m)</th></tr></thead><tbody>`;
@@ -737,10 +801,7 @@ function htmlWt(){
   <tr><td class="l" colspan="3">겹침 공제 (같은 자리를 두 번 센 부분)</td><td class="n">−${fx(R.overlap,3)}</td><td></td></tr>
   <tr class="tot"><td class="l" colspan="3">콘크리트 순체적 V<sub>c</sub></td><td class="n">${fx(R.Vc,3)}</td><td class="n">${fx(R.zcC,3)}</td></tr></tbody></table></div>
   <div class="eq">W<sub>c</sub> = ${fx(R.Vc,3)} × ${P.gc} = ${fx(R.Wc,1)} kN (${fx(R.Wc/9.81,1)} t)</div>`;
-  h+=`<h3>2. 속채움</h3><div class="tblwrap"><table class="t"><thead><tr><th>구분</th><th>내부 공간 (m³)</th><th>채움 체적 (m³)</th><th>단위중량</th><th>중량 (kN)</th></tr></thead><tbody>
-  <tr><td class="l">격실 (z ≤ ${fx(P.zf1,2)})</td><td class="n">${fx(R.Cap1,2)}</td><td class="n">${fx(R.Vf1,2)}</td><td class="n">${P.gf}</td><td class="n">${fx(R.Vf1*P.gf,1)}</td></tr>
-  <tr><td class="l">기둥 내부 (z ≤ ${fx(P.zf2,2)})</td><td class="n">${fx(R.Cap2,2)}</td><td class="n">${fx(R.Vf2,2)}</td><td class="n">${P.gf}</td><td class="n">${fx(R.Vf2*P.gf,1)}</td></tr>
-  <tr class="tot"><td class="l" colspan="2">합계 (도심 z = ${fx(R.zcF,3)} m)</td><td class="n">${fx(R.Vf,2)}</td><td></td><td class="n">${fx(R.Wf,1)}</td></tr></tbody></table></div>`;
+  h+=htmlFillTbl();
   h+=`<h3>3. 설치 후 부력 및 유효중량</h3><div class="eq">잠긴 외곽 체적 V<sub>sub</sub> = ∫₀<sup>d</sup> π·R<sub>외곽</sub>(z)² dz,  부력 U = V<sub>sub</sub> × γ<sub>w</sub></div>
   <div class="tblwrap"><table class="t"><thead><tr><th>구분</th><th>설계조위 ${dl(P.hwl)}</th><th>약최저저조위 DL 0.000</th></tr></thead><tbody>
   <tr><td class="l">수심 d (m)</td><td class="n">${fx(I.dH,3)}</td><td class="n">${fx(I.dL,3)}</td></tr>
@@ -759,10 +820,15 @@ function htmlQty(){
   R.parts.forEach(p=>h+=`<tr><td class="l">콘크리트 ${p.nm}</td><td>f<sub>ck</sub> 45 MPa</td><td class="n">${fx(p.V,3)}</td><td>m³</td><td class="fm">${p.f}</td></tr>`);
   h+=`<tr><td class="l">겹침 공제</td><td></td><td class="n">−${fx(R.overlap,3)}</td><td>m³</td><td class="fm">부재 겹침부</td></tr>
   <tr class="sub"><td class="l">콘크리트 소계</td><td></td><td class="n">${fx(R.Vc,3)}</td><td>m³</td><td></td></tr>
-  <tr><td class="l">속채움 (격실)</td><td>γ ${P.gf} kN/m³</td><td class="n">${fx(R.Vf1,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>
-  <tr><td class="l">속채움 (기둥 내부)</td><td></td><td class="n">${fx(R.Vf2,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>
-  <tr><td class="l">저판 하부 그라우팅</td><td>두께 ${P.tg} m</td><td class="n">${fx(R.grout,3)}</td><td>m³</td><td class="fm">π × ${fx(R.Rbase,3)}² × ${P.tg}</td></tr>
+  ${R.fnd.Vsk>0?`<tr><td class="l">콘크리트 스커트</td><td>높이 ${P.skH} × 두께 ${P.skT} m</td><td class="n">${fx(R.fnd.Vsk,3)}</td><td>m³</td><td class="fm">π × (${fx(R.Rbase,3)}² − ${fx(R.Rbase-P.skT,3)}²) × ${P.skH}</td></tr>`:""}
+  <tr><td class="l">속채움 (격실) ${matNm(R.fill.m1)}</td><td>γ ${fx(R.fill.g1,1)} kN/m³</td><td class="n">${fx(R.Vf1,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>
+  ${R.fill.cvOn?`<tr><td class="l">격실 위 피복석</td><td>두께 ${P.cvT} m, 소요 지름 ${R.fnd.cv?fx(R.fnd.cv.D,2):"-"} m 이상</td><td class="n">${fx(R.fill.Vcv,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>`:""}
+  <tr><td class="l">속채움 (기둥 내부) ${matNm(R.fill.m2)}</td><td>γ ${fx(R.fill.g2,1)} kN/m³</td><td class="n">${fx(R.Vf2,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>
+  ${P.tgb>0?`<tr><td class="l">자갈 고르기층</td><td>두께 ${P.tgb} m, 여유폭 ${P.gbW} m</td><td class="n">${fx(R.fnd.Vgb,3)}</td><td>m³</td><td class="fm">π × ${fx(R.fnd.Rg,3)}² × ${P.tgb}</td></tr>`:""}
+  <tr><td class="l">저판 하부 그라우트</td><td>두께 ${P.tg} m</td><td class="n">${fx(R.grout,3)}</td><td>m³</td><td class="fm">π × ${fx(R.Rbase,3)}² × ${P.tg}</td></tr>
   <tr><td class="l">거치용 콘크리트 패드</td><td>${P.padB}×${P.padB}×${P.padH} m</td><td class="n">${fx(R.pad,3)}</td><td>m³</td><td class="fm">${P.padN}개 × ${P.padB}² × ${P.padH}</td></tr>
+  ${R.fnd.sc.on?`<tr><td class="l">세굴방지공 필터층</td><td>두께 ${P.scF} m, 폭 ${P.scB} m</td><td class="n">${fx(R.fnd.sc.Vfi,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Ro,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF}</td></tr>
+  <tr><td class="l">세굴방지공 피복석</td><td>두께 ${P.scA} m, 소요 지름 ${fx(R.fnd.sc.ar.D,2)} m 이상</td><td class="n">${fx(R.fnd.sc.Var,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Ro,3)}² − ${fx(R.Rwide,3)}²) × ${P.scA} (앞굽 위 포함, 비탈 제외)</td></tr>`:""}
   </tbody></table></div><p class="note">콘크리트 강도 ${P.fck} MPa.</p>`;
   h+=`<h3>철근 (개략)</h3><div class="tblwrap"><table class="t"><thead><tr><th>부위</th><th>수량 (t)</th></tr></thead><tbody>`;
   R.M.qty.rows.forEach(r=>h+=`<tr><td class="l">${r.nm}</td><td class="n">${fx(r.kg/1000,2)}</td></tr>`);
@@ -880,20 +946,22 @@ function htmlStress(){
 function htmlReport(){
   const P=R.P, t=R.T;
   const tp=P.type==="caisson"?"케이슨형 (평저 원통 케이슨 + "+(R.S.hex?"육각":"원형")+" 샤프트)":"원추형 (저판 + 하부 원통 + 원추 + 원형 기둥)";
-  let h=`<h2>1. 설계 개요</h2><p>해상풍력 발전기 중력식 기초(GBS)의 자중·부력, 외력, 안정(전도·활동·지지력·편심) 및 예인 시 부유 안정을 검토한다.</p>
+  let h=`<h2>1. 설계 개요</h2><p>해상풍력 발전기 중력식 기초(GBS)의 자중·부력, 외력, 안정(전도·활동·지지력·편심), 부재, 예인 시 부유 안정, 기초(거치·그라우트·세굴방지공)를 검토한다.</p>
   <table class="t" style="max-width:720px"><tbody>
   <tr><td class="l">형식</td><td class="l">${tp}</td></tr>
   <tr><td class="l">터빈</td><td class="l">${esc(t.name)} (${t.MW} MW, 허브 MSL+${t.hub} m)</td></tr>
   <tr><td class="l">설치 위치</td><td class="l">저판 하면 ${dl(P.zbDL)}, 해저면 ${dl(P.sbDL)}, 설계조위 ${dl(P.hwl)}, MSL ${dl(P.msl)}</td></tr>
   <tr><td class="l">적용 기준</td><td class="l">DNV-RP-C205 (풍속·파랑), DNV-ST-0126 (유효면적), 항만 및 어항 설계기준 (안전율)</td></tr>
-  <tr><td class="l">재료</td><td class="l">콘크리트 ${P.gc} kN/m³ (f<sub>ck</sub> 45 MPa), 속채움 ${P.gf} kN/m³, 해수 ${P.gw} kN/m³</td></tr></tbody></table>
+  <tr><td class="l">재료</td><td class="l">콘크리트 ${P.gc} kN/m³ (f<sub>ck</sub> ${P.fck} MPa), 격실 속채움 ${matNm(R.fill.m1)} ${fx(R.fill.g1,1)} kN/m³, 기둥 속채움 ${matNm(R.fill.m2)} ${fx(R.fill.g2,1)} kN/m³, 해수 ${P.gw} kN/m³</td></tr>
+  ${P.type==="caisson"?`<tr><td class="l">케이슨 상부</td><td class="l">${P.ctt>0?`상판 두께 ${P.ctt} m (폐합형)`:"상판 없음 (개방형) — 방사형 격벽이 버팀벽으로 기둥을 잡음"}, 격벽 ${Math.round(P.cnr)}개 × ${P.ctr} m</td></tr>`:""}</tbody></table>
   <div class="fig">${primsSVG(secPrims(R),"정면 단면도")}</div><p class="note" style="text-align:center">그림 1. 정면 단면도</p>`;
   h+=`<h2>2. 자중 및 부력</h2>`+htmlWt();
   h+=`<h2>3. 하중</h2>`+htmlLoad();
   h+=`<h2>4. 하중조합 및 안정검토</h2>`+htmlStab();
   h+=`<h2>5. 부재설계</h2>`+htmlMember();
   h+=`<h2>6. 예인 시 부유 안정</h2>`+htmlFlt();
-  h+=`<h2>7. 수량</h2>`+htmlQty();
+  h+=`<h2>7. 기초 · 세굴방지공</h2>`+htmlFnd();
+  h+=`<h2>8. 수량</h2>`+htmlQty();
   return h;
 }
 
@@ -998,7 +1066,7 @@ $("btnXlsx").addEventListener("click",()=>{ try{ saveFile(`${baseName()}_계산�
 
 /* DXF (R12, mm) */
 function dxfStr(s){ return String(s).replace(/[^\x20-\x7e]/g,c=>"\\U+"+c.codePointAt(0).toString(16).toUpperCase().padStart(4,"0")); }
-const DXL={RB:[1,"REBAR"],RBD:[1,"REBAR"],SHT:[7,"SHEET"],STX:[7,"TEXT"],SDM:[3,"DIM"],SMU:[8,"TEXT"],SHC:[8,"HIDDEN"],CONC:[8,"CONC"],FILL:[42,"FILL"],WATER:[5,"WATER"],SOIL:[34,"SOIL"],GROUT:[9,"GROUT"],STEEL:[4,"STEEL"],ROCK:[33,"ROCK"],PLUG:[34,"SOIL"],RAD:[8,"HIDDEN"],LINE:[7,"OUTLINE"],HID:[8,"HIDDEN"],CEN:[1,"CENTER"],WL:[5,"WATER"],TXT:[7,"TEXT"],DIM:[3,"DIM"],MUT:[8,"TEXT"]};
+const DXL={RB:[1,"REBAR"],RBD:[1,"REBAR"],SHT:[7,"SHEET"],STX:[7,"TEXT"],SDM:[3,"DIM"],SMU:[8,"TEXT"],SHC:[8,"HIDDEN"],CONC:[8,"CONC"],FILL:[42,"FILL"],RFIL:[42,"FILL"],GRAV:[33,"GRAVEL"],WATER:[5,"WATER"],SOIL:[34,"SOIL"],GROUT:[9,"GROUT"],STEEL:[4,"STEEL"],ROCK:[33,"ROCK"],PLUG:[34,"SOIL"],RAD:[8,"HIDDEN"],LINE:[7,"OUTLINE"],HID:[8,"HIDDEN"],CEN:[1,"CENTER"],WL:[5,"WATER"],TXT:[7,"TEXT"],DIM:[3,"DIM"],MUT:[8,"TEXT"]};
 function primsDXF(prs){
   const k=1000, e=[]; const L=l=>(DXL[l]||[7,"0"])[1];
   prs.forEach(({pr,dx,dy})=>pr.o.forEach(p=>{ if(p.L==="CFIL") return; // 채움 띠는 DXF에 넣지 않음
@@ -1024,7 +1092,7 @@ $("btnDxf").addEventListener("click",async()=>{ try{
   { const sh=sheetPrims(R); z.file(`${baseName()}_배근도_A3.dxf`,primsDXF([{pr:sh,dx:0,dy:0}])); }
   { const gs=genSheetPrims(R); z.file(`${baseName()}_일반도_A3.dxf`,primsDXF([{pr:gs,dx:0,dy:0}])); }
   { const g0=genSheetPrims(R), b=detailSheetPrims(R,true); if(g0.dLeft){ const a=detailSheetPrims(R,false,g0.dN-g0.dLeft); z.file(`${baseName()}_상세도_A3.dxf`,primsDXF([{pr:a,dx:0,dy:0}])); } z.file(`${baseName()}_배근상세도_A3.dxf`,primsDXF([{pr:b,dx:0,dy:0}])); }
-  z.file("읽어보기.txt",`단위: mm, 원점 = 기초 중심 · 저판 하면.\r\n레이어: REBAR 철근, SHEET 도면 테두리·표, CONC 콘크리트, FILL 속채움, WATER 해수·수위, SOIL 지반, GROUT 그라우팅, HIDDEN 숨은선(격벽 등), CENTER 중심선, DIM 치수, TEXT 문자.\r\n한글 문자는 \\U+ 형식으로 들어 있어 AutoCAD에서 그대로 보입니다. 글꼴이 깨지면 문자 스타일을 한글 글꼴(맑은 고딕 등)로 바꾸세요.\r\n`);
+  z.file("읽어보기.txt",`단위: mm, 원점 = 기초 중심 · 저판 하면.\r\n레이어: REBAR 철근, SHEET 도면 테두리·표, CONC 콘크리트, FILL 속채움(모래·사석), GRAVEL 자갈 고르기층·필터층, WATER 해수·수위, SOIL 지반, GROUT 그라우팅, HIDDEN 숨은선(격벽 등), CENTER 중심선, DIM 치수, TEXT 문자.\r\n한글 문자는 \\U+ 형식으로 들어 있어 AutoCAD에서 그대로 보입니다. 글꼴이 깨지면 문자 스타일을 한글 글꼴(맑은 고딕 등)로 바꾸세요.\r\n`);
   saveFile(`${baseName()}_도면_${stamp()}.zip`,await z.generateAsync({type:"blob"}));
 }catch(e){ toast("도면을 만들지 못했습니다"); console.error(e); } });
 
@@ -1055,7 +1123,7 @@ function build3D(){
   const mF=new THREE.MeshStandardMaterial({color:0xd9bf7f,roughness:1,side:THREE.DoubleSide,clippingPlanes:clip});
   const lathe=(pts,m)=>{ const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(Math.max(0.0001,p[0]),p[1])),72); grp.add(new THREE.Mesh(g,m)); };
   const ring=(ri,ro,z0,z1,m)=>lathe([[ri,z0],[ro,z0],[ro,z1],[ri,z1],[ri,z0]],m);
-  if(P.type==="caisson"){ const Rw=P.cDw/2,Rwi=Rw-P.ctw; ring(0,P.cDs/2,0,P.cts,mC); ring(Rwi,Rw,P.cts,P.cH,mC); ring(R.rso,Rwi,P.cH-P.ctt,P.cH,mC);
+  if(P.type==="caisson"){ const Rw=P.cDw/2,Rwi=Rw-P.ctw; ring(0,P.cDs/2,0,P.cts,mC); ring(Rwi,Rw,P.cts,P.cH,mC); if(P.ctt>0) ring(R.rso,Rwi,P.cH-P.ctt,P.cH,mC);
     const n=Math.round(P.cnr), L=Rwi-R.rso, hh=P.cH-P.ctt-P.cts; for(let i=0;i<n;i++){ const a=2*PI*i/n+PI/n, g=new THREE.BoxGeometry(L,hh,P.ctr), m=new THREE.Mesh(g,mC); m.position.set((R.rso+L/2)*Math.cos(a),P.cts+hh/2,-(R.rso+L/2)*Math.sin(a)); m.rotation.y=a; grp.add(m); } }
   else { const Rw=P.Dw/2,Rt=P.Dt/2,z1=P.tb+P.hw; ring(0,P.Db/2,0,P.tb,mC); ring(Rw-P.tw,Rw,P.tb,z1,mC); lathe([[Rw-P.tkh,z1],[Rw,z1],[Rt,R.z2],[Rt-P.tkh,R.z2],[Rw-P.tkh,z1]],mC); }
   if(R.S.hex){ const sh=new THREE.Shape(), ho=new THREE.Path(), a=P.ha, ai=R.S.hex.ai;
@@ -1067,9 +1135,13 @@ function build3D(){
   if(P.Dp>0&&P.tp>0) ring(R.rso,Math.max(P.Dp/2,R.rso),P.ztop-P.tp,P.ztop,mC);
   if(R.topRing){ const T=R.topRing; ring(T.rr,T.rsi,T.zA,P.ztop,mC); if(T.hh>0) lathe([[T.rsi,T.z0],[T.rsi,T.zA],[T.rr,T.zA],[T.rsi,T.z0]],mC); }
   (P.rings||[]).forEach(r=>{ if(r.D>0&&r.t>0&&r.h>0) ring(r.D/2-r.t,r.D/2,r.z,r.z+r.h,mC); });
-  if($("fill3d").checked){ const zb0=P.type==="caisson"?P.cts:P.tb, zt=Math.min(P.zf1,P.type==="caisson"?P.cH-P.ctt:R.z2);
-    if(zt>zb0){ const pts=[[R.rso,zb0]]; for(let i=0;i<=24;i++){ const z=zb0+(zt-zb0)*i/24; pts.push([wallIn(P,z)-0.02,z]); } pts.push([R.rso,zt],[R.rso,zb0]); lathe(pts,mF); }
-    if(P.zf2>P.zc0) ring(0,R.rsi-0.02,P.zc0,Math.min(P.zf2,P.ztop),mF); }
+  if($("fill3d").checked){ const FL=R.fill, zb0=P.type==="caisson"?P.cts:P.tb, zTopC=P.type==="caisson"?P.cH-P.ctt:R.z2;
+    const mR=new THREE.MeshStandardMaterial({color:0xa99d86,roughness:1,side:THREE.DoubleSide,clippingPlanes:clip}), mA=new THREE.MeshStandardMaterial({color:0x7d756a,roughness:1,side:THREE.DoubleSide,clippingPlanes:clip}), mW=new THREE.MeshStandardMaterial({color:0x5aa0d0,transparent:true,opacity:.45,roughness:1,side:THREE.DoubleSide,clippingPlanes:clip});
+    const matOf=m=>m==="rock"?mR:m==="water"?mW:mF;
+    const band=(za,zb_,m)=>{ za=Math.max(za,zb0); zb_=Math.min(zb_,zTopC); if(zb_<=za+1e-6) return; const pts=[[R.rso,za]]; for(let i=0;i<=24;i++){ const z=za+(zb_-za)*i/24; pts.push([wallIn(P,z)-0.02,z]); } pts.push([R.rso,zb_],[R.rso,za]); lathe(pts,m); };
+    if(FL.m1!=="none") band(zb0,FL.zr,matOf(FL.m1)); if(FL.cvOn) band(FL.zr,FL.zcv,mA);
+    if(P.zf2>P.zc0&&FL.m2!=="none") ring(0,R.rsi-0.02,P.zc0,Math.min(P.zf2,P.ztop),matOf(FL.m2));
+    const F=R.fnd; if(F&&F.sc&&F.sc.on){ const zb=Math.max(P.sbDL-P.zbDL,-P.tg), zt=(P.type==="caisson"?P.cts:P.tb); ring(R.Rbase,F.sc.Ro,zb,zb+P.scF+P.scA,mA); ring(R.Rwide,R.Rbase,zt,zt+P.scA,mA); } }
   const dH=P.hwl-P.zbDL, Rb=R.Rbase;
   if($("water3d").checked){ const g=new THREE.CircleGeometry(Rb*2.6,64); g.rotateX(-PI/2); g.translate(0,dH,0);
     grp.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x3f8fc9,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}))); }
@@ -1179,9 +1251,10 @@ function rbDetail(R,th){
     tag(iA2[0]+(iB2[0]-iA2[0])*0.35,iA2[1]+(iB2[1]-iA2[1])*0.35,`K2 ${rb.kM.bar}@${rb.kM.s} (자오선 내측)`);
     tag(oA2[0]+(oB2[0]-oA2[0])*0.7,oA2[1]+(oB2[1]-oA2[1])*0.7,`K3 ${Ki.bar}@${Ki.s} (자오선 외측)`);
   } else {
-    const T1=D.rows.find(r=>r.mk==="T1"), dt=db(T1.bar), zt1=P.cH-cv-dt/2, zb1=P.cH-P.ctt+cv+dt/2;
-    line(cw+cv,zt1,Rwi+tw-cv,zt1); line(cw+cv,zb1,Rwi-cv,zb1); dots(cw+cv,zt1-dt,Rwi-cv,zt1-dt,T1.s/1000); dots(cw+cv,zb1+dt,Rwi-cv,zb1+dt,T1.s/1000);
-    tag((cw+Rwi)/2,zt1,`T1 ${T1.bar}@${T1.s} (상판, 양면 2방향)`);
+    const T1=D.rows.find(r=>r.mk==="T1");
+    if(T1){ const dt=db(T1.bar), zt1=P.cH-cv-dt/2, zb1=P.cH-P.ctt+cv+dt/2;
+      line(cw+cv,zt1,Rwi+tw-cv,zt1); line(cw+cv,zb1,Rwi-cv,zb1); dots(cw+cv,zt1-dt,Rwi-cv,zt1-dt,T1.s/1000); dots(cw+cv,zb1+dt,Rwi-cv,zb1+dt,T1.s/1000);
+      tag((cw+Rwi)/2,zt1,`T1 ${T1.bar}@${T1.s} (상판, 양면 2방향)`); }
     const R1=D.rows.find(r=>r.mk==="R1"); if(R1){ o.push({t:"poly",L:"HID",pts:[[cw,tb],[Rwi,tb],[Rwi,P.cH-P.ctt],[cw,P.cH-P.ctt]]}); tag((cw+Rwi)/2,(tb+P.cH-P.ctt)/2,`R1·R2 ${R1.bar}@${R1.s} (방사형 격벽, 숨은선)`); }
   }
   // 기둥: 띠철근(점, 바깥) + 축방향 2단(선)
@@ -1262,7 +1335,7 @@ function sheetPrims(R){
     const notes=["치수 단위는 mm이며, 높이는 저판 하면 기준이다.","철근 규격·간격은 부재설계 탭의 검토 결과이며, 철근 번호는 배근 상세도의 철근재료표와 같다.",
       "피복은 철근 표면까지의 순피복이다.","원주 방향 철근의 이음 위치는 서로 엇갈리게 배치한다.",
       `보강 링 배근 상세${cais&&P.cnr>=2?", 격벽 접합부 배근 상세":""}, 철근 가공도, 철근재료표는 배근 상세도를 참조한다.`,
-      ...(cais&&P.cnr>=2?["방사형 격벽 철근(R1·R2)은 하부 슬래브·상판·기둥·외벽에 정착한다."]:[]),
+      ...(cais&&P.cnr>=2?[P.ctt>0?"방사형 격벽 철근(R1·R2)은 하부 슬래브·상판·기둥·외벽에 정착한다.":"방사형 격벽 철근(R1·R2)은 하부 슬래브·기둥·외벽에 정착하고, 상단은 자유단(상판 없음)이다. 기둥 접합면 연결철근(R3)과 하단 인발 철근(R4)은 철근재료표를 따른다."]:[]),
       "정착·이음 길이는 예비값(가정)이며 실시설계에서 KDS 14 20 52에 따라 확인한다."];
     notes.forEach((s2,i)=>{ wrapTxt(s2,2.3*k,150*k).forEach((ln,j)=>{ if(!j) o.push({t:"text",L:"STX",x:x0,z,h:2.3*k,s:`${i+1}.`}); o.push({t:"text",L:"STX",x:x0+5*k,z,h:2.3*k,s:ln}); z-=3.7*k; }); });
   }
@@ -1295,9 +1368,9 @@ function genNotes(R){
   const notes=[
     `치수 단위는 mm, 표고는 DL(약최저저조위 기준, m)이며 구조물 높이는 저판 하면 기준이다.`,
     `콘크리트 fck = ${P.fck} MPa(해양 노출), 철근 SD${P.fy}, 순피복 ${P.cov} mm. 철근 상세는 배근도를 따른다.`,
-    `속채움(단위중량 ${P.gf} kN/m³)은 ${cais?"격실":"원통·원추 내부"} 상단 높이 ${fx(P.zf1,1)} m, 기둥 내부 ${fx(P.zf2,1)} m까지 채운다.`,
-    `저판 하부 그라우팅 두께 ${fx(P.tg*1000,0)} mm. 허용지지력 ${fx(P.qa,0)} kPa는 가정값이며 지반조사 결과로 확인한다.`,
-    rg.length?`보강 링 ${rg.length}개(${P.ringAuto==="1"?`자동 배치: 기둥 하단·벽체 접합부${cais?"·상판 접합부":""}`:"직접 입력"})는 강도 부재가 아니며 최소철근과 연결철근으로 저판·기둥·벽체에 일체화한다.`:`보강 링 없음.`,
+    `속채움: ${cais?"격실":"원통·원추 내부"}은 ${matNm(R.fill.m1)}(${fx(R.fill.g1,1)} kN/m³)${R.fill.m1==="none"?"":` 상단 높이 ${fx(R.fill.zr,1)} m까지`}${R.fill.cvOn?`, 그 위 피복석 ${fx(P.cvT*1000,0)} mm`:""}, 기둥 내부는 ${matNm(R.fill.m2)}(${fx(R.fill.g2,1)} kN/m³)${R.fill.m2==="none"?"":` ${fx(P.zf2,1)} m까지`} 채운다.${R.fill.open?" 개방형 케이슨은 거치 후 위에서 속채움하며, 이웃 격실 채움 높이 차는 "+P.dhRad+" m 이내로 관리한다.":""}`,
+    `기초: 준설 후 자갈 고르기층 ${fx((P.tgb||0)*1000,0)} mm(저판 밖 여유폭 ${fx(P.gbW||0,1)} m)을 깔고 패드 ${P.padN}개로 거치·수평을 맞춘 뒤(허용 ${P.tilt}°) 저판 하부 ${fx(P.tg*1000,0)} mm를 ${P.sk==="skirt"?"스커트 안에 ":P.sk==="bag"?"그라우트 백으로 막고 ":""}그라우트로 채운다.${R.fnd.sc.on?` 둘레에 필터층 ${fx(P.scF*1000,0)} mm + 피복석 ${fx(P.scA*1000,0)} mm(폭 ${fx(P.scB,1)} m)의 세굴방지공을 둔다.`:""} 허용지지력 ${fx(P.qa,0)} kPa는 가정값이며 지반조사 결과로 확인한다.`,
+    rg.length?`보강 링 ${rg.length}개(${P.ringAuto==="1"?`자동 배치: 기둥 하단·벽체 접합부${cais?(P.ctt>0?"·상판 접합부":"·격실 상단 기둥 둘레"):""}`:"직접 입력"})는 강도 부재가 아니며 최소철근과 연결철근으로 저판·기둥·벽체에 일체화한다.`:`보강 링 없음.`,
     `터빈 ${T.name}: 하중 작용점(인터페이스) MSL+${T.ifz} m, 하중표 ${T.uls?(T.scaled?"축척 추정값(제작사 하중으로 교체 필요)":"제작사 값"):"없음(자중만 반영)"}.`,
     `상부 플랫폼·접안시설·J-tube·부속 강재는 이 도면에 표시하지 않는다.`,
   ];
@@ -1320,7 +1393,7 @@ function genSheetPrims(R,noBot){
   o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:k*.2}); o.push({t:"poly",L:"SHT",pts:[[10*k,10*k],[W-10*k,10*k],[W-10*k,H-10*k],[10*k,H-10*k]],w:k*.5});
   // 정면 단면도 (왼쪽)
   const dx=14*k-sx0, dz=H-22*k-sz1;
-  const mono=sp.o.filter(p=>!(p.t==="poly"&&(p.L==="WATER"||p.L==="FILL"))).map(p=>p.t==="poly"&&p.L==="SOIL"?{t:"poly",open:1,L:"SHT",pts:p.pts.slice(1,-1),w:.12}:p);
+  const mono=sp.o.filter(p=>!(p.t==="poly"&&(p.L==="WATER"||p.L==="FILL"||p.L==="RFIL"))).map(p=>p.t==="poly"&&p.L==="SOIL"?{t:"poly",open:1,L:"SHT",pts:p.pts.slice(1,-1),w:.12}:p);
   o.push(...mapPrims(mono,1,dx,dz));
   o.push({t:"text",L:"STX",x:14*k,z:H-15*k,h:3.4*k,s:`정면 단면도   S = 1 : ${sc}`});
   // 평면도 (오른쪽 위)
@@ -1362,10 +1435,13 @@ function genSheetPrims(R,noBot){
     let x=rg.x; for(let i=0;i<n&&left.length;i++){ const cw=rg.w*asp[i]/sa; const sc2=placeCell(o,left[0],x,rg.top,cw-3,rg.h,k,2.0,2); if(sc2){ dsc.push(sc2); left.shift(); } else break; x+=cw; }
     if(ri===0) o0=o.length; });
   // 상단 내측 링 상세: 보강 링 상세와 같은 축척으로 단면도 아래 상세 줄 밑(바깥 아래 구석)에, 설명은 그림 오른쪽
-  if(trM&&!noBot){ const rs=dsc.slice(0,nRg), scT=rs.length?Math.max(...rs):0; let placed=0;
-    if(scT){ let zmin=Infinity; for(let i=oS;i<o0;i++){ const p=o[i]; if(!p) continue; const zs=[p.z,p.z1,p.z2,...(p.pts||[]).map(q=>q[1])].filter(v=>isFinite(v)); if(zs.length&&Math.min(...zs)<(secBot-6)*k) zmin=Math.min(zmin,...zs); }
-      const top=isFinite(zmin)?zmin/k-5:secBot-8, kT=scT/1000, cl=trM(2.0*kT), [a,b,c2,d]=cl.box, hNeed=(d-b)/kT+2.0*3.9+2, wNeed=(c2-a)/kT+4;
-      if(top-10.5>=hNeed&&wNeed<=150){ placeCell(o,trM,14,top,Math.max(wNeed+2,90),top-10.5,k,2.0,0,scT); dsc.push(scT); placed=1;
+  if(trM&&!noBot){ const rs=dsc.slice(0,nRg), sc0=rs.length?Math.max(...rs):0; let placed=0;
+    // 보강 링 상세 중 가장 작은 축척으로, 자리가 모자라면 한두 단계까지만 줄임
+    const cand=sc0?[sc0,...DSCALES.filter(v=>v>sc0).slice(0,2)]:[];
+    let zmin=Infinity; for(let i=oS;i<o0;i++){ const p=o[i]; if(!p) continue; const zs=[p.z,p.z1,p.z2,...(p.pts||[]).map(q=>q[1])].filter(v=>isFinite(v)); if(zs.length&&Math.min(...zs)<(secBot-6)*k) zmin=Math.min(zmin,...zs); }
+    for(const scT of cand){ if(placed) break;
+      const top=isFinite(zmin)?zmin/k-3.5:secBot-8, kT=scT/1000, cl=trM(2.0*kT), [a,b,c2,d]=cl.box, hNeed=(d-b)/kT+2.0*3.9+1.5, wNeed=(c2-a)/kT+4;
+      if(top-8.5>=hNeed&&wNeed<=150){ placeCell(o,trM,14,top,Math.max(wNeed+2,90),top-8.5,k,2.0,0,scT); dsc.push(scT); placed=1;
         let zl=top-2.0*3.9-2.5, xl=14+wNeed+6; cl.lab.forEach(t=>wrapTxt(t,2.0*k,(232-wNeed-8)*k).forEach(ln=>{ o.push({t:"text",L:"STX",x:xl*k,z:zl*k,h:2.0*k,s:ln}); zl-=3.1; })); } }
     if(!placed) return genSheetPrims(R,true); }
   return {o,box:[0,0,W,H],sc,scP,bg:1,over,mono:1,dLeft:left.length,dN:mks.length};
@@ -1487,23 +1563,23 @@ function wallJointCell(R,th,kind,det){
     title=`상세 ${det} — 격벽·${isC?"기둥":"외벽"} 접합부 (평면)`;
   } else { // 격벽 직각 단면: x = 두께 방향, z = 높이(하부 슬래브 상면 0), 가운데 생략
     const h=P.cH-P.ctt-P.cts, show=1.4, gap=0.8, cmp=h>2*show+gap+0.2, Z=z=>!cmp||z<=show?z:z-(h-2*show-gap), hT=Z(h), Wm=Math.max(1.6,tw*2.6);
-    const dS=BARS[rb.sB.bar].d/1000, dT=BARS[distRB(P.ctt).bar].d/1000, eb=Math.min(la,P.cts-cv-2*dS), et=Math.min(la,P.ctt-cv-2*dT), hb=eb<la-1e-6, ht=et<la-1e-6;
+    const op=!(P.ctt>0), dS=BARS[rb.sB.bar].d/1000, dT=op?0:BARS[distRB(P.ctt).bar].d/1000, eb=Math.min(la,P.cts-cv-2*dS), et=op?-cv:Math.min(la,P.ctt-cv-2*dT), hb=eb<la-1e-6, ht=!op&&et<la-1e-6;
     o.push({t:"poly",L:"CONC",pts:[[-tw/2,0],[tw/2,0],[tw/2,Z(show)],[-tw/2,Z(show)]],w:th*.05});
     if(cmp) o.push({t:"poly",L:"CONC",pts:[[-tw/2,Z(h-show)],[tw/2,Z(h-show)],[tw/2,hT],[-tw/2,hT]],w:th*.05});
-    ol([[-Wm,-P.cts],[Wm,-P.cts],[Wm,0],[-Wm,0]]); ol([[-Wm,hT],[Wm,hT],[Wm,hT+P.ctt],[-Wm,hT+P.ctt]]);
-    [[-P.cts,0],[hT,hT+P.ctt]].forEach(([a,b])=>{ brk(-Wm,a,-Wm,b); brk(Wm,a,Wm,b); });
+    ol([[-Wm,-P.cts],[Wm,-P.cts],[Wm,0],[-Wm,0]]); if(!op) ol([[-Wm,hT],[Wm,hT],[Wm,hT+P.ctt],[-Wm,hT+P.ctt]]);
+    (op?[[-P.cts,0]]:[[-P.cts,0],[hT,hT+P.ctt]]).forEach(([a,b])=>{ brk(-Wm,a,-Wm,b); brk(Wm,a,Wm,b); });
     if(cmp){ brk(-tw/2,Z(show),tw/2,Z(show)); brk(-tw/2,Z(h-show),tw/2,Z(h-show)); }
     [-1,1].forEach(f=>{ const x=f*fy; ln(x,-eb,x,Z(show)); if(hb) ln(x,-eb,x+f*hk,-eb); if(cmp){ ln(x,Z(h-show),x,hT+et); } else ln(x,Z(show),x,hT+et); if(ht) ln(x,hT+et,x+f*hk,hT+et); });
     for(let z=cv;z<=h-cv+1e-6;z+=sp1){ if(cmp&&z>show-0.05&&z<h-show+0.05) continue; dot(fy2,Z(z)); dot(-fy2,Z(z)); }
-    dimV(o,-P.cts,0,Wm+th*1.4,th,mm(P.cts)); dimV(o,hT,hT+P.ctt,Wm+th*1.4,th,mm(P.ctt)); dimV(o,0,hT,Wm+th*1.4,th,mm(h)+(cmp?" (중간 생략)":""));
+    dimV(o,-P.cts,0,Wm+th*1.4,th,mm(P.cts)); if(!op) dimV(o,hT,hT+P.ctt,Wm+th*1.4,th,mm(P.ctt)); dimV(o,0,hT,Wm+th*1.4,th,mm(h)+(cmp?" (중간 생략)":""));
     dimH(o,-tw/2,tw/2,hT+P.ctt+th*1.2,th,mm(tw));
-    dimV(o,-eb,0,-fy-th*1.0,th*.8,mm(eb)); dimV(o,hT,hT+et,-fy-th*1.0,th*.8,mm(et));
+    dimV(o,-eb,0,-fy-th*1.0,th*.8,mm(eb)); if(!op) dimV(o,hT,hT+et,-fy-th*1.0,th*.8,mm(et)); else dimV(o,hT+et,hT,-fy-th*1.0,th*.8,mm(cv));
     if(hb) dimH(o,fy,fy+hk,-eb-th*1.0,th*.8,mm(hk)); if(ht) dimH(o,fy,fy+hk,hT+et+th*0.5,th*.8,mm(hk));
     dimV(o,cv,cv+sp1,-tw/2-th*1.0,th*.8,mm(sp1)); dimH(o,-tw/2,-tw/2+cv,Z(show)*0.6,th*.75,mm(cv));
-    o.push({t:"text",L:"TXT",x:-Wm*0.62,z:-P.cts*0.6,h:th*.85,s:"하부 슬래브",anchor:"middle"}); o.push({t:"text",L:"TXT",x:-Wm*0.62,z:hT+P.ctt*0.3,h:th*.85,s:"상판",anchor:"middle"});
+    o.push({t:"text",L:"TXT",x:-Wm*0.62,z:-P.cts*0.6,h:th*.85,s:"하부 슬래브",anchor:"middle"}); if(!op) o.push({t:"text",L:"TXT",x:-Wm*0.62,z:hT+P.ctt*0.3,h:th*.85,s:"상판",anchor:"middle"}); else o.push({t:"text",L:"TXT",x:-Wm,z:hT+th*0.3,h:th*.85,s:"상단 자유 (상판 없음)"});
     tags.push({mk:"R2",x:fy,z:Z(show)*0.7}); tags.push({mk:"R1",x:fy2,z:Z(cv+sp1*Math.max(1,Math.floor((show-cv)/sp1)))});
-    lab.push(`R2 하부 슬래브 정착 ${mm(eb)}${hb?` + 갈고리 ${mm(hk)}`:""}, 상판 정착 ${mm(et)}${ht?` + 갈고리 ${mm(hk)}`:""} (40d = ${mm(la)}, 슬래브 철근 안쪽까지)`);
-    box=[-Wm-th*1.5,-P.cts-th*1.6,Wm+th*6.5,hT+P.ctt+th*2.8]; title=`상세 ${det} — 격벽·슬래브 접합부 (직각 단면)`;
+    lab.push(op?`R2 하부 슬래브 정착 ${mm(eb)}${hb?` + 갈고리 ${mm(hk)}`:""} (40d = ${mm(la)}), 위 끝은 격벽 상단에서 피복 ${mm(cv)} 아래`:`R2 하부 슬래브 정착 ${mm(eb)}${hb?` + 갈고리 ${mm(hk)}`:""}, 상판 정착 ${mm(et)}${ht?` + 갈고리 ${mm(hk)}`:""} (40d = ${mm(la)}, 슬래브 철근 안쪽까지)`);
+    box=[-Wm-th*1.5,-P.cts-th*1.6,Wm+th*6.5,hT+P.ctt+th*2.8]; title=`상세 ${det} — 격벽·${op?"하부 ":""}슬래브 접합부 (직각 단면)`;
   }
   // 철근 번호 원표시 (오른쪽)
   const tx=box[2]-th*2.4; tags.sort((a,b)=>b.z-a.z).forEach((t,i)=>{ const tz=box[3]-th*3.5-i*th*2.6; o.push({t:"line",L:"DIM",x1:t.x,z1:t.z,x2:tx-th*0.1,z2:tz,w:th*.04}); o.push({t:"dot",L:"DIM",x:t.x,z:t.z,r:th*.18}); o.push({t:"circle",L:"DIM",x:tx+th*0.9,z:tz,r:th*1.0}); o.push({t:"text",L:"DIM",x:tx+th*0.9,z:tz-th*0.32,h:th*.7,s:t.mk,anchor:"middle"}); });
@@ -1530,7 +1606,7 @@ function clipPoly(pts,x0,x1,z0,z1){ let out=pts; const edge=(inside,cut)=>{ cons
   edge(q=>q[0]>=x0,(A,B)=>cx(A,B,x0)); if(out.length) edge(q=>q[0]<=x1,(A,B)=>cx(A,B,x1)); if(out.length) edge(q=>q[1]>=z0,(A,B)=>cz(A,B,z0)); if(out.length) edge(q=>q[1]<=z1,(A,B)=>cz(A,B,z1)); return out; }
 function wallSecCell(R,th,rebar,bg){
   const P=R.P, cro=R.S.hex?R.S.hex.flats/2:R.rso, cri=R.S.hex?cro-P.hth:R.rsi, Rw=P.cDw/2, Rwi=Rw-P.ctw, o=[], x0=rebar?0:Math.max(0,cri-0.8), x1=Math.max(Rw+0.8,R.Rbase), z0=0, z1=P.cH+0.8; // 오른쪽은 하부 슬래브 끝까지
-  if(!bg) { clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,P.cts); clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop); clipRect(o,x0,x1,z0,z1,Rwi,Rw,P.cts,P.cH); clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH); }
+  if(!bg) { clipRect(o,x0,x1,z0,z1,0,R.Rbase,0,P.cts); clipRect(o,x0,x1,z0,z1,cri,cro,P.zc0,P.ztop); clipRect(o,x0,x1,z0,z1,Rwi,Rw,P.cts,P.cH); if(P.ctt>0) clipRect(o,x0,x1,z0,z1,cro,Rwi,P.cH-P.ctt,P.cH); }
   if(!bg) o.push({t:"poly",L:"CONC",pts:[[cro,P.cts],[Rwi,P.cts],[Rwi,P.cH-P.ctt],[cro,P.cH-P.ctt]],w:th*.12});
   else { // 격벽만 채움, 보강 링과 겹치는 부분은 공제(높이 구간으로 나눠 링 폭을 뺀 띠로 채움)
     const h0=P.cts, h1=P.cH-P.ctt, rg=(P.rings||[]).filter(r=>r.D>0&&r.t>0&&r.h>0), zs=[...new Set([h0,h1,...rg.flatMap(r=>[r.z,r.z+r.h]).filter(z=>z>h0&&z<h1)])].sort((a,b)=>a-b);
@@ -1543,9 +1619,9 @@ function wallSecCell(R,th,rebar,bg){
     const bk=cro-cri; o.push({t:"poly",open:1,L:"SHT",w:.05,pts:[[cri-bk*.3,z1],[cri+bk*.3,z1],[cri+bk*.45,z1+bk*.25],[cri+bk*.55,z1-bk*.25],[cri+bk*.7,z1],[cro+bk*.3,z1]]}); }
   if(x0>1e-6){ const e=Math.min(0.25,P.cts*0.25), zm=P.cts/2, bl=[[x0,-e],[x0,zm-e],[x0-e,zm-e*0.3],[x0+e,zm+e*0.3],[x0,zm+e],[x0,P.cts+e]]; // 파단선(왼쪽은 잘라서 그림)
     for(let i=1;i<bl.length;i++) o.push({t:"line",L:"CONC",x1:bl[i-1][0],z1:bl[i-1][1],x2:bl[i][0],z2:bl[i][1],w:th*.08}); }
-  dimH(o,cro,Rwi,-th*1.8,th,mm(Rwi-cro)); dimV(o,P.cts,P.cH-P.ctt,x1+th*1.4,th,mm(P.cH-P.ctt-P.cts)); dimV(o,0,P.cts,x1+th*1.4,th,mm(P.cts)); dimV(o,P.cH-P.ctt,P.cH,x1+th*1.4,th,mm(P.ctt));
+  dimH(o,cro,Rwi,-th*1.8,th,mm(Rwi-cro)); dimV(o,P.cts,P.cH-P.ctt,x1+th*1.4,th,mm(P.cH-P.ctt-P.cts)); dimV(o,0,P.cts,x1+th*1.4,th,mm(P.cts)); if(P.ctt>0) dimV(o,P.cH-P.ctt,P.cH,x1+th*1.4,th,mm(P.ctt));
   o.push({t:"text",L:"TXT",x:(cro+Rwi)/2,z:(P.cts+P.cH-P.ctt)/2,h:th,s:"격벽",anchor:"middle"});
-  let lab=[`높이 ${mm(P.cH-P.ctt-P.cts)} (하부 슬래브 위 ~ 상판 아래)`,`길이 ${mm(Rwi-cro)} (기둥 외면 ~ 외벽 내면)`];
+  let lab=[`높이 ${mm(P.cH-P.ctt-P.cts)} (하부 슬래브 위 ~ ${P.ctt>0?"상판 아래":"격벽 상단, 상판 없음"})`,`길이 ${mm(Rwi-cro)} (기둥 외면 ~ 외벽 내면)`];
   if(rebar){ const D=R.M.qty.detail, r1=D.rows.find(r=>r.mk==="R1"); if(r1){ const cv=P.cov/1000, d=BARS[r1.bar].d/1000, sp=r1.s/1000, la=Math.ceil(40*d*10)/10;
       const ln=(a,b,c,d2)=>o.push({t:"line",L:"RB",x1:a,z1:b,x2:c,z2:d2,w:th*.14});
       for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) ln(cro-Math.min(la,cro-cri-cv),z,Rwi+Math.min(la,P.ctw-cv),z);
@@ -1554,7 +1630,7 @@ function wallSecCell(R,th,rebar,bg){
       { const zs=[], xs=[]; for(let z=P.cts+cv;z<=P.cH-P.ctt-cv+1e-6;z+=sp) zs.push(z); for(let x=cro+cv;x<=Rwi-cv+1e-6;x+=sp) xs.push(x);
         const h=P.cH-P.ctt-P.cts, tx=x1+th*4.2, tg=[{mk:"R1",x:cro+(Rwi-cro)*0.62,z:zs[Math.floor(zs.length*0.7)]||P.cts+h*0.7,tz:P.cts+h*0.62},{mk:"R2",x:xs[Math.floor(xs.length*0.88)]||Rwi-0.5,z:P.cts+h*0.3,tz:P.cts+h*0.38}];
         tg.forEach(t=>{ o.push({t:"line",L:"DIM",x1:t.x,z1:t.z,x2:tx-th*0.1,z2:t.tz,w:th*.04}); o.push({t:"dot",L:"DIM",x:t.x,z:t.z,r:th*.18}); o.push({t:"circle",L:"DIM",x:tx+th*0.9,z:t.tz,r:th*1.0,w:th*.05}); o.push({t:"text",L:"DIM",x:tx+th*0.9,z:t.tz-th*0.32,h:th*.7,s:t.mk,anchor:"middle"}); }); }
-      lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·상판·기둥·외벽에 40d(부재 두께 이내)`]); } }
+      lab=D.rows.filter(r=>/^R/.test(r.mk)).map(r=>`${r.mk} ${r.bar}@${r.s} ${r.face}`).concat([`정착: 하부 슬래브·${P.ctt>0?"상판·":""}기둥·외벽에 40d(부재 두께 이내)${P.ctt>0?"":", 상단 자유단"}`]); } }
   if(bg){ const ol=[]; bg.forEach(p=>{ const q=clipPoly(p.pts,x0,x1,z0,z1); if(q.length<3) return; const cut=q.findIndex((v,j)=>Math.abs(v[1]-z1)<1e-9&&Math.abs(q[(j+1)%q.length][1]-z1)<1e-9); const W=.07; if(cut<0) ol.push({t:"poly",open:1,L:"SHT",pts:[...q,q[0]],w:W}); else ol.push({t:"poly",open:1,L:"SHT",pts:[...q.slice(cut+1),...q.slice(0,cut+1)],w:W}); }); o.unshift(...ol.slice(0,0)); const iF=o.reduce((m,p,i)=>p.t==="poly"&&p.L==="CFIL"?i:m,-1); o.splice(iF+1,0,...ol); } // 배근도: 위 상세와 같은 단면 외곽선(채움 없음)을 격벽 채움 위에, 철근은 그 위에
   return {o,box:[x0,-th*3,x1+th*(rebar?6.5:2.4),z1],lab,title:`단면 A-A — 방사형 격벽${rebar?" 배근":""}`};
 }
@@ -1659,13 +1735,13 @@ function htmlMember(){
 하중계수: 토압 ${P.gH},  풍·파랑·조류 ${P.gE},  터빈 ULS 1.0 (제작사 하중계수 포함 가정),  저판 반력 1.2 × 지반반력 − 0.9 × 자중</div>`;
   if(!M.ok) h+=`<p class="warn">N.G 부재가 있습니다. 왼쪽 "최적 배근 자동 계산"을 누르면 철근을 다시 고르고, 철근으로 안 되는 부재는 두께를 키웁니다.</p>`;
   h+=`<h3>1. 저판</h3><div class="eq">지배 조합 ${S.gov}: 지반반력 q = ${fx(S.qSoil,1)} kN/m²
-저판 위 유효 자중 w = (γ<sub>c</sub> − γ<sub>w</sub>)·t + (γ<sub>f</sub> − γ<sub>w</sub>)·h<sub>f</sub> = (${P.gc} − ${P.gw})×${fx(S.t,2)} + (${P.gf} − ${P.gw})×${fx(S.hFill,2)} = ${fx(S.wDead,1)} kN/m²
+저판 위 유효 자중 w = (γ<sub>c</sub> − γ<sub>w</sub>)·t + γ′<sub>속채움</sub>·h<sub>f</sub>${S.hCv>0?" + γ′<sub>피복석</sub>·h<sub>피복</sub>":""} = (${P.gc} − ${P.gw})×${fx(S.t,2)} + ${fx(S.gsub1,2)}×${fx(S.hFill,2)}${S.hCv>0?` + ${fx(S.gsubC,2)}×${fx(S.hCv,2)}`:""} = ${fx(S.wDead,1)} kN/m²
 설계 순반력 q<sub>u</sub> = 1.2 × ${fx(S.qSoil,1)} − 0.9 × ${fx(S.wDead,1)} = ${fx(S.qu,1)} kN/m²  (사용 ${fx(S.qs,1)})
 경간 L = ${isFinite(S.La)?`min(반경 방향 ${fx(S.Lr,2)}, 격벽 간격 ${fx(S.La,2)})`:`벽 안쪽 ~ 기둥 바깥 ${fx(S.Lr,2)}`} = ${fx(S.L,2)} m, 양단 고정 1방향 슬래브로 근사
 지점 M = q<sub>u</sub>L²/12 = ${fx(S.Msup,1)},  중앙 M = q<sub>u</sub>L²/24 = ${fx(S.Mmid,1)} kN·m/m${S.heel>0?`,  뒷굽(${fx(S.heel,2)} m) M = q·c²/2 = ${fx(S.Mheel,1)}`:""},  V = ${fx(S.V,1)} kN/m</div>`;
   h+=flexRows(M.sT,rb.sT,"상면 (경간 중앙"+(S.heel>0?" · 뒷굽":"")+")")+flexRows(M.sB,rb.sB,"하면 (벽체·기둥 지점부)");
-  h+=`<h3>2. 하부 벽체 (${P.type==="caisson"?"케이슨 외벽":"원통"})</h3><div class="eq">속채움 정지토압 계수 K₀ = 1 − sin ${P.phiF}° = ${fx(W.K0,3)},  수중단위중량 γ′ = ${P.gf} − ${P.gw} = ${fx(W.gsub,2)} kN/m³
-하단 수평압 p = K₀·γ′·h = ${fx(W.K0,3)} × ${fx(W.gsub,2)} × ${fx(W.h,2)} = ${fx(W.p0s,2)} kN/m² (계수 ${P.gH} → ${fx(W.p0,2)})
+  h+=`<h3>2. 하부 벽체 (${P.type==="caisson"?"케이슨 외벽":"원통"})</h3><div class="eq">속채움(${matNm(R.fill.m1)}) 정지토압 계수 K₀ = 1 − sin ${P.phiF}° = ${fx(W.K0,3)},  수중단위중량 γ′ = ${fx(R.fill.g1,2)} − ${P.gw} = ${fx(W.gsub,2)} kN/m³
+하단 수평압 p = K₀·${W.hCv>0?"(γ′·h + γ′<sub>피복석</sub>·h<sub>피복</sub>)":"γ′·h"} = ${fx(W.K0,3)} × ${W.hCv>0?`(${fx(W.gsub,2)} × ${fx(W.hR,2)} + ${fx(W.gsubC,2)} × ${fx(W.hCv,2)})`:`${fx(W.gsub,2)} × ${fx(W.h,2)}`} = ${fx(W.p0s,2)} kN/m² (계수 ${P.gH} → ${fx(W.p0,2)})
 원주 인장 T = p·r = ${fx(W.p0,2)} × ${fx(W.r,3)} = ${fx(W.Tu,1)} kN/m  (사용 ${fx(W.Ts,1)})
 하단 고정 연직 휨 M = p/(2β²),  β = [3(1−ν²)/(r²t²)]<sup>1/4</sup> = ${fx(W.beta,4)} → M = ${fx(W.Mu,1)} kN·m/m</div>`;
   if(W.p0<=0) h+=`<p class="note">속채움이 물(γ ≤ γ<sub>w</sub>)이라 안팎 수압이 같아 벽체 원주 인장이 생기지 않습니다. 최소철근으로 배근합니다.</p>`;
@@ -1686,10 +1762,37 @@ P<sub>u</sub> = V<sub>터빈</sub> + 0.9 × (기둥 자중 ${fx(C.Wabove,0)} −
   <tr><td>최소철근비</td><td class="fm">ρ = A<sub>st</sub>/A<sub>g</sub></td><td class="n">${fx(c.rho*100,2)} %</td><td class="n">≥ 0.5 %</td><td>${okt(c.okMin)}</td></tr>
   </tbody></table></div>
   <p class="note">피로(터빈 반복하중에 의한 철근 응력 진폭), 프리스트레스, 터빈 앵커 연결부 상세는 포함하지 않았습니다. 벽체·원추는 속채움 토압만 고려했고 파랑 국부압은 빠져 있습니다.</p>`;
+  if(P.type==="caisson") h+=htmlRad(K?5:4);
   h+=`<h3>철근재료표</h3><div class="tblwrap"><table class="t"><thead><tr><th>번호</th><th>부재 · 위치</th><th>규격</th><th>간격 (mm)</th><th>개수</th><th>길이 (m)</th><th>총길이 (m)</th><th>중량 (t)</th></tr></thead><tbody>${M.qty.detail.rows.map(r=>`<tr><td>${r.mk}</td><td class="l">${r.nm} ${r.face}</td><td>${r.bar}</td><td class="n">${r.s}</td><td class="n">${fx(r.n,0)}</td><td class="n">${fx(r.L,2)}</td><td class="n">${fx(r.tot,0)}</td><td class="n">${fx(r.kg/1000,2)}</td></tr>`).join("")}<tr class="tot"><td colspan="7" class="l">합계 (콘크리트 1 m³당 ${fx(M.qty.perM3,0)} kg, 이음·할증 제외)</td><td class="n">${fx(M.qty.tot/1000,2)}</td></tr></tbody></table></div>
   <p class="note">저판은 원형 면적에 X·Y 직교 그물로, 원주 철근은 한 바퀴 길이로 셌습니다. 이음 길이와 할증은 들어 있지 않습니다. 원추 자오선 철근은 위로 갈수록 둘레가 줄어 개수를 0.75배로 셌습니다.</p>`;
   return h;
 }
+/* 개방형 케이슨 격벽 검토 + 격벽 개수 추천 */
+function htmlRad(no){
+  const P=R.P, M=R.M, r=M.rad, ok=b=>okt(b);
+  let h=`<h3>${no}. 방사형 격벽 ${P.ctt>0?"(상판 있음)":"(개방형 — 버팀벽)"}</h3>`;
+  if(P.ctt>0) h+=`<p>상판(두께 ${P.ctt} m)이 있어 기둥 모멘트를 상판·하부 슬래브 짝힘으로 넘깁니다. 격벽은 배력철근으로 배근합니다(상판 두께를 0으로 하면 개방형 검토).</p>`;
+  else if(!r) h+=`<p class="warn">격벽이 없어 개방형 검토를 할 수 없습니다.</p>`;
+  else if(r.few) h+=`<p class="warn">격벽 ${r.n}개로는 모든 방향의 기둥 모멘트를 받을 수 없습니다. 3개 이상 필요합니다.</p>`;
+  else { h+=`<div class="eq">상판이 없으므로 기둥 하단(케이슨 상단) 계수 모멘트 M<sub>u</sub> = ${fx(r.Mu,0)} kN·m, 전단 V<sub>u</sub> = ${fx(r.Vu,0)} kN을 격벽 ${r.n}개가 받는다고 봄 (가정, 단순 모형)
+격벽 높이 h = ${fx(r.h,2)} m, 길이 L = ${fx(r.Lr,2)} m, 두께 t = ${r.ctr} m,  Σcos²θ = n/2 = ${fx(r.sc,1)}
+① 기둥–격벽 접합면 연직 전단 F = M<sub>u</sub> / (r × Σcos²θ) = ${fx(r.Mu,0)} / (${fx(r.ro,3)} × ${fx(r.sc,1)}) = ${fx(r.F,0)} kN (격벽 1개 최대)
+   상한 ϕV<sub>n,max</sub> = ϕ × min(0.2f<sub>ck</sub>, 3.3 + 0.08f<sub>ck</sub>, 11) × t × h = 0.75 × ${fx(r.vMax,2)} × ${r.ctr} × ${fx(r.h,2)} × 1000 = ${fx(r.phi*r.VnMax,0)} kN ${ok(r.okJ)}
+   전단마찰 철근 A<sub>vf</sub> = F / (ϕ·μ·f<sub>y</sub>) = ${fx(r.F,0)} × 1000 / (0.75 × 1.4 × ${P.fy}) = ${fx(r.Avf,0)} mm² → 높이 1 m당 ${fx(r.avf,0)} mm² → ${r.jb.bar} @ ${r.jb.s} 양면 (R3)
+② 격벽 하단 인발 (기둥 쪽 끝 → 저판) A<sub>s</sub> = F / (0.85·f<sub>y</sub>) = ${fx(r.AsT,0)} mm² → ${r.tieBar} ${r.nTie}본 (R4, 저판 하부철근까지 정착)
+③ 면내 수평 전단 V = V<sub>u</sub> / Σcos²θ = ${fx(r.Vi,0)} kN ≤ ϕV<sub>c</sub> = 0.75 × (1/6)√${P.fck} × ${r.ctr} × 0.8 × ${fx(r.Lr,2)} × 10⁶/1000 = ${fx(r.phiVc,0)} kN ${ok(r.okV)}
+④ 면외 휨 (시공 중 이웃 격실 채움 높이 차 Δh = ${P.dhRad} m, 가정): p = K₀·γ′·Δh = ${fx(r.K0,3)} × ${fx(r.gs,2)} × ${P.dhRad} = ${fx(r.dp,2)} kN/m²
+   M = min(캔틸레버 p·h<sub>f</sub>²/2 = ${fx(r.Mc,1)}, 수평 고정보 p·L²/12 = ${fx(r.Mb,1)}) = ${fx(r.Ms,1)} kN·m/m (계수 ${P.gH} → ${fx(r.Mu2,1)})
+   ${r.okB?`→ ${r.rbB.bar} @ ${r.rbB.s} 양면 (R1) ${ok(true)}`:`→ 두께 ${r.ctr} m로는 철근으로 안 됨 (필요 두께 ${isFinite(r.tReqB)?fx(r.tReqB,2):"> 1.5"} m) ${ok(false)}`}
+필요 두께 = max(①, ③${r.okB?"":", ④"}) = ${isFinite(r.tReq)?fx(r.tReq,3):"—"} m ${ok(r.ok)}</div>
+  <p class="note">상판이 없는 개방형은 기둥 모멘트가 격벽을 거쳐 저판으로 갑니다. 기둥이 격벽 없이 혼자 받는 몫은 안전 쪽으로 빼고, 격벽이 모두 받는다고 봤습니다. 판 거동·응력 집중은 실시설계에서 유한요소해석으로 확인하세요.</p>`; }
+  // 격벽 개수 추천
+  if(!R.radCnt) R.radCnt=radCountTable(P);
+  const T=R.radCnt, cur=Math.round(P.cnr);
+  h+=`<h4>격벽 개수 추천</h4><p>개수만 바꿔 같은 조건으로 다시 계산했습니다 (철근은 개수마다 다시 골라 비교, 기둥 하단은 개수와 무관해서 제외). ${T.best?`<b>모든 검토를 만족하는 가장 적은 개수는 ${T.best.n}개</b>입니다${T.best.n<cur?` — 지금 ${cur}개에서 ${T.best.n}개로 줄여도 됩니다`:T.best.n>cur?` — 지금 ${cur}개로는 부족합니다`:" (지금 개수)"}.`:`이 범위에서 모든 검토를 만족하는 개수가 없습니다. 저판·격벽 두께를 키워 보세요.`}</p>
+  <div class="tblwrap"><table class="t"><thead><tr><th>개수</th><th>외벽 쪽 격벽 간격 (m)</th><th>저판·벽체 (철근으로)</th>${T.open?"<th>격벽 검토 (두께 "+P.ctr+" m)</th><th>필요 격벽 두께 (m)</th>":""}<th>콘크리트 (m³)</th><th>철근 (t)</th></tr></thead><tbody>${T.rows.map(x=>`<tr class="${x.cur?"gov":""}"><td class="n">${x.n}${x.cur?" (현재)":""}${T.best&&x.n===T.best.n?" ★":""}</td><td class="n">${fx(x.La,2)}</td><td>${x.failO.length?`<span class="bad-t">N.G</span> ${x.failO.join(", ")}`:'<span class="ok-t">O.K</span>'}</td>${T.open?`<td>${x.rc.ok?'<span class="ok-t">O.K</span>':'<span class="bad-t">N.G</span>'}</td><td class="n">${x.tMin!=null?fx(x.tMin,2):"> 1.5"}</td>`:""}<td class="n">${fx(x.Vc,0)}</td><td class="n">${fx(x.steel,1)}</td></tr>`).join("")}</tbody></table></div>
+  <p class="note">격벽이 적을수록 저판 경간(격벽 사이)이 길어져 저판 휨이 커지고, 개방형은 격벽 1개가 받는 힘이 커집니다. ★ = 추천. 철근량은 개수마다 다시 고른 최적 배근 기준입니다.</p>`;
+  return h; }
 $("btnRbF").addEventListener("click",()=>doRbOpt("freq"));
 $("btnRbA").addEventListener("click",()=>doRbOpt("auto"));
 $("btnRbT").addEventListener("click",()=>doRbOpt("thk"));
