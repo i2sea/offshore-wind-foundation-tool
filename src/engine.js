@@ -248,11 +248,13 @@ function fndCalc(P,c){
   const sc={on:on(P.scOn),ds,k:WN.k,L:WN.L,Um0,ucAvg,Ub,ar,Dst,KC,Ucw,A,B,S,Brec,Dl};
   if(sc.on){ /* 단면: 윗면은 앞굽 위 높이(저판 윗면 + 피복석 두께, 해저면 위 피복석 두께보다 낮지 않게)로 외벽 면에서 폭 끝까지 수평 → 바깥 끝에서 1:n 사선 한 번으로 필터층까지 */
     const Ro=c.Rbase+P.scB, n=P.scS>0?P.scS:2, zb=Math.max(P.sbDL-P.zbDL,-P.tg), zF=zb+P.scF, zA=zF+P.scA, zt=c.zbs, tA=Math.max(zA,zt+P.scA);
-    const x1=Ro, Re=Ro+n*(tA-zF);
-    const top=r=>r<=Ro?tA:Math.max(zF,tA-(r-Ro)/n), bot=r=>r<c.Rbase?zt:zF;
-    let Va=0; const N=400; for(let i=0;i<N;i++){ const r=c.Rwide+(Re-c.Rwide)*(i+.5)/N, h=Math.max(0,top(r)-bot(r)); Va+=2*PI*r*h*(Re-c.Rwide)/N; }
-    Object.assign(sc,{Ro,Re,n,zb,zF,zA,zt,tA,x1,Var:Va,Vfi:PI*(Re*Re-c.Rbase**2)*P.scF,
-      prof:[[c.Rwide,zt],[c.Rwide,tA],[Ro,tA],[Re,zF],[c.Rbase,zF],[c.Rbase,zt]]});
+    /* 필터층은 피복석 밑을 따라가고, 끝은 피복석 비탈과 나란히(피복석 두께만큼 아래) 같은 1:n 경사로 해저면까지 */
+    const x1=Ro, Re=Ro+n*(tA-zb), fA=Math.max(zF,tA-P.scA), Rf0=Ro+n*(fA-zF), Rf=Ro+n*(fA-zb);
+    const fTop=r=>r<=Rf0?zF:Math.max(zb,fA-(r-Ro)/n), top=r=>r<=Ro?tA:Math.max(zb,tA-(r-Ro)/n), bot=r=>r<c.Rbase?zt:fTop(r);
+    let Va=0, Vf=0; const N=400; for(let i=0;i<N;i++){ const r=c.Rwide+(Re-c.Rwide)*(i+.5)/N, dr=(Re-c.Rwide)/N; Va+=2*PI*r*Math.max(0,top(r)-bot(r))*dr; if(r>=c.Rbase) Vf+=2*PI*r*Math.max(0,fTop(r)-zb)*dr; }
+    Object.assign(sc,{Ro,Re,Rf,n,zb,zF,zA,zt,tA,x1,Var:Va,Vfi:Vf,
+      Rf0,prof:[[c.Rwide,zt],[c.Rwide,tA],[Ro,tA],[Re,zb],[Rf,zb],[Rf0,zF],[c.Rbase,zF],[c.Rbase,zt]],
+      fprof:[[c.Rbase,zb],[Rf,zb],[Rf0,zF],[c.Rbase,zF]]});
     sc.okT=P.scA>=ar.t2-1e-9; sc.okB=P.scB>=Brec-1e-9; sc.ok=sc.okT&&sc.okB;
     if(!sc.okT) warns.push(`세굴방지공 피복석 두께 ${P.scA} m가 소요 두께 2D = ${ar.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${ar.D.toFixed(2)} m).`);
     if(!sc.okB) warns.push(`세굴방지공 폭 ${P.scB} m가 권장 폭 ${Brec.toFixed(1)} m보다 좁습니다.`); }

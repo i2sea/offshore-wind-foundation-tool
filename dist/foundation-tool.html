@@ -918,11 +918,13 @@ function fndCalc(P,c){
   const sc={on:on(P.scOn),ds,k:WN.k,L:WN.L,Um0,ucAvg,Ub,ar,Dst,KC,Ucw,A,B,S,Brec,Dl};
   if(sc.on){ /* 단면: 윗면은 앞굽 위 높이(저판 윗면 + 피복석 두께, 해저면 위 피복석 두께보다 낮지 않게)로 외벽 면에서 폭 끝까지 수평 → 바깥 끝에서 1:n 사선 한 번으로 필터층까지 */
     const Ro=c.Rbase+P.scB, n=P.scS>0?P.scS:2, zb=Math.max(P.sbDL-P.zbDL,-P.tg), zF=zb+P.scF, zA=zF+P.scA, zt=c.zbs, tA=Math.max(zA,zt+P.scA);
-    const x1=Ro, Re=Ro+n*(tA-zF);
-    const top=r=>r<=Ro?tA:Math.max(zF,tA-(r-Ro)/n), bot=r=>r<c.Rbase?zt:zF;
-    let Va=0; const N=400; for(let i=0;i<N;i++){ const r=c.Rwide+(Re-c.Rwide)*(i+.5)/N, h=Math.max(0,top(r)-bot(r)); Va+=2*PI*r*h*(Re-c.Rwide)/N; }
-    Object.assign(sc,{Ro,Re,n,zb,zF,zA,zt,tA,x1,Var:Va,Vfi:PI*(Re*Re-c.Rbase**2)*P.scF,
-      prof:[[c.Rwide,zt],[c.Rwide,tA],[Ro,tA],[Re,zF],[c.Rbase,zF],[c.Rbase,zt]]});
+    /* 필터층은 피복석 밑을 따라가고, 끝은 피복석 비탈과 나란히(피복석 두께만큼 아래) 같은 1:n 경사로 해저면까지 */
+    const x1=Ro, Re=Ro+n*(tA-zb), fA=Math.max(zF,tA-P.scA), Rf0=Ro+n*(fA-zF), Rf=Ro+n*(fA-zb);
+    const fTop=r=>r<=Rf0?zF:Math.max(zb,fA-(r-Ro)/n), top=r=>r<=Ro?tA:Math.max(zb,tA-(r-Ro)/n), bot=r=>r<c.Rbase?zt:fTop(r);
+    let Va=0, Vf=0; const N=400; for(let i=0;i<N;i++){ const r=c.Rwide+(Re-c.Rwide)*(i+.5)/N, dr=(Re-c.Rwide)/N; Va+=2*PI*r*Math.max(0,top(r)-bot(r))*dr; if(r>=c.Rbase) Vf+=2*PI*r*Math.max(0,fTop(r)-zb)*dr; }
+    Object.assign(sc,{Ro,Re,Rf,n,zb,zF,zA,zt,tA,x1,Var:Va,Vfi:Vf,
+      Rf0,prof:[[c.Rwide,zt],[c.Rwide,tA],[Ro,tA],[Re,zb],[Rf,zb],[Rf0,zF],[c.Rbase,zF],[c.Rbase,zt]],
+      fprof:[[c.Rbase,zb],[Rf,zb],[Rf0,zF],[c.Rbase,zF]]});
     sc.okT=P.scA>=ar.t2-1e-9; sc.okB=P.scB>=Brec-1e-9; sc.ok=sc.okT&&sc.okB;
     if(!sc.okT) warns.push(`세굴방지공 피복석 두께 ${P.scA} m가 소요 두께 2D = ${ar.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${ar.D.toFixed(2)} m).`);
     if(!sc.okB) warns.push(`세굴방지공 폭 ${P.scB} m가 권장 폭 ${Brec.toFixed(1)} m보다 좁습니다.`); }
@@ -2731,7 +2733,7 @@ function secPrims(R){
   if(F.sk) both([[R.Rbase-P.skT,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,0],[R.Rbase-P.skT,0]],"CONC");
   // 세굴방지공: 필터층(해저면 위) + 피복석 (저판 앞굽 위까지 덮음)
   if(F.bf) both(F.bf.poly,"GRAV");   // 준설 자리 되메움(필터재)
-  if(F.sc&&F.sc.on){ const S=F.sc; both([[R.Rbase,S.zb],[S.Re,S.zb],[S.Re,S.zF],[R.Rbase,S.zF]],"GRAV"); both(S.prof,"ROCK"); }
+  if(F.sc&&F.sc.on){ const S=F.sc; both(S.fprof,"GRAV"); both(S.prof,"ROCK"); }
   const cw=R.S.hex?R.S.hex.flats/2:rso, ci=R.S.hex?R.S.hex.flats/2-P.hth:rsi;
   // 속채움
   const FL=R.fill||{zr:P.zf1,zcv:P.zf1,m1:"sand",m2:"sand"}, LM=m=>m==="rock"?"RFIL":m==="water"?"WATER":"FILL";
@@ -3116,8 +3118,9 @@ S = ${S.KC>S.B?`1.3·D·[1 − exp(−A(KC − B))] = ${fx(S.S,2)} m`:`0 (KC ${f
   <tr><td class="l">피복석 두께</td><td class="n">${P.scA} m</td><td class="n">≥ ${fx(S.ar.t2,2)} m</td><td>${ok(S.okT)}</td></tr>
   <tr><td class="l">폭 (저판 가장자리에서)</td><td class="n">${P.scB} m</td><td class="n">≥ ${fx(S.Brec,1)} m</td><td>${ok(S.okB)}</td></tr>
   <tr><td class="l">필터층</td><td class="n">${P.scF} m</td><td class="l">입도 필터 규칙</td><td>—</td></tr></tbody></table></div>
-  <div class="eq">단면: 윗면 z = ${fx(S.tA,2)} m(저판 윗면 + 피복석 두께)로 외벽 면에서 폭 끝 r = ${fx(S.Ro,2)} m까지 수평 → 1:${S.n} 사선 한 번으로 r = ${fx(S.Re,2)} m에서 필터층 위(z = ${fx(S.zF,2)} m). 저판 밖 피복석 두께 = ${fx(S.tA-S.zF,2)} m
-수량: 필터층 π × (${fx(S.Re,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF} = ${fx(S.Vfi,1)} m³,  피복석 = 단면 회전 적분 ∫2πr·h(r)dr = ${fx(S.Var,1)} m³</div>`;
+  <div class="eq">단면: 윗면 z = ${fx(S.tA,2)} m(저판 윗면 + 피복석 두께)로 외벽 면에서 폭 끝 r = ${fx(S.Ro,2)} m까지 수평 → 1:${S.n} 사선 한 번으로 r = ${fx(S.Re,2)} m에서 해저면(z = ${fx(S.zb,2)} m). 저판 밖 피복석 두께 = ${fx(S.tA-S.zF,2)} m
+필터층: 두께 ${P.scF} m, 피복석 밑을 따라 r = ${fx(S.Rf0,2)} m까지 간 뒤 피복석 비탈과 나란히(피복석 두께 ${P.scA} m 아래) 1:${S.n}로 r = ${fx(S.Rf,2)} m에서 해저면
+수량: 필터층 = 단면 회전 적분 ${fx(S.Vfi,1)} m³,  피복석 = 단면 회전 적분 ∫2πr·h(r)dr = ${fx(S.Var,1)} m³</div>`;
   return h; }
 function htmlWt(){
   const P=R.P, I=R.inst;
@@ -3154,7 +3157,7 @@ function htmlQty(){
   ${R.fnd.bf?`<tr><td class="l">준설 자리 되메움 (필터재)</td><td>저판 밖 ~ 준설 비탈 끝</td><td class="n">${fx(R.fnd.bf.V,3)}</td><td>m³</td><td class="fm">고르기층 윗면 ~ 해저면, 회전 적분</td></tr>`:""}
   <tr><td class="l">저판 하부 그라우트</td><td>두께 ${P.tg} m</td><td class="n">${fx(R.grout,3)}</td><td>m³</td><td class="fm">π × ${fx(R.Rbase,3)}² × ${P.tg}</td></tr>
   <tr><td class="l">거치용 콘크리트 패드</td><td>${P.padB}×${P.padB}×${P.padH} m</td><td class="n">${fx(R.pad,3)}</td><td>m³</td><td class="fm">${P.padN}개 × ${P.padB}² × ${P.padH}</td></tr>
-  ${R.fnd.sc.on?`<tr><td class="l">세굴방지공 필터층</td><td>두께 ${P.scF} m, 폭 ${P.scB} m</td><td class="n">${fx(R.fnd.sc.Vfi,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Re,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF}</td></tr>
+  ${R.fnd.sc.on?`<tr><td class="l">세굴방지공 필터층</td><td>두께 ${P.scF} m, 폭 ${P.scB} m</td><td class="n">${fx(R.fnd.sc.Vfi,3)}</td><td>m³</td><td class="fm">단면(수평 + 바깥 끝 1:${R.fnd.sc.n} 사선) 회전 적분</td></tr>
   <tr><td class="l">세굴방지공 피복석</td><td>두께 ${P.scA} m, 소요 지름 ${fx(R.fnd.sc.ar.D,2)} m 이상</td><td class="n">${fx(R.fnd.sc.Var,3)}</td><td>m³</td><td class="fm">단면(외벽 면 ~ 폭 끝 수평 + 바깥 1:${R.fnd.sc.n} 사선) 회전 적분</td></tr>`:""}
   </tbody></table></div><p class="note">콘크리트 강도 ${P.fck} MPa.</p>`;
   h+=`<h3>철근 (개략)</h3><div class="tblwrap"><table class="t"><thead><tr><th>부위</th><th>수량 (t)</th></tr></thead><tbody>`;
@@ -3468,7 +3471,7 @@ function build3D(){
     const band=(za,zb_,m)=>{ za=Math.max(za,zb0); zb_=Math.min(zb_,zTopC); if(zb_<=za+1e-6) return; const pts=[[R.rso,za]]; for(let i=0;i<=24;i++){ const z=za+(zb_-za)*i/24; pts.push([wallIn(P,z)-0.02,z]); } pts.push([R.rso,zb_],[R.rso,za]); lathe(pts,m); };
     if(FL.m1!=="none") band(zb0,FL.zr,matOf(FL.m1)); if(FL.cvOn) band(FL.zr,FL.zcv,mA);
     if(P.zf2>P.zc0&&FL.m2!=="none") ring(0,R.rsi-0.02,P.zc0,Math.min(P.zf2,P.ztop),matOf(FL.m2));
-    const F=R.fnd; if(F&&F.sc&&F.sc.on){ const S=F.sc; lathe([...S.prof,S.prof[0]],mA); ring(R.Rbase,S.Re,S.zb,S.zF,mA); } }
+    const F=R.fnd; if(F&&F.sc&&F.sc.on){ const S=F.sc; lathe([...S.prof,S.prof[0]],mA); lathe([...S.fprof,S.fprof[0]],mA); } }
   const dH=P.hwl-P.zbDL, Rb=R.Rbase;
   if($("water3d").checked){ const g=new THREE.CircleGeometry(Rb*2.6,64); g.rotateX(-PI/2); g.translate(0,dH,0);
     grp.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x3f8fc9,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}))); }
