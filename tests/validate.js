@@ -2,7 +2,7 @@
 // (현장 자료로 기존 계산서 값을 재현하는 검증은 저장소 밖의 비공개 자료 폴더에 따로 있습니다.)
 const fs=require("fs"), path=require("path"), vm=require("vm");
 const src=["engine.js","member.js","mono.js","pile.js","jacket.js"].map(f=>fs.readFileSync(path.join(__dirname,"..","src",f),"utf8")).join("\n").replace(/^if\(typeof module!=="undefined"\).*$/m,"");
-const ctx={Math,console}; vm.createContext(ctx); vm.runInContext(src+"\nthis.E={upgradeP,fndCalc,radCheck,radCountTable,memberForces,compute,DEF,mfCM,waveNumber,froyaU0,froya,memberDesign,optimizeAll,optimizeMember,optimizeMemberFreq,computeMono,computePile,pileFE,sandCoef,beamFreq,monoFreq,TURB_PRESETS,computeJacket,frameAssemble,frameSolve,tubCheck,compute};",ctx);
+const ctx={Math,console}; vm.createContext(ctx); vm.runInContext(src+"\nthis.E={upgradeP,fndCalc,fndRec,radCheck,radCountTable,memberForces,compute,DEF,mfCM,waveNumber,froyaU0,froya,memberDesign,optimizeAll,optimizeMember,optimizeMemberFreq,computeMono,computePile,pileFE,sandCoef,beamFreq,monoFreq,TURB_PRESETS,computeJacket,frameAssemble,frameSolve,tubCheck,compute};",ctx);
 const E=ctx.E; let fail=0;
 const near=(name,got,exp,tol)=>{ const ok=Math.abs(got-exp)<=tol; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} ${name}: ${got.toFixed(3)} (기대 ${exp} ± ${tol})`); };
 /* 터빈 하중 이동 · 파랑 */
@@ -47,6 +47,9 @@ for(const ty of ["jk4","jk3"]){ const J=E.computeJacket({...E.DEF,type:ty}); J.L
   near("해저면 파랑 수립자 속도 πH/T/sinh(kd) (m/s)",S.Um0,Math.PI*P.Hw/P.Tw/Math.sinh(S.k*S.ds),1e-9);
   const C2=E.memberForces(R).col, r=E.radCheck(P,R,C2,P.ctr,12); near("격벽 접합면 연직 전단 F = Mu/(r·n/2) (kN)",r.F,C2.Mu/(R.rso*6),1e-6);
   near("패드 압력 = (γc−γw)(Vc+V스커트)/(n·B²) (kN/m²)",R.fnd.qPad,(P.gc-P.gw)*(R.Vc+R.fnd.Vsk)/(P.padN*P.padB**2),1e-6);
+  { const rc=E.fndRec(P,R.fnd), a=rc.find(x=>x.k==="scA"), n=rc.find(x=>x.k==="padN"), Q2=E.compute({...P,...Object.fromEntries(rc.map(x=>[x.k,x.rec]))});
+    near("추천 피복석 두께 = 2D를 0.1 m 올림",a.rec,Math.ceil(S.ar.t2/0.1-1e-9)*0.1,1e-9);
+    const ok=Q2.fnd.sc.ok&&Q2.fnd.okPad&&(!Q2.fnd.cv||Q2.fnd.cv.ok)&&Q2.P.tg>=Q2.fnd.tgReq-1e-9; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 기초 추천값 적용 후 피복석·폭·패드·그라우트 모두 만족 (패드 ${n.rec}개)`); }
   const T=E.radCountTable(P); console.log(`${T.best?"OK  ":"FAIL"} 격벽 개수 추천: ${T.best?T.best.n+"개":"없음"} (${T.rows.map(x=>x.n+(x.ok?"○":"×")).join(" ")})`); if(!T.best) fail++; }
 { const old={...E.DEF,type:"caisson",ctt:0.5,gf:19,phiF:30}; delete old.f1m; delete old.sk; const u=E.upgradeP(old);
   const ok=u.f1m==="user"&&u.gf2===19&&u.phi2===30&&u.cvT===0&&u.sk==="none"&&u.scOn===old.scOn; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 예전 설계 파일: 두 구역에 같은 단위중량·φ, 피복석·스커트 없음 (세굴방지공은 표시)`); }

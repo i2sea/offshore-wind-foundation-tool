@@ -266,6 +266,17 @@ function fndCalc(P,c){
     if(!cv.ok) warns.push(`격실 위 피복석 두께 ${f.cvT} m가 소요 두께 2D = ${r.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${r.D.toFixed(2)} m).`); }
   return {bf,Rg,Vgb,Vgr,tgReq,sk,Vsk,Wsk,Wsub0,Apad,qPad,qPadA,okPad,pLim,pAllow,dTop,sc,cv,warns};
 }
+/* 기초 최적값 추천: 검토를 만족하는 가장 작은 값 (올림 단위: 두께 0.1 m, 폭 0.5 m, 그라우트·스커트 0.05 m)
+   필터층 최소 0.3 m(가정, 필터재 2층), 패드 개수 ≥ 3 */
+function fndRec(P,F){ const up=(v,u)=>+(Math.ceil(v/u-1e-9)*u).toFixed(3), out=[];
+  const add=(k,nm,cur,rec,why)=>out.push({k,nm,cur,rec,why,chg:Math.abs(cur-rec)>1e-9});
+  const tgR=up(F.tgReq,0.05); if(P.sk&&P.sk!=="none") add("tg","그라우트 두께",P.tg,tgR,`패드 높이 ${P.padH} + 고르기 허용오차 ${P.gbTol}`);
+  if(F.sk) add("skH","스커트 높이",P.skH,up(Math.max(P.tg,P.sk!=="none"?tgR:P.tg)+0.2,0.05),"그라우트 두께 + 근입 0.2 m (가정)");
+  if(P.padB>0){ const n=Math.max(3,Math.ceil(F.Wsub0/(F.qPadA*P.padB**2)-1e-9)); add("padN","거치 패드 개수",P.padN,n,`수중 중량 ${F.Wsub0.toFixed(0)} kN / (단기 허용 ${F.qPadA.toFixed(0)} × ${P.padB}²)`); }
+  const S=F.sc; if(S.on){ add("scA","세굴방지공 피복석 두께",P.scA,up(S.ar.t2,0.1),`2D = 2 × ${S.ar.D.toFixed(3)} m`); add("scB","세굴방지공 폭",P.scB,up(S.Brec,0.5),"max(1.5 × S × cot30°, 5 m)");
+    add("scF","필터층 두께",P.scF,0.3,"필터재 2층 최소 (가정)"); }
+  if(F.cv) add("cvT","격실 위 피복석 두께",P.cvT,up(F.cv.t2,0.1),`2D = 2 × ${F.cv.D.toFixed(3)} m`);
+  return out; }
 function compute(P){
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};
   const warns=[];
@@ -521,4 +532,4 @@ function towTable(P){
 }
 /*MEMBER*/
 /*ENGINE END*/
-if(typeof module!=="undefined") module.exports={cdsOf,compute,DEF,upgradeP,FILLMAT,fndCalc,towTable,mfCM,waveNumber,froya,froyaU0,TURB_PRESETS,turbLoads,hexProps};
+if(typeof module!=="undefined") module.exports={cdsOf,compute,DEF,upgradeP,FILLMAT,fndCalc,fndRec,towTable,mfCM,waveNumber,froya,froyaU0,TURB_PRESETS,turbLoads,hexProps};
