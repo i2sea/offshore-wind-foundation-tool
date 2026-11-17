@@ -5,7 +5,7 @@ const dl=v=>`DL(${v>=0?"+":"−"})${fx(Math.abs(v),3)}`;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
 const NUM=["Db","tb","Dw","tw","hw","hk","Dt","tkh","cDs","cts","cDw","ctw","cH","ctt","cnr","ctr","Dc","tc","tcT","ha","hth","hhn","zc0","ztop","Dp","tp","trB","trT","trH","trB","trT","trH",
-  "zf1","zf2","gf","gc","gf2","phi2","cvT","dhRad","fbMin","tgb","gbW","gbTol","skH","skT","scB","scF","scA","Ss","gAr","scAmp","isbC","zbDL","sbDL","emb","yIfD","hwl","dhw","dlw","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
+  "zf1","zf2","gf","gc","gf2","phi2","cvT","dhRad","fbMin","tgb","gbW","gbTol","skH","skT","scB","scF","scA","scS","Ss","gAr","scAmp","isbC","zbDL","sbDL","emb","yIfD","hwl","dhw","dlw","msl","gw","tg","f1","fmar","vtip","rpmR","gG","gNu","Uref","zref","Cs","Tavg","Hw","Tw","airGap","Uc","Uce","wcf","d0w","ks","kh","kfac",
   "mu","qa","tilt","aeff","fck","fy","cov","kcr","phiF","gH","gE","fsO1","fsS1","fsO2","fsS2","fsO3","fsS3","qf3","dTow","ukc","gmMin","zcut","zbal","Wadd","zadd","padN","padB","padH",
   "mD","mDt","mzA","mzB","mtop","mL","mz1","mz2","mt1","mt2","mt3","mca","mfy","mgM","mgs","mgE","mtTP","mgap","mWsec","mgg","mDrG","mDrL","mScK","mScT","mScS","mmg","mRot","mFSc","mFSu",
   "jWb","jWt","jN","jRat","jTPh","jStub","jDir","jLD","jLt","jBrD","jBrt","jMbD","jMbt","jMg","jfy","jgM","jgE","jWtp","jWsec","jPD","jPt","jPL","jScK","jScT","jScS"];
@@ -405,9 +405,7 @@ function secPrims(R){
   o.push({t:"poly",L:"GROUT",pts:[[-R.Rbase,-P.tg],[R.Rbase,-P.tg],[R.Rbase,0],[-R.Rbase,0]]});
   if(F.sk) both([[R.Rbase-P.skT,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,0],[R.Rbase-P.skT,0]],"CONC");
   // 세굴방지공: 필터층(해저면 위) + 피복석 (저판 앞굽 위까지 덮음)
-  if(F.sc&&F.sc.on){ const zb=Math.max(zSB,-P.tg), zF=zb+P.scF, zA=zF+P.scA, zt=(P.type==="caisson"?P.cts:P.tb), Rw=R.Rwide, Rb=R.Rbase, Ro=Rb+P.scB, tA=Math.max(zA,zt+P.scA);
-    both([[Rb,zb],[Ro+2*P.scA,zb],[Ro+2*P.scA,zF],[Rb,zF]],"GRAV");
-    both([[Rw,zt],[Rw,tA],[Rb+Math.max(0,tA-zA)*2,tA],[Rb+Math.max(0,tA-zA)*2,zA],[Ro,zA],[Ro+2*P.scA,zF],[Rb,zF],[Rb,zt]],"ROCK"); }
+  if(F.sc&&F.sc.on){ const S=F.sc; both([[R.Rbase,S.zb],[S.Re,S.zb],[S.Re,S.zF],[R.Rbase,S.zF]],"GRAV"); both(S.prof,"ROCK"); }
   const cw=R.S.hex?R.S.hex.flats/2:rso, ci=R.S.hex?R.S.hex.flats/2-P.hth:rsi;
   // 속채움
   const FL=R.fill||{zr:P.zf1,zcv:P.zf1,m1:"sand",m2:"sand"}, LM=m=>m==="rock"?"RFIL":m==="water"?"WATER":"FILL";
@@ -454,7 +452,7 @@ function secPrims(R){
   o.push({t:"text",L:"TXT",x:xL+.3,z:zSB-fs*1.4,h:fs*.85,s:`해저면 ${dl(P.sbDL)}`});
   // 표고
   const lev=(z,x)=>{ o.push({t:"line",L:"TXT",x1:x-1-fs*5.2,z1:z,x2:x+.6,z2:z}); o.push({t:"tri",L:"TXT",x,z,s:.6}); o.push({t:"text",L:"TXT",x:x-1,z:z+.35,h:fs*.75,s:dl(z+P.zbDL),anchor:"end",num:1}); };
-  lev(0,-R.Rbase-1); lev(wt,-R.Rwide-1); if(P.type==="cone") lev(z2,-P.Dt/2-1); lev(P.ztop,-Math.max(P.Dp/2,cw)-1);
+  { const S=R.fnd&&R.fnd.sc; if(S&&S.on){ const x=-S.Re-1; lev(0,x); o.push({t:"line",L:"TXT",x1:x,z1:0,x2:-R.Rbase,z2:0,w:.05}); } else lev(0,-R.Rbase-1); } lev(wt,-R.Rwide-1); if(P.type==="cone") lev(z2,-P.Dt/2-1); lev(P.ztop,-Math.max(P.Dp/2,cw)-1);
   // 터빈 인터페이스
   o.push({t:"text",L:"MUT",x:Math.max(P.Dp/2,cw)+1,z:R.zIf,h:fs*.7,s:`◀ 터빈 하중 작용 MSL+${R.T.ifz}`});
   // 치수
@@ -791,7 +789,8 @@ S = ${S.KC>S.B?`1.3·D·[1 − exp(−A(KC − B))] = ${fx(S.S,2)} m`:`0 (KC ${f
   <tr><td class="l">피복석 두께</td><td class="n">${P.scA} m</td><td class="n">≥ ${fx(S.ar.t2,2)} m</td><td>${ok(S.okT)}</td></tr>
   <tr><td class="l">폭 (저판 가장자리에서)</td><td class="n">${P.scB} m</td><td class="n">≥ ${fx(S.Brec,1)} m</td><td>${ok(S.okB)}</td></tr>
   <tr><td class="l">필터층</td><td class="n">${P.scF} m</td><td class="l">입도 필터 규칙</td><td>—</td></tr></tbody></table></div>
-  <div class="eq">수량: 필터층 π × (${fx(S.Ro,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF} = ${fx(S.Vfi,1)} m³,  피복석 π × (${fx(S.Ro,3)}² − ${fx(R.Rwide,3)}²) × ${P.scA} = ${fx(S.Var,1)} m³ (저판 앞굽 위 포함)</div>`;
+  <div class="eq">단면: 윗면 z = ${fx(S.tA,2)} m(저판 윗면 + 피복석 두께)로 외벽 면에서 폭 끝 r = ${fx(S.Ro,2)} m까지 수평 → 1:${S.n} 사선 한 번으로 r = ${fx(S.Re,2)} m에서 필터층 위(z = ${fx(S.zF,2)} m). 저판 밖 피복석 두께 = ${fx(S.tA-S.zF,2)} m
+수량: 필터층 π × (${fx(S.Re,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF} = ${fx(S.Vfi,1)} m³,  피복석 = 단면 회전 적분 ∫2πr·h(r)dr = ${fx(S.Var,1)} m³</div>`;
   return h; }
 function htmlWt(){
   const P=R.P, I=R.inst;
@@ -827,8 +826,8 @@ function htmlQty(){
   ${P.tgb>0?`<tr><td class="l">자갈 고르기층</td><td>두께 ${P.tgb} m, 여유폭 ${P.gbW} m</td><td class="n">${fx(R.fnd.Vgb,3)}</td><td>m³</td><td class="fm">π × ${fx(R.fnd.Rg,3)}² × ${P.tgb}</td></tr>`:""}
   <tr><td class="l">저판 하부 그라우트</td><td>두께 ${P.tg} m</td><td class="n">${fx(R.grout,3)}</td><td>m³</td><td class="fm">π × ${fx(R.Rbase,3)}² × ${P.tg}</td></tr>
   <tr><td class="l">거치용 콘크리트 패드</td><td>${P.padB}×${P.padB}×${P.padH} m</td><td class="n">${fx(R.pad,3)}</td><td>m³</td><td class="fm">${P.padN}개 × ${P.padB}² × ${P.padH}</td></tr>
-  ${R.fnd.sc.on?`<tr><td class="l">세굴방지공 필터층</td><td>두께 ${P.scF} m, 폭 ${P.scB} m</td><td class="n">${fx(R.fnd.sc.Vfi,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Ro,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF}</td></tr>
-  <tr><td class="l">세굴방지공 피복석</td><td>두께 ${P.scA} m, 소요 지름 ${fx(R.fnd.sc.ar.D,2)} m 이상</td><td class="n">${fx(R.fnd.sc.Var,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Ro,3)}² − ${fx(R.Rwide,3)}²) × ${P.scA} (앞굽 위 포함, 비탈 제외)</td></tr>`:""}
+  ${R.fnd.sc.on?`<tr><td class="l">세굴방지공 필터층</td><td>두께 ${P.scF} m, 폭 ${P.scB} m</td><td class="n">${fx(R.fnd.sc.Vfi,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Re,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF}</td></tr>
+  <tr><td class="l">세굴방지공 피복석</td><td>두께 ${P.scA} m, 소요 지름 ${fx(R.fnd.sc.ar.D,2)} m 이상</td><td class="n">${fx(R.fnd.sc.Var,3)}</td><td>m³</td><td class="fm">단면(외벽 면 ~ 폭 끝 수평 + 바깥 1:${R.fnd.sc.n} 사선) 회전 적분</td></tr>`:""}
   </tbody></table></div><p class="note">콘크리트 강도 ${P.fck} MPa.</p>`;
   h+=`<h3>철근 (개략)</h3><div class="tblwrap"><table class="t"><thead><tr><th>부위</th><th>수량 (t)</th></tr></thead><tbody>`;
   R.M.qty.rows.forEach(r=>h+=`<tr><td class="l">${r.nm}</td><td class="n">${fx(r.kg/1000,2)}</td></tr>`);
@@ -1141,7 +1140,7 @@ function build3D(){
     const band=(za,zb_,m)=>{ za=Math.max(za,zb0); zb_=Math.min(zb_,zTopC); if(zb_<=za+1e-6) return; const pts=[[R.rso,za]]; for(let i=0;i<=24;i++){ const z=za+(zb_-za)*i/24; pts.push([wallIn(P,z)-0.02,z]); } pts.push([R.rso,zb_],[R.rso,za]); lathe(pts,m); };
     if(FL.m1!=="none") band(zb0,FL.zr,matOf(FL.m1)); if(FL.cvOn) band(FL.zr,FL.zcv,mA);
     if(P.zf2>P.zc0&&FL.m2!=="none") ring(0,R.rsi-0.02,P.zc0,Math.min(P.zf2,P.ztop),matOf(FL.m2));
-    const F=R.fnd; if(F&&F.sc&&F.sc.on){ const zb=Math.max(P.sbDL-P.zbDL,-P.tg), zt=(P.type==="caisson"?P.cts:P.tb); ring(R.Rbase,F.sc.Ro,zb,zb+P.scF+P.scA,mA); ring(R.Rwide,R.Rbase,zt,zt+P.scA,mA); } }
+    const F=R.fnd; if(F&&F.sc&&F.sc.on){ const S=F.sc; lathe([...S.prof,S.prof[0]],mA); ring(R.Rbase,S.Re,S.zb,S.zF,mA); } }
   const dH=P.hwl-P.zbDL, Rb=R.Rbase;
   if($("water3d").checked){ const g=new THREE.CircleGeometry(Rb*2.6,64); g.rotateX(-PI/2); g.translate(0,dH,0);
     grp.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x3f8fc9,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}))); }

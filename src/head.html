@@ -578,12 +578,13 @@ svg [data-k]:hover{fill:var(--bad)}
       <div class="f" data-for-gsc><label for="scB">폭 (저판 가장자리에서)</label><input id="scB" type="number" step="0.5"></div>
       <div class="f" data-for-gsc><label for="scF">필터층 두께</label><input id="scF" type="number" step="0.05"></div>
       <div class="f" data-for-gsc><label for="scA">피복석 두께</label><input id="scA" type="number" step="0.1"></div>
+      <div class="f" data-for-gsc><label for="scS">비탈 경사 (1 : n)</label><input id="scS" type="number" step="0.5" min="1"></div>
       <div class="f"><label for="Ss">돌 비중</label><input id="Ss" type="number" step="0.01"></div>
       <div class="f"><label for="gAr">피복석 포화 단위중량 (kN/m³)</label><input id="gAr" type="number" step="0.1"></div>
       <div class="f"><label for="scAmp">구조물 둘레 유속 증폭</label><input id="scAmp" type="number" step="0.1"></div>
       <div class="f"><label for="isbC">Isbash 계수 C</label><input id="isbC" type="number" step="0.01"></div>
     </div>
-    <p class="hint">피복석 크기는 해저면 유속(선형파 수립자 속도 + 조류 × 증폭)으로 Isbash식에서 구하고 두께는 2층(2D) 이상으로 봅니다. 증폭 1.5, C 0.86(난류 큼), 비중 2.65, 단위중량 20 kN/m³는 가정입니다. 세굴 깊이와 권장 폭은 '기초 · 세굴' 탭에 나옵니다.</p>
+    <p class="hint">피복석 크기는 해저면 유속(선형파 수립자 속도 + 조류 × 증폭)으로 Isbash식에서 구하고 두께는 2층(2D) 이상으로 봅니다. 증폭 1.5, C 0.86(난류 큼), 비중 2.65, 단위중량 20 kN/m³, 비탈 1:2는 가정입니다. 피복석 윗면은 앞굽 위 높이로 외벽 면에서 폭 끝까지 수평이고, 바깥 끝을 사선 한 번으로 마무리합니다. 세굴 깊이와 권장 폭은 '기초 · 세굴' 탭에 나옵니다.</p>
   </fieldset>
 </form>
 </aside>

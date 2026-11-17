@@ -43,7 +43,7 @@ const DEF={
   dTow:15,ukc:1.0,gmMin:0.5,fbMin:1.5,Wadd:0,zadd:0,zcut:0,zbal:0,padN:12,padB:3.0,padH:0.5,
   // 기초: 해저면 고르기층(자갈) · 그라우트 · 스커트 · 세굴방지공 (값은 가정)
   tgb:0.5,gbW:3.0,gbTol:0.1,sk:"skirt",skH:1.0,skT:0.3,
-  scOn:"1",scB:10,scF:0.5,scA:2.5,Ss:2.65,gAr:20,scAmp:1.5,isbC:0.86,
+  scOn:"1",scB:10,scF:0.5,scA:2.5,scS:2,Ss:2.65,gAr:20,scAmp:1.5,isbC:0.86,
 };
 /* 속채움 재료 기본값 (가정): γ 포화 단위중량 kN/m³, φ 내부마찰각 ° */
 const FILLMAT={rock:{nm:"사석",g:20,phi:40},sand:{nm:"모래",g:19,phi:30},water:{nm:"물 (해수)",g:10.1,phi:0},none:{nm:"없음",g:0,phi:0},user:{nm:"직접 입력"}};
@@ -242,7 +242,13 @@ function fndCalc(P,c){
   const Dst=2*c.Rwide, KC=Um0*P.Tw/Dst, Ucw=ucAvg/(ucAvg+Um0), A=0.03+0.75*Ucw**2.6, B=6*Math.exp(-4.7*Ucw), S=KC>B?1.3*Dst*(1-Math.exp(-A*(KC-B))):0;
   const cot=1/Math.tan(30*PI/180), Brec=Math.max(1.5*S*cot,5.0);
   const sc={on:on(P.scOn),ds,k:WN.k,L:WN.L,Um0,ucAvg,Ub,ar,Dst,KC,Ucw,A,B,S,Brec,Dl};
-  if(sc.on){ const Ro=c.Rbase+P.scB; sc.Var=PI*(Ro*Ro-c.Rwide**2)*P.scA; sc.Vfi=PI*(Ro*Ro-c.Rbase**2)*P.scF; sc.Ro=Ro;
+  if(sc.on){ /* 단면: 윗면은 앞굽 위 높이(저판 윗면 + 피복석 두께, 해저면 위 피복석 두께보다 낮지 않게)로 외벽 면에서 폭 끝까지 수평 → 바깥 끝에서 1:n 사선 한 번으로 필터층까지 */
+    const Ro=c.Rbase+P.scB, n=P.scS>0?P.scS:2, zb=Math.max(P.sbDL-P.zbDL,-P.tg), zF=zb+P.scF, zA=zF+P.scA, zt=c.zbs, tA=Math.max(zA,zt+P.scA);
+    const x1=Ro, Re=Ro+n*(tA-zF);
+    const top=r=>r<=Ro?tA:Math.max(zF,tA-(r-Ro)/n), bot=r=>r<c.Rbase?zt:zF;
+    let Va=0; const N=400; for(let i=0;i<N;i++){ const r=c.Rwide+(Re-c.Rwide)*(i+.5)/N, h=Math.max(0,top(r)-bot(r)); Va+=2*PI*r*h*(Re-c.Rwide)/N; }
+    Object.assign(sc,{Ro,Re,n,zb,zF,zA,zt,tA,x1,Var:Va,Vfi:PI*(Re*Re-c.Rbase**2)*P.scF,
+      prof:[[c.Rwide,zt],[c.Rwide,tA],[Ro,tA],[Re,zF],[c.Rbase,zF],[c.Rbase,zt]]});
     sc.okT=P.scA>=ar.t2-1e-9; sc.okB=P.scB>=Brec-1e-9; sc.ok=sc.okT&&sc.okB;
     if(!sc.okT) warns.push(`세굴방지공 피복석 두께 ${P.scA} m가 소요 두께 2D = ${ar.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${ar.D.toFixed(2)} m).`);
     if(!sc.okB) warns.push(`세굴방지공 폭 ${P.scB} m가 권장 폭 ${Brec.toFixed(1)} m보다 좁습니다.`); }
