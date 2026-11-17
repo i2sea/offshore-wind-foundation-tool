@@ -65,7 +65,7 @@ fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 4px;m
 .igt{font:inherit;font-size:12px;padding:5px 9px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--muted);cursor:pointer}
 .igt[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
 fieldset.gOff{display:none}
-.fillrow{clear:both;margin:0 0 6px}.fillrow>b{display:block;font-size:12px;margin:2px 0 4px}
+.fillcols{clear:both;display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 0 6px}.fillcol{display:flex;flex-direction:column;gap:8px;padding:0 10px 0 0;min-width:0}.fillcol+.fillcol{border-left:1px solid var(--line);padding:0 0 0 10px}.fillcol>b{font-size:12px;margin:2px 0 0}
 legend{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:0;margin-bottom:6px;float:left;width:100%}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;clear:both}
 .f{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -392,28 +392,23 @@ svg [data-k]:hover{fill:var(--bad)}
     <p class="hint" id="ringNote"></p>
   </fieldset>
   <fieldset data-g="shape" data-cat="grav">
-    <legend>속채움 · 재료</legend>
-    <div class="fillrow"><b>격실 (저판 위)</b>
-      <div class="grid2">
+    <legend>속채움</legend>
+    <div class="fillcols">
+      <div class="fillcol"><b>격실 (저판 위)</b>
         <div class="f"><label for="f1m">재료</label><select id="f1m"><option value="rock">사석</option><option value="sand">모래</option><option value="water">물 (해수)</option><option value="none">없음</option><option value="user">직접 입력</option></select></div>
-        <div class="f"><label for="zf1">채움 상단 높이 (저판 하면 기준)</label><input id="zf1" type="number" step="0.1"></div>
+        <div class="f"><label for="zf1">채움 상단 높이</label><input id="zf1" type="number" step="0.1"></div>
         <div class="f"><label for="gf">포화 단위중량 (kN/m³)</label><input id="gf" type="number" step="0.1"></div>
         <div class="f"><label for="phiF">내부마찰각 (°)</label><input id="phiF" type="number" step="1"></div>
-        <div class="f" data-cvt><label for="cvT">격실 위 피복석 두께 (0 = 없음)</label><input id="cvT" type="number" step="0.1" min="0"></div>
+        <div class="f" data-cvt><label for="cvT">위 피복석 두께 (0 = 없음)</label><input id="cvT" type="number" step="0.1" min="0"></div>
       </div>
-    </div>
-    <div class="fillrow"><b>기둥 내부</b>
-      <div class="grid2">
+      <div class="fillcol"><b>기둥 내부</b>
         <div class="f"><label for="f2m">재료</label><select id="f2m"><option value="rock">사석</option><option value="sand">모래</option><option value="water">물 (해수)</option><option value="none">없음</option><option value="user">직접 입력</option></select></div>
-        <div class="f"><label for="zf2">채움 상단 높이 (저판 하면 기준)</label><input id="zf2" type="number" step="0.1"></div>
+        <div class="f"><label for="zf2">채움 상단 높이</label><input id="zf2" type="number" step="0.1"></div>
         <div class="f"><label for="gf2">포화 단위중량 (kN/m³)</label><input id="gf2" type="number" step="0.1"></div>
         <div class="f"><label for="phi2">내부마찰각 (°)</label><input id="phi2" type="number" step="1"></div>
       </div>
     </div>
-    <div class="grid2">
-      <div class="f"><label for="gc">콘크리트 단위중량 (kN/m³)</label><input id="gc" type="number" step="0.1"></div>
-    </div>
-    <p class="hint">재료를 고르면 단위중량·내부마찰각 기본값(가정)이 들어갑니다: 사석 20 kN/m³·40°, 모래 19·30°, 물 10.1. 바꾸면 '직접 입력'이 됩니다. 채움 높이가 격실 높이를 넘으면 격실 상단까지만 채웁니다. 개방형 케이슨은 사석 위에 피복석을 덮고(두께만큼 사석 상단이 내려감), 채우지 않은 격실 공간은 해수로 찹니다.</p>
+    <p class="hint">재료를 고르면 단위중량·내부마찰각 기본값(가정)이 들어갑니다: 사석 20 kN/m³·40°, 모래 19·30°, 물 10.1. 바꾸면 '직접 입력'이 됩니다. 채움 높이는 저판 하면 기준이며, 격실 높이를 넘으면 격실 상단까지만 채웁니다. 개방형 케이슨은 사석 위에 피복석을 덮고(두께만큼 사석 상단이 내려감), 채우지 않은 격실 공간은 해수로 찹니다.</p>
   </fieldset>
   <fieldset data-g="env">
     <legend>설치 위치 · 수위 (DL 기준)</legend>
@@ -527,6 +522,7 @@ svg [data-k]:hover{fill:var(--bad)}
     <div id="rbInputs"></div>
     <div class="grid2" style="margin-top:8px">
       <div class="f"><label for="fck">콘크리트 f<sub>ck</sub> (MPa)</label><input id="fck" type="number" step="1"></div>
+      <div class="f"><label for="gc">콘크리트 단위중량 (kN/m³)</label><input id="gc" type="number" step="0.1"></div>
       <div class="f"><label for="fy">철근 f<sub>y</sub> (MPa)</label><input id="fy" type="number" step="100"></div>
       <div class="f"><label for="cov">순피복 (mm, 해양 노출)</label><input id="cov" type="number" step="5"></div>
       <div class="f"><label for="kcr">균열 κ<sub>cr</sub> (건조 280, 그 외 210)</label><input id="kcr" type="number" step="10"></div>
