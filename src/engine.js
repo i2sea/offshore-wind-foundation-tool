@@ -261,9 +261,12 @@ function fndCalc(P,c){
   else if(S>0.5) warns.push(`세굴방지공이 없습니다. 추정 세굴 깊이 ${S.toFixed(2)} m.`);
   // 격실 위 피복석
   let cv=null; const f=c.fill;
-  if(f&&f.cvOn){ const zTop=f.zcv+(P.zbDL-P.sbDL), uw=um(zTop), uc=ucAt(zTop), U=uw+uc, r=isb(U);   // 격실 안은 외벽이 막아 둘레 증폭 없음 (가정)
-    cv={zTop,uw,uc,U,...r,t:f.cvT,ok:f.cvT>=r.t2-1e-9};
-    if(!cv.ok) warns.push(`격실 위 피복석 두께 ${f.cvT} m가 소요 두께 2D = ${r.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${r.D.toFixed(2)} m).`); }
+  /* 개방형 케이슨에 사석·모래를 채우면 위가 드러나므로 피복석이 필요 — 두께 0이어도 소요값을 계산해 경고 */
+  const needCv=f&&f.open&&(f.m1==="rock"||f.m1==="sand"||f.m1==="user")&&f.Vf1>0;
+  if(f&&(f.cvOn||needCv)){ const zTop=(f.cvOn?f.zcv:f.zr)+(P.zbDL-P.sbDL), uw=um(zTop), uc=ucAt(zTop), U=uw+uc, r=isb(U);   // 격실 안은 외벽이 막아 둘레 증폭 없음 (가정)
+    const t=f.cvOn?f.cvT:0; cv={zTop,uw,uc,U,...r,t,ok:t>=r.t2-1e-9,missing:!f.cvOn};
+    if(cv.missing) warns.push(`개방형 격실 속채움 위에 피복석이 없습니다. 드러난 속채움이 파랑·조류에 흩어질 수 있습니다 (소요 두께 2D = ${r.t2.toFixed(2)} m, 소요 지름 ${r.D.toFixed(2)} m).`);
+    else if(!cv.ok) warns.push(`격실 위 피복석 두께 ${f.cvT} m가 소요 두께 2D = ${r.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${r.D.toFixed(2)} m).`); }
   return {bf,Rg,Vgb,Vgr,tgReq,sk,Vsk,Wsk,Wsub0,Apad,qPad,qPadA,okPad,pLim,pAllow,dTop,sc,cv,warns};
 }
 /* 기초 최적값 추천: 검토를 만족하는 가장 작은 값 (올림 단위: 두께 0.1 m, 폭 0.5 m, 그라우트·스커트 0.05 m)
@@ -275,7 +278,7 @@ function fndRec(P,F){ const up=(v,u)=>+(Math.ceil(v/u-1e-9)*u).toFixed(3), out=[
   if(P.padB>0){ const n=Math.max(3,Math.ceil(F.Wsub0/(F.qPadA*P.padB**2)-1e-9)); add("padN","거치 패드 개수",P.padN,n,`수중 중량 ${F.Wsub0.toFixed(0)} kN / (단기 허용 ${F.qPadA.toFixed(0)} × ${P.padB}²)`); }
   const S=F.sc; if(S.on){ add("scA","세굴방지공 피복석 두께",P.scA,up(S.ar.t2,0.1),`2D = 2 × ${S.ar.D.toFixed(3)} m`); add("scB","세굴방지공 폭",P.scB,up(S.Brec,0.5),"max(1.5 × S × cot30°, 5 m)");
     add("scF","필터층 두께",P.scF,0.3,"필터재 2층 최소 (가정)"); }
-  if(F.cv) add("cvT","격실 위 피복석 두께",P.cvT,up(F.cv.t2,0.1),`2D = 2 × ${F.cv.D.toFixed(3)} m`);
+  if(F.cv) add("cvT","격실 위 피복석 두께",F.cv.missing?0:P.cvT,up(F.cv.t2,0.1),`2D = 2 × ${F.cv.D.toFixed(3)} m${F.cv.missing?" (지금 피복석 없음)":""}`);
   return out; }
 function compute(P){
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};

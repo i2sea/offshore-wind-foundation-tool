@@ -931,9 +931,12 @@ function fndCalc(P,c){
   else if(S>0.5) warns.push(`세굴방지공이 없습니다. 추정 세굴 깊이 ${S.toFixed(2)} m.`);
   // 격실 위 피복석
   let cv=null; const f=c.fill;
-  if(f&&f.cvOn){ const zTop=f.zcv+(P.zbDL-P.sbDL), uw=um(zTop), uc=ucAt(zTop), U=uw+uc, r=isb(U);   // 격실 안은 외벽이 막아 둘레 증폭 없음 (가정)
-    cv={zTop,uw,uc,U,...r,t:f.cvT,ok:f.cvT>=r.t2-1e-9};
-    if(!cv.ok) warns.push(`격실 위 피복석 두께 ${f.cvT} m가 소요 두께 2D = ${r.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${r.D.toFixed(2)} m).`); }
+  /* 개방형 케이슨에 사석·모래를 채우면 위가 드러나므로 피복석이 필요 — 두께 0이어도 소요값을 계산해 경고 */
+  const needCv=f&&f.open&&(f.m1==="rock"||f.m1==="sand"||f.m1==="user")&&f.Vf1>0;
+  if(f&&(f.cvOn||needCv)){ const zTop=(f.cvOn?f.zcv:f.zr)+(P.zbDL-P.sbDL), uw=um(zTop), uc=ucAt(zTop), U=uw+uc, r=isb(U);   // 격실 안은 외벽이 막아 둘레 증폭 없음 (가정)
+    const t=f.cvOn?f.cvT:0; cv={zTop,uw,uc,U,...r,t,ok:t>=r.t2-1e-9,missing:!f.cvOn};
+    if(cv.missing) warns.push(`개방형 격실 속채움 위에 피복석이 없습니다. 드러난 속채움이 파랑·조류에 흩어질 수 있습니다 (소요 두께 2D = ${r.t2.toFixed(2)} m, 소요 지름 ${r.D.toFixed(2)} m).`);
+    else if(!cv.ok) warns.push(`격실 위 피복석 두께 ${f.cvT} m가 소요 두께 2D = ${r.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${r.D.toFixed(2)} m).`); }
   return {bf,Rg,Vgb,Vgr,tgReq,sk,Vsk,Wsk,Wsub0,Apad,qPad,qPadA,okPad,pLim,pAllow,dTop,sc,cv,warns};
 }
 /* 기초 최적값 추천: 검토를 만족하는 가장 작은 값 (올림 단위: 두께 0.1 m, 폭 0.5 m, 그라우트·스커트 0.05 m)
@@ -945,7 +948,7 @@ function fndRec(P,F){ const up=(v,u)=>+(Math.ceil(v/u-1e-9)*u).toFixed(3), out=[
   if(P.padB>0){ const n=Math.max(3,Math.ceil(F.Wsub0/(F.qPadA*P.padB**2)-1e-9)); add("padN","거치 패드 개수",P.padN,n,`수중 중량 ${F.Wsub0.toFixed(0)} kN / (단기 허용 ${F.qPadA.toFixed(0)} × ${P.padB}²)`); }
   const S=F.sc; if(S.on){ add("scA","세굴방지공 피복석 두께",P.scA,up(S.ar.t2,0.1),`2D = 2 × ${S.ar.D.toFixed(3)} m`); add("scB","세굴방지공 폭",P.scB,up(S.Brec,0.5),"max(1.5 × S × cot30°, 5 m)");
     add("scF","필터층 두께",P.scF,0.3,"필터재 2층 최소 (가정)"); }
-  if(F.cv) add("cvT","격실 위 피복석 두께",P.cvT,up(F.cv.t2,0.1),`2D = 2 × ${F.cv.D.toFixed(3)} m`);
+  if(F.cv) add("cvT","격실 위 피복석 두께",F.cv.missing?0:P.cvT,up(F.cv.t2,0.1),`2D = 2 × ${F.cv.D.toFixed(3)} m${F.cv.missing?" (지금 피복석 없음)":""}`);
   return out; }
 function compute(P){
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};
@@ -2644,7 +2647,7 @@ function rbToast(P0){
   const P1=readInputs(), ch=[["tb","저판 두께"],["tw","하부 원통 벽두께"],["tkh","원추 두께"],["tc","기둥 벽두께"],["cts","하부 슬래브 두께"],["ctw","외벽 두께"],["Dc","기둥 외경"],["ha","육각 샤프트 한 변"],["Db","저판 직경"],["cDs","하부 슬래브 직경"],["fck","f_ck"]].filter(([k])=>P0[k]!==P1[k]).map(([k,n])=>k==="fck"?`${n} ${P0[k]} → ${P1[k]} MPa`:`${n} ${fx(P0[k],2)} → ${fx(P1[k],2)} m`);
   toast(R.M.ok?`부재설계를 만족하도록 고쳤습니다${R.freq&&R.freq.f?` — 고유진동수 ${fx(R.freq.f,3)} Hz ${R.freq.ok?"O.K":"N.G"}`:""}${ch.length?` (${ch.join(", ")})`:""}. 철근 ${fx(R.M.qty.tot/1000,0)} t`:`N.G인 부재가 남았습니다${ch.length?` (${ch.join(", ")})`:""}. 부재설계 탭 안내를 확인하세요.`); }
 function warnInfo(w){
-  if(/^세굴방지공 피복석 두께|^세굴방지공 폭|^격실 위 피복석 두께|^그라우트 두께 .*보다 얇습니다|^스커트 높이|^거치 패드 압력/.test(w)){ const map={"세굴방지공 피복석":"scA","세굴방지공 폭":"scB","격실 위 피복석":"cvT","그라우트 두께":"tg","스커트 높이":"skH","거치 패드":"padN"};
+  if(/^세굴방지공 피복석 두께|^세굴방지공 폭|^격실 위 피복석 두께|^개방형 격실 속채움 위에 피복석이 없습니다|^그라우트 두께 .*보다 얇습니다|^스커트 높이|^거치 패드 압력/.test(w)){ const map={"세굴방지공 피복석":"scA","세굴방지공 폭":"scB","격실 위 피복석":"cvT","개방형 격실":"cvT","그라우트 두께":"tg","스커트 높이":"skH","거치 패드":"padN"};
     const k=Object.entries(map).find(([t])=>w.startsWith(t))[1], r=fndRec(R.P,R.fnd).find(x=>x.k===k);
     return {tip:"'기초 · 세굴' 탭의 최적값 추천 표에서 모든 기초 항목을 한 번에 맞출 수 있습니다.",fixes:r?[{label:`${FIXN[k][0]}를 ${r.rec} ${FIXN[k][1]}로`,patch:{[k]:r.rec}}]:[]}; }
   if(/^부재설계 철근 검토가/.test(w)){ 
@@ -2692,7 +2695,7 @@ const FIXN={scA:["세굴방지공 피복석 두께","m"],scB:["세굴방지공 �
   mt1:["하부 두께","mm"],mt2:["중간 두께","mm"],mt3:["상부 두께","mm"],mtop:["말뚝 상단 표고","m"],mzA:["테이퍼 구간 하단","m"],mzB:["테이퍼 구간 상단","m"],mDt:["상부 직경","m"],mL:["근입깊이","m"],mz1:["하부↔중간 경계","m"],mz2:["중간↔상부 경계","m"],mSc:["세굴 대책",""]};
 function fixText(f){
   if(!f.patch) return f.label;
-  const P=R.P, nv=(k,v)=>k==="turb"?(turbineOf({...P,turb:v}).name):(k==="mSc"||k==="jSc")?(+v===1?"세굴방지공 설치":"없음"):k==="mTP"?(v==="bolt"?"볼트 연결":"그라우트 연결"):/^(mt\d|jLt|jBrt|jMbt|jPt)$/.test(k)?fx(v,0):k==="zcut"&&!(v>0)?`${fx(P.ztop,2)} (전체)`:fx(v,2);
+  const P=R.P, nv=(k,v)=>k==="turb"?(turbineOf({...P,turb:v}).name):(k==="mSc"||k==="jSc")?(+v===1?"세굴방지공 설치":"없음"):k==="mTP"?(v==="bolt"?"볼트 연결":"그라우트 연결"):/^(mt\d|jLt|jBrt|jMbt|jPt|padN|cnr)$/.test(k)?fx(v,0):k==="zcut"&&!(v>0)?`${fx(P.ztop,2)} (전체)`:fx(v,2);
   const ch=Object.entries(f.patch).filter(([k,v])=>FIXN[k]&&P[k]!==v).map(([k,v])=>`${FIXN[k][0]} ${nv(k,P[k])} → ${nv(k,v)}${FIXN[k][1]?" "+FIXN[k][1]:""}`);
   const i=f.label.indexOf(" ("), note=i>=0&&f.label.endsWith(")")?f.label.slice(i+2,-1):"";
   return ch.join(", ")+(note?` (${note})`:"");
@@ -3139,7 +3142,7 @@ S = ${S.KC>S.B?`1.3·D·[1 − exp(−A(KC − B))] = ${fx(S.S,2)} m`:`0 (KC ${f
   h+=`<h3>6. 피복석 크기 (Isbash)</h3><div class="eq">U = C·√(2gΔD) → D = U² / (2gΔC²),  Δ = ρ<sub>s</sub>/ρ<sub>w</sub> − 1 = ${P.Ss} / ${fx(P.gw/9.81,4)} − 1 = ${fx(S.Dl,3)},  C = ${P.isbC} (가정)</div>
   <div class="tblwrap"><table class="t"><thead><tr><th>위치</th><th>설계 유속 U (m/s)</th><th>소요 지름 D (m)</th><th>개당 중량 (t)</th><th>소요 두께 2D (m)</th><th>입력 두께 (m)</th><th>판정</th></tr></thead><tbody>
   <tr><td class="l">세굴방지공 (해저면)</td><td class="n">${fx(S.Ub,3)}</td><td class="n">${fx(S.ar.D,3)}</td><td class="n">${fx(S.ar.W,3)}</td><td class="n">${fx(S.ar.t2,2)}</td><td class="n">${S.on?P.scA:"없음"}</td><td>${S.on?ok(S.okT):"—"}</td></tr>
-  ${F.cv?`<tr><td class="l">격실 위 피복석 (해저면 위 ${fx(F.cv.zTop,2)} m)</td><td class="n">${fx(F.cv.U,3)}</td><td class="n">${fx(F.cv.D,3)}</td><td class="n">${fx(F.cv.W,3)}</td><td class="n">${fx(F.cv.t2,2)}</td><td class="n">${F.cv.t}</td><td>${ok(F.cv.ok)}</td></tr>`:""}
+  ${F.cv?`<tr><td class="l">격실 위 피복석 (해저면 위 ${fx(F.cv.zTop,2)} m)</td><td class="n">${fx(F.cv.U,3)}</td><td class="n">${fx(F.cv.D,3)}</td><td class="n">${fx(F.cv.W,3)}</td><td class="n">${fx(F.cv.t2,2)}</td><td class="n">${F.cv.missing?"없음":F.cv.t}</td><td>${ok(F.cv.ok)}</td></tr>`:""}
   </tbody></table></div>
   ${F.cv?`<div class="eq">격실 위 유속 = 파랑 πH/T·cosh(kz)/sinh(kd) + 조류 U·(z/d)<sup>1/7</sup> = ${fx(F.cv.uw,3)} + ${fx(F.cv.uc,3)} = ${fx(F.cv.U,3)} m/s (격실 안은 외벽이 막아 증폭 없음, 가정)</div>`:""}
   <p class="note">개당 중량 = ρ<sub>s</sub>·π/6·D³. 피복석은 2층 이상(두께 2D)으로 깝니다. 필터층은 피복석 D15 / 필터 D85 ≤ 5 (필터 규칙)를 만족하는 입도로 정합니다.</p>`;

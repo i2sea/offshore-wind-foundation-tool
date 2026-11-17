@@ -50,6 +50,8 @@ for(const ty of ["jk4","jk3"]){ const J=E.computeJacket({...E.DEF,type:ty}); J.L
   { const rc=E.fndRec(P,R.fnd), a=rc.find(x=>x.k==="scA"), n=rc.find(x=>x.k==="padN"), Q2=E.compute({...P,...Object.fromEntries(rc.map(x=>[x.k,x.rec]))});
     near("추천 피복석 두께 = 2D를 0.1 m 올림",a.rec,Math.ceil(S.ar.t2/0.1-1e-9)*0.1,1e-9);
     const ok=Q2.fnd.sc.ok&&Q2.fnd.okPad&&(!Q2.fnd.cv||Q2.fnd.cv.ok)&&Q2.P.tg>=Q2.fnd.tgReq-1e-9; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 기초 추천값 적용 후 피복석·폭·패드·그라우트 모두 만족 (패드 ${n.rec}개)`); }
+  { const Q3=E.compute({...P,cvT:0}), ok=Q3.fnd.cv&&Q3.fnd.cv.missing&&Q3.warns.some(w=>/피복석이 없습니다/.test(w))&&E.fndRec(Q3.P,Q3.fnd).some(x=>x.k==="cvT"&&x.cur===0&&x.rec>0);
+    if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 개방형 격실 사석 위 피복석 0 → 경고 + 추천값`); }
   const T=E.radCountTable(P); console.log(`${T.best?"OK  ":"FAIL"} 격벽 개수 추천: ${T.best?T.best.n+"개":"없음"} (${T.rows.map(x=>x.n+(x.ok?"○":"×")).join(" ")})`); if(!T.best) fail++; }
 { const old={...E.DEF,type:"caisson",ctt:0.5,gf:19,phiF:30}; delete old.f1m; delete old.sk; const u=E.upgradeP(old);
   const ok=u.f1m==="user"&&u.gf2===19&&u.phi2===30&&u.cvT===0&&u.sk==="none"&&u.scOn===old.scOn; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 예전 설계 파일: 두 구역에 같은 단위중량·φ, 피복석·스커트 없음 (세굴방지공은 표시)`); }
