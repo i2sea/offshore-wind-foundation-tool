@@ -225,6 +225,10 @@ function fndCalc(P,c){
   const warns=[], Ab=PI*c.Rbase**2, rhoW=P.gw/G, on=v=>v!=="0"&&v!==0&&v!==false;
   const Rg=c.Rbase+Math.max(0,P.gbW||0), Vgb=PI*Rg*Rg*Math.max(0,P.tgb||0);
   const Vgr=Ab*P.tg, tgReq=(P.padH||0)+(P.gbTol||0);
+  /* 준설 자리 되메움(필터재): 준설 바닥 = 그라우트 + 고르기층 아래, 고르기 범위 끝에서 1:1로 해저면까지. 저판 밖 ~ 비탈 끝, 고르기층(또는 그라우트) 윗면 ~ 해저면 */
+  const zSB=P.sbDL-P.zbDL, pit=-P.tg-(P.tgb||0), xr=c.Rbase+Math.max(1,P.gbW||0), sP=Math.max(0,zSB-pit);
+  let bf=null; if(zSB>-P.tg+1e-6){ const bot=r=>r<=xr?-P.tg:pit+(r-xr), N=200, r1=xr+sP; let V=0; for(let i=0;i<N;i++){ const r=c.Rbase+(r1-c.Rbase)*(i+.5)/N, h=Math.max(0,zSB-bot(r)); V+=2*PI*r*h*(r1-c.Rbase)/N; }
+    bf={V,xr,pit,zSB,r1,poly:[[c.Rbase,-P.tg],[xr,-P.tg],[xr,pit],[r1,zSB],[c.Rbase,zSB]]}; }
   const sk=P.sk==="skirt", Vsk=sk?PI*(c.Rbase**2-Math.max(0,c.Rbase-P.skT)**2)*P.skH:0, Wsk=Vsk*(P.gc-P.gw);
   if(P.sk&&P.sk!=="none"&&P.tg+1e-9<tgReq) warns.push(`그라우트 두께 ${P.tg} m가 패드 높이 + 고르기 허용오차 = ${tgReq.toFixed(2)} m보다 얇습니다.`);
   if(sk&&P.skH<P.tg+0.2-1e-9) warns.push(`스커트 높이 ${P.skH} m가 그라우트 두께 + 근입 0.2 m(가정) = ${(P.tg+0.2).toFixed(2)} m보다 낮아 그라우트를 가두지 못할 수 있습니다.`);
@@ -258,7 +262,7 @@ function fndCalc(P,c){
   if(f&&f.cvOn){ const zTop=f.zcv+(P.zbDL-P.sbDL), uw=um(zTop), uc=ucAt(zTop), U=uw+uc, r=isb(U);   // 격실 안은 외벽이 막아 둘레 증폭 없음 (가정)
     cv={zTop,uw,uc,U,...r,t:f.cvT,ok:f.cvT>=r.t2-1e-9};
     if(!cv.ok) warns.push(`격실 위 피복석 두께 ${f.cvT} m가 소요 두께 2D = ${r.t2.toFixed(2)} m보다 얇습니다 (소요 지름 ${r.D.toFixed(2)} m).`); }
-  return {Rg,Vgb,Vgr,tgReq,sk,Vsk,Wsk,Wsub0,Apad,qPad,qPadA,okPad,pLim,pAllow,dTop,sc,cv,warns};
+  return {bf,Rg,Vgb,Vgr,tgReq,sk,Vsk,Wsk,Wsub0,Apad,qPad,qPadA,okPad,pLim,pAllow,dTop,sc,cv,warns};
 }
 function compute(P){
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};

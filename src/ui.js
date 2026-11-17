@@ -405,6 +405,7 @@ function secPrims(R){
   o.push({t:"poly",L:"GROUT",pts:[[-R.Rbase,-P.tg],[R.Rbase,-P.tg],[R.Rbase,0],[-R.Rbase,0]]});
   if(F.sk) both([[R.Rbase-P.skT,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,-Math.min(P.skH,P.tg+(P.tgb||0))],[R.Rbase,0],[R.Rbase-P.skT,0]],"CONC");
   // 세굴방지공: 필터층(해저면 위) + 피복석 (저판 앞굽 위까지 덮음)
+  if(F.bf) both(F.bf.poly,"GRAV");   // 준설 자리 되메움(필터재)
   if(F.sc&&F.sc.on){ const S=F.sc; both([[R.Rbase,S.zb],[S.Re,S.zb],[S.Re,S.zF],[R.Rbase,S.zF]],"GRAV"); both(S.prof,"ROCK"); }
   const cw=R.S.hex?R.S.hex.flats/2:rso, ci=R.S.hex?R.S.hex.flats/2-P.hth:rsi;
   // 속채움
@@ -758,9 +759,10 @@ function htmlFillTbl(){ const P=R.P, F=R.fill;
   return h; }
 function htmlFnd(){
   const P=R.P, F=R.fnd, S=F.sc, ok=b=>b?'<span class="ok-t">O.K</span>':'<span class="bad-t">N.G</span>';
-  let h=`<h3>1. 시공 순서 (해외 GBS 방식)</h3><p>준설 → 자갈 고르기층 → 패드로 거치·수평 맞춤 → 스커트 안 빈틈 그라우트 → 세굴방지공(필터층 + 피복석) → 속채움.</p>`;
+  let h=`<h3>1. 시공 순서 (해외 GBS 방식)</h3><p>준설 → 자갈 고르기층 → 패드로 거치·수평 맞춤 → 스커트 안 빈틈 그라우트 → 저판 밖 준설 자리 되메움(필터재) → 세굴방지공(필터층 + 피복석) → 속채움.</p>`;
   h+=`<h3>2. 고르기층 · 그라우트 · 스커트</h3><div class="eq">고르기 범위 반경 = 저판 반경 + 여유폭 = ${fx(R.Rbase,3)} + ${P.gbW} = ${fx(F.Rg,3)} m,  체적 = π × ${fx(F.Rg,3)}² × ${P.tgb} = ${fx(F.Vgb,2)} m³
-그라우트 소요 두께 = 패드 높이 + 고르기 허용오차 = ${P.padH} + ${P.gbTol} = ${fx(F.tgReq,2)} m  →  입력 ${P.tg} m ${ok(P.tg>=F.tgReq-1e-9)}
+${F.bf?`준설 자리 되메움(필터재): 저판 밖 r = ${fx(R.Rbase,2)} ~ ${fx(F.bf.r1,2)} m, 고르기층 윗면(z = ${fx(-P.tg,2)}) ~ 해저면(z = ${fx(F.bf.zSB,2)}), 준설 비탈 1:1 (가정) → ${fx(F.bf.V,2)} m³
+`:""}그라우트 소요 두께 = 패드 높이 + 고르기 허용오차 = ${P.padH} + ${P.gbTol} = ${fx(F.tgReq,2)} m  →  입력 ${P.tg} m ${ok(P.tg>=F.tgReq-1e-9)}
 그라우트 체적 = π × ${fx(R.Rbase,3)}² × ${P.tg} = ${fx(F.Vgr,2)} m³ (저판 밑, ${P.sk==="skirt"?"스커트 안":P.sk==="bag"?"그라우트 백 안":"가두기 없음"})${F.sk?`
 스커트: 높이 ${P.skH} m ≥ 그라우트 두께 + 근입 0.2 m(가정) = ${fx(P.tg+0.2,2)} m ${ok(P.skH>=P.tg+0.2-1e-9)},  콘크리트 ${fx(F.Vsk,2)} m³, 수중 중량 ${fx(F.Wsk,1)} kN (안정검토 연직력에 포함)`:""}</div>`;
   h+=`<h3>3. 거치 (그라우트 전)</h3><div class="eq">거치 직후 수중 중량 (속채움 전, 격실 침수) W' = (γc − γw) × (V<sub>c</sub>${F.Vsk>0?" + V<sub>스커트</sub>":""}) = (${P.gc} − ${P.gw}) × ${fx(R.Vc+F.Vsk,2)} = ${fx(F.Wsub0,1)} kN
@@ -824,6 +826,7 @@ function htmlQty(){
   ${R.fill.cvOn?`<tr><td class="l">격실 위 피복석</td><td>두께 ${P.cvT} m, 소요 지름 ${R.fnd.cv?fx(R.fnd.cv.D,2):"-"} m 이상</td><td class="n">${fx(R.fill.Vcv,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>`:""}
   <tr><td class="l">속채움 (기둥 내부) ${matNm(R.fill.m2)}</td><td>γ ${fx(R.fill.g2,1)} kN/m³</td><td class="n">${fx(R.Vf2,3)}</td><td>m³</td><td class="fm">내부 공간 적분</td></tr>
   ${P.tgb>0?`<tr><td class="l">자갈 고르기층</td><td>두께 ${P.tgb} m, 여유폭 ${P.gbW} m</td><td class="n">${fx(R.fnd.Vgb,3)}</td><td>m³</td><td class="fm">π × ${fx(R.fnd.Rg,3)}² × ${P.tgb}</td></tr>`:""}
+  ${R.fnd.bf?`<tr><td class="l">준설 자리 되메움 (필터재)</td><td>저판 밖 ~ 준설 비탈 끝</td><td class="n">${fx(R.fnd.bf.V,3)}</td><td>m³</td><td class="fm">고르기층 윗면 ~ 해저면, 회전 적분</td></tr>`:""}
   <tr><td class="l">저판 하부 그라우트</td><td>두께 ${P.tg} m</td><td class="n">${fx(R.grout,3)}</td><td>m³</td><td class="fm">π × ${fx(R.Rbase,3)}² × ${P.tg}</td></tr>
   <tr><td class="l">거치용 콘크리트 패드</td><td>${P.padB}×${P.padB}×${P.padH} m</td><td class="n">${fx(R.pad,3)}</td><td>m³</td><td class="fm">${P.padN}개 × ${P.padB}² × ${P.padH}</td></tr>
   ${R.fnd.sc.on?`<tr><td class="l">세굴방지공 필터층</td><td>두께 ${P.scF} m, 폭 ${P.scB} m</td><td class="n">${fx(R.fnd.sc.Vfi,3)}</td><td>m³</td><td class="fm">π × (${fx(R.fnd.sc.Re,3)}² − ${fx(R.Rbase,3)}²) × ${P.scF}</td></tr>
