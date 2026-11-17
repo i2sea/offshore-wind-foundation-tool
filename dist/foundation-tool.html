@@ -57,6 +57,8 @@ button{font:inherit;cursor:pointer}
 .wt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 .layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
 @media (max-width:960px){.layout{grid-template-columns:minmax(0,1fr)}}
+/* 넓은 화면: 왼쪽 입력창은 화면에 붙어 따로 스크롤, 오른쪽 결과는 페이지 스크롤 */
+@media (min-width:961px){aside.inputs{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}}
 aside.inputs{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:4px 14px 14px}
 fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 4px;min-width:0}
 .igtabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 0 8px;position:sticky;top:0;background:var(--panel);z-index:2;margin-bottom:2px}
