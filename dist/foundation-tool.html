@@ -717,7 +717,7 @@ const FILLMAT={rock:{nm:"사석",g:20,phi:40},sand:{nm:"모래",g:19,phi:30},wat
 /* 예전 설계 파일(새 칸 없음)을 그때 결과 그대로 읽도록 채움 */
 function upgradeP(o){ if(!o||typeof o!=="object") return o; const q={...o}, old=Object.keys(o).length>20;
   if(old&&o.f1m==null){ q.f1m="user"; q.f2m="user"; if(o.gf!=null&&o.gf2==null) q.gf2=o.gf; if(o.phi2==null) q.phi2=o.phiF!=null?o.phiF:30; if(o.phiF==null) q.phiF=30; q.cvT=0; }
-  if(old&&o.sk==null){ q.sk="none"; q.scOn="0"; q.tgb=0; q.gbW=0; q.gbTol=0; }
+  if(old&&o.sk==null){ q.sk="none"; q.gbTol=0; }   // 스커트는 안정검토 연직력에 들어가므로 예전 파일은 없음. 고르기층·세굴방지공은 결과에 영향이 없어 기본값으로 표시
   return q; }
 const frus=(D,d,h)=>PI*h/12*(D*D+D*d+d*d);
 const ann=(D,t)=>PI/4*(D*D-Math.max(0,D-2*t)**2);

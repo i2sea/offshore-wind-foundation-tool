@@ -49,5 +49,5 @@ for(const ty of ["jk4","jk3"]){ const J=E.computeJacket({...E.DEF,type:ty}); J.L
   near("패드 압력 = (γc−γw)(Vc+V스커트)/(n·B²) (kN/m²)",R.fnd.qPad,(P.gc-P.gw)*(R.Vc+R.fnd.Vsk)/(P.padN*P.padB**2),1e-6);
   const T=E.radCountTable(P); console.log(`${T.best?"OK  ":"FAIL"} 격벽 개수 추천: ${T.best?T.best.n+"개":"없음"} (${T.rows.map(x=>x.n+(x.ok?"○":"×")).join(" ")})`); if(!T.best) fail++; }
 { const old={...E.DEF,type:"caisson",ctt:0.5,gf:19,phiF:30}; delete old.f1m; delete old.sk; const u=E.upgradeP(old);
-  const ok=u.f1m==="user"&&u.gf2===19&&u.phi2===30&&u.cvT===0&&u.sk==="none"&&u.scOn==="0"; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 예전 설계 파일: 두 구역에 같은 단위중량·φ, 피복석·스커트·세굴방지공 없음`); }
+  const ok=u.f1m==="user"&&u.gf2===19&&u.phi2===30&&u.cvT===0&&u.sk==="none"&&u.scOn===old.scOn; if(!ok) fail++; console.log(`${ok?"OK  ":"FAIL"} 예전 설계 파일: 두 구역에 같은 단위중량·φ, 피복석·스커트 없음 (세굴방지공은 표시)`); }
 console.log(fail?`\n${fail}개 실패`:"\n모두 통과"); process.exit(fail?1:0);
