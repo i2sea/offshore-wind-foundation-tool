@@ -2734,8 +2734,10 @@ function secPrims(R){
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
   const zHW=P.hwl-P.zbDL, zMS=P.msl-P.zbDL, zLW=-P.zbDL, zSB=P.sbDL-P.zbDL;
-  const F=R.fnd||{}, scW=F.sc&&F.sc.on?P.scB+2*P.scA:0, xL=-Rmax-26-scW, xR=Rmax+(P.Hw>0?40:22)+scW, zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+(P.tgb||0)+3);  // 오른쪽에 설계파 그림 자리
+  const F=R.fnd||{}, SC=F.sc&&F.sc.on?F.sc:null, zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+(P.tgb||0)+3);
   const fs=Math.max(1.4,(zT-zB)/44);
+  /* 가로 자리: 오른쪽 = 높이 치수 2줄(세굴방지공 바깥) + 설계파 그림, 왼쪽 = 수위 표시 + 세굴방지공·저판 하면 표고 (수위 글자는 수면 근처, 세굴방지공은 해저면 근처라 겹치지 않음) */
+  const xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+9.5, xR=P.Hw>0?xd2+27:xd2+9, xL=-Math.max(Rmax+26,SC?SC.Re+1+fs*5.6:0);
   const both=(pts,L,extra)=>{ o.push({t:"poly",pts,L,...extra}); o.push({t:"poly",pts:pts.map(p=>[-p[0],p[1]]),L,...extra}); };
   // 지반 (준설 바닥 = 그라우트 + 자갈 고르기층 아래)
   const pit=-P.tg-(P.tgb||0), xr=R.Rbase+Math.max(1,P.gbW||0);
@@ -2790,7 +2792,7 @@ function secPrims(R){
   // 수위
   const wl=(z,lab,dash)=>{ o.push({t:"line",L:"WL",x1:xL,z1:z,x2:-Rmax-1,z2:z,dash}); o.push({t:"tri",L:"WL",x:xL+3,z,s:0.9}); o.push({t:"text",L:"WL",x:xL+.3,z:z+1.3,h:fs*.85,s:lab}); };
   drawLevels(o,waterLevels(P).map((v,i)=>({z:v.y-P.zbDL,lab:v.lab,dash:i>0})),xL+.3,xL+15.5,-Rmax-1,fs);
-  waveDraw(o,P,Rmax+16,xR-1,zHW,P.zbDL,fs);
+  waveDraw(o,P,xd2+3,xR-1,zHW,P.zbDL,fs);
   o.push({t:"text",L:"TXT",x:xL+.3,z:zSB-fs*1.4,h:fs*.85,s:`해저면 ${dl(P.sbDL)}`});
   // 표고
   const lev=(z,x)=>{ o.push({t:"line",L:"TXT",x1:x-1-fs*5.2,z1:z,x2:x+.6,z2:z}); o.push({t:"tri",L:"TXT",x,z,s:.6}); o.push({t:"text",L:"TXT",x:x-1,z:z+.35,h:fs*.75,s:dl(z+P.zbDL),anchor:"end",num:1}); };
@@ -2798,7 +2800,7 @@ function secPrims(R){
   // 터빈 인터페이스
   o.push({t:"text",L:"MUT",x:Math.max(P.Dp/2,cw)+1,z:R.zIf,h:fs*.7,s:`◀ 터빈 하중 작용 MSL+${R.T.ifz}`});
   // 치수
-  const SC=R.fnd&&R.fnd.sc&&R.fnd.sc.on?R.fnd.sc:null, xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+9.5;
+
   const vdim=(za,zb,x,key,sh)=>{ if(zb-za<1e-6) return; o.push({t:"line",L:"DIM",x1:x,z1:za,x2:x,z2:zb});
     [za,zb].forEach(z=>{ o.push({t:"line",L:"DIM",x1:x-.5,z1:z-.5,x2:x+.5,z2:z+.5}); o.push({t:"line",L:"DIM",x1:x-1.4,z1:z,x2:x+.8,z2:z}); });
     const zm=(za+zb)/2, s=fx((zb-za)*1000,0);
@@ -3542,7 +3544,7 @@ $("svImport").addEventListener("change",async e=>{ const f=e.target.files[0]; if
 
 
 /* ---------- 배근도 (A3 시트) ---------- */
-const SCALES=[50,75,100,125,150,200,250,300,400,500];
+const SCALES=[50,75,100,125,150,200,250,300,400,500,600,750,1000];
 function mapPrims(o,f,dx,dz){ return o.map(p=>{ const q={...p};
   if(p.pts) q.pts=p.pts.map(([x,z])=>[x*f+dx,z*f+dz]);
   if("x" in p){ q.x=p.x*f+dx; q.z=p.z*f+dz; } if("x1" in p){ q.x1=p.x1*f+dx; q.z1=p.z1*f+dz; q.x2=p.x2*f+dx; q.z2=p.z2*f+dz; }
@@ -3758,7 +3760,7 @@ function genSheetPrims(R,noBot){
   const pp=planPrims(R), [px0,pz0,px1,pz1]=pp.box;
   let scP=SCALES[SCALES.length-1]; for(const s of SCALES){ if((px1-px0)/(s/1000)<=150&&(pz1-pz0)/(s/1000)<=92){ scP=s; break; } }
   const f=sc/scP, pcx=252*k-px0*f+ (150*k-(px1-px0)*f)/2, pcz=H-22*k-pz1*f;
-  o.push(...mapPrims(pp.o,f,pcx,pcz).map(p=>({...p,h:p.h?p.h*f:p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));
+  o.push(...mapPrims(pp.o,f,pcx,pcz).map(p=>({...p,h:p.h?Math.min(p.h*f,2.6*k):p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));   // 평면도 글자는 도면에서 2.6 mm 이하
   o.push({t:"text",L:"STX",x:252*k,z:H-15*k,h:3.4*k,s:`평면도   S = 1 : ${scP}`});
   // 주기·설계 조건·검토 결과·수량
   const N=genNotes(R), x0=252*k, wmax=156*k; let z=pcz+pz0*f-6*k;
