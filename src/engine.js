@@ -72,7 +72,9 @@ function shaftR(P){
       높이 = 1.5 × 기둥 주철근 정착길이(40d) → 0.5 m 단위 올림 (최소 1.0 m)
    ② 벽체 접합부 링: 하부 원통(케이슨 외벽) 내면에 붙여 저판 상면에서 시작. 외경 = 벽체 내경, 두께 = max(0.5, 벽두께),
       높이 = 1.5 × 벽체 연직철근 정착길이(40d) → 0.5 m 단위 올림 (최소 1.0 m, 벽 높이 이하) */
-function autoRings(P){
+/* 중력식 기둥 하단 = 저판(하부 슬래브) 윗면 — 입력하지 않고 따라감 (저판 두께가 바뀌어도 기둥·링 ①이 뜨거나 묻히지 않게) */
+function gravZc0(P){ if(P.type==="cone") P.zc0=P.tb; else if(P.type==="caisson") P.zc0=P.cts; return P; }
+function autoRings(P){ gravZc0(P);
   const cais=P.type==="caisson", tb=cais?P.cts:P.tb, S=shaftR(P), rb=P.rb||{};
   const dbOf=b=>(typeof BARS!=="undefined"&&BARS[b])?BARS[b].d/1000:(parseInt(String(b).slice(1))||25)/1000;
   const hOf=(bar,hmax)=>Math.min(hmax,Math.max(1.0,Math.ceil(1.5*40*dbOf(bar)/0.5)*0.5));
@@ -86,7 +88,7 @@ function autoRings(P){
     if(S.ro+t3<Rwi-0.5&&z3>tb+0.5) out.push({D:+(2*(S.ro+t3)).toFixed(3),t:+t3.toFixed(3),h:+h3.toFixed(3),z:+z3.toFixed(3),auto:P.ctt>0?"상판·기둥 접합부":"격실 상단 기둥 둘레"}); }
   return out;
 }
-function buildParts(P){
+function buildParts(P){ gravZc0(P);
   const S=shaftR(P), rso=S.ro, rsi=S.ri, parts=[];
   /* 원형 기둥 벽두께: 하단 tc → 상단 tcT 직선 변화 (tcT 0이면 같음) */
   const rsiT=!S.hex&&P.tcT>0&&Math.abs(P.tcT-P.tc)>1e-9?Math.max(0,rso-P.tcT):rsi, rsiAt=z=>rsiT===rsi?rsi:rsi+(rsiT-rsi)*Math.min(1,Math.max(0,(z-P.zc0)/Math.max(1e-6,P.ztop-P.zc0)));
@@ -280,7 +282,7 @@ function fndRec(P,F){ const up=(v,u)=>+(Math.ceil(v/u-1e-9)*u).toFixed(3), out=[
     add("scF","필터층 두께",P.scF,0.3,"필터재 2층 최소 (가정)"); }
   if(F.cv) add("cvT","격실 위 피복석 두께",F.cv.missing?0:P.cvT,up(F.cv.t2,0.1),`2D = 2 × ${F.cv.D.toFixed(3)} m${F.cv.missing?" (지금 피복석 없음)":""}`);
   return out; }
-function compute(P){
+function compute(P){ gravZc0(P);
   if(P.ringAuto==="1"&&P.type!=="mono1"&&P.type!=="monoT") P={...P,rings:autoRings(P)};
   const warns=[];
   const {parts,z2,wideTop,Rbase,Rwide,S,topRing,rsiT,rsiAt}=buildParts(P);

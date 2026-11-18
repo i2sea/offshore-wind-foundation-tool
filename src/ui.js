@@ -44,7 +44,7 @@ function readInputs(){
   NUM.forEach(k=>{ const v=parseFloat($(k).value); ST[k]=isFinite(v)?v:0; });
   ST.sgc=$("sgc").value; ST.surf=$("surf").value; ST.shp=$("shp").value; ST.turb=$("turb").value; ST.crest=+$("crest").value; ST.hydro=+$("hydro").value; ST.mTP=$("mTP").value; ST.mInst=$("mInst").value; ST.mSc=$("mSc").value; ST.soilPre=$("soilPre").value; ST.jHz=$("jHz").value; ST.jFlood=$("jFlood").value; ST.jSc=$("jSc").value; ST.gBase=$("gBase").value;
   ["f1m","f2m","sk","scOn"].forEach(k=>ST[k]=$(k).value);
-  ST.waveSrc=$("waveSrc").value.trim(); ST.zbAuto=$("zbAuto").value; if(ST.zbAuto==="1"&&!["mono1","monoT","jk3","jk4"].includes(ST.type)){ ST.zbDL=+(ST.sbDL-ST.emb).toFixed(3); $("zbDL").value=ST.zbDL; } ST.topR=+$("topR").value;
+  ST.waveSrc=$("waveSrc").value.trim(); if(ST.type==="cone"||ST.type==="caisson"){ gravZc0(ST); $("zc0").value=ST.zc0; } ST.zbAuto=$("zbAuto").value; if(ST.zbAuto==="1"&&!["mono1","monoT","jk3","jk4"].includes(ST.type)){ ST.zbDL=+(ST.sbDL-ST.emb).toFixed(3); $("zbDL").value=ST.zbDL; } ST.topR=+$("topR").value;
   ST.rings=ST.rings.map(r=>({D:+r.D||0,t:+r.t||0,h:+r.h||0,z:+r.z||0}));
   MEMB.forEach(([k])=>{ const b=$("rb_"+k+"_bar"); if(b) ST.rb[k]={bar:b.value,s:Math.max(50,parseFloat($("rb_"+k+"_s").value)||200)}; });
   return JSON.parse(JSON.stringify(ST));
@@ -114,7 +114,8 @@ function applyType(){
   { const open=ST.type==="caisson"&&!(parseFloat($("ctt").value)>0); document.querySelectorAll("[data-for-open],[data-cvt]").forEach(el=>el.hidden=!open);
     document.querySelectorAll("[data-for-sk]").forEach(el=>el.hidden=$("sk").value!=="skirt"); document.querySelectorAll("[data-for-gsc]").forEach(el=>el.hidden=$("scOn").value!=="1"); }
   { const gv=!["mono1","monoT","jk3","jk4"].includes(ST.type); document.querySelectorAll("[data-ifd]").forEach(el=>el.hidden=gv); document.querySelectorAll("[data-zba]").forEach(el=>el.hidden=!gv||String(ST.zbAuto)!=="1");
-    const zi=$("zbDL"); zi.readOnly=gv&&String(ST.zbAuto)==="1"; zi.classList.toggle("fromFile",zi.readOnly); zi.title=zi.readOnly?"해저면 − 근입 깊이로 자동 계산":""; }
+    const zi=$("zbDL"); zi.readOnly=gv&&String(ST.zbAuto)==="1"; zi.classList.toggle("fromFile",zi.readOnly); zi.title=zi.readOnly?"해저면 − 근입 깊이로 자동 계산":"";
+    const zc=$("zc0"), gz=ST.type==="cone"||ST.type==="caisson"; zc.readOnly=gz; zc.classList.toggle("fromFile",gz); zc.title=gz?"저판(하부 슬래브) 윗면 높이를 자동으로 따름":""; }
   igApply();
   document.querySelectorAll("[data-for-jsc]").forEach(el=>el.hidden=el.dataset.forJsc!==$("jSc").value);
   document.querySelectorAll("[data-shp]").forEach(f=>f.hidden=f.dataset.shp!==$("shp").value);
@@ -136,8 +137,7 @@ $("ringAuto").addEventListener("change",()=>{ ST.ringAuto=$("ringAuto").value;
   drawRings(); run(); });
 $("ringAdd").addEventListener("click",()=>{ ST.rings.push({D:6,t:0.5,h:1,z:1}); drawRings(); run(); });
 document.querySelectorAll(".wt").forEach(b=>b.addEventListener("click",()=>{ readInputs(); if(ST.type!==b.dataset.type){ optRun++; $("optPanel").hidden=true; } ST.type=b.dataset.type;
-  if(ST.type==="caisson"&&ST.zc0>ST.cH) ST.zc0=ST.cts;
-  $("zc0").value=ST.zc0; applyType(); run(); }));
+  gravZc0(ST); $("zc0").value=ST.zc0; applyType(); run(); }));
 const lastSub={grav:"cone",mono:"mono1",jacket:"jk4"};
 document.querySelectorAll(".wc").forEach(b=>b.addEventListener("click",()=>{ const c=b.dataset.cat;
   if(catOf(ST.type)===c) return; readInputs(); lastSub[catOf(ST.type)]=ST.type; ST.type=lastSub[c]; optRun++; $("optPanel").hidden=true;
