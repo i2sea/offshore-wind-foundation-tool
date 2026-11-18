@@ -400,7 +400,7 @@ function secPrims(R){
   const F=R.fnd||{}, SC=F.sc&&F.sc.on?F.sc:null, zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+(P.tgb||0)+3);
   const fs=Math.max(1.4,(zT-zB)/44);
   /* 가로 자리: 오른쪽 = 높이 치수 2줄(세굴방지공 바깥) + 설계파 그림, 왼쪽 = 수위 표시 + 세굴방지공·저판 하면 표고 (수위 글자는 수면 근처, 세굴방지공은 해저면 근처라 겹치지 않음) */
-  const xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+9.5, xR=P.Hw>0?xd2+27:xd2+9, xL=-Math.max(Rmax+26,SC?SC.Re+1+fs*5.6:0);
+  const xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+7, xR=P.Hw>0?xd2+22:xd2+9, xL=-Math.max(Rmax+26,SC?SC.Re+1+fs*5.6:0);
   const both=(pts,L,extra)=>{ o.push({t:"poly",pts,L,...extra}); o.push({t:"poly",pts:pts.map(p=>[-p[0],p[1]]),L,...extra}); };
   // 지반 (준설 바닥 = 그라우트 + 자갈 고르기층 아래)
   const pit=-P.tg-(P.tgb||0), xr=R.Rbase+Math.max(1,P.gbW||0);
@@ -491,8 +491,8 @@ function secPrims(R){
   o.push({t:"text",L:"MUT",x:cw+.6,z:(Math.max(z2,wt)+P.ztop)/2,h:fs*.78,s:P.type==="caisson"?"샤프트":"기둥"});
   return {o,box:[xL,zB,xR,zT],fs};
 }
-function planPrims(R){
-  const P=R.P, o=[], Rmax=Math.max(R.Rbase,P.Dp/2)+5, fs=Rmax/9.5;
+function planPrims(R,fsO){   // fsO: 도면용 글자 높이(m, 도면 축척 기준) — 주면 글자를 그 크기로, 영역은 실제 그린 범위로
+  const P=R.P, o=[], Rmax=Math.max(R.Rbase,P.Dp/2)+(fsO?1.5:5), fs=fsO||Rmax/9.5;
   o.push({t:"circle",L:"CONC",x:0,z:0,r:R.Rbase,fill:1});
   if(P.type==="caisson"){ o.push({t:"circle",L:"LINE",x:0,z:0,r:P.cDw/2}); o.push({t:"circle",L:"HID",x:0,z:0,r:P.cDw/2-P.ctw});
     const n=Math.round(P.cnr), Rwi=P.cDw/2-P.ctw, r0=R.S.hex?R.S.hex.flats/2:R.rso; for(let i=0;i<n;i++){ const a=2*PI*i/n+PI/n; const off=P.ctr/2; [-off,off].forEach(dd=>{ const c=Math.cos(a),s=Math.sin(a); o.push({t:"line",L:"HID",x1:r0*c-dd*s,z1:r0*s+dd*c,x2:Rwi*c-dd*s,z2:Rwi*s+dd*c}); }); } }
@@ -515,6 +515,10 @@ function planPrims(R){
   if(P.type==="cone") lab(P.Dt/2,40,`Ø${fx(P.Dt*1000,0)} 원추 상단`); else lab(P.cDw/2,40,`Ø${fx(P.cDw*1000,0)} 외벽`);
   if(R.S.hex) lab(P.ha,150,`육각 a=${fx(P.ha*1000,0)}`); else lab(P.Dc/2,150,`Ø${fx(P.Dc*1000,0)} 기둥`);
   if(P.type==="caisson") lab(P.cDw/2-P.ctw,-145,`격벽 ${Math.round(P.cnr)}개`); else lab(P.Dw/2-P.tw,-145,`Ø${fx((P.Dw-2*P.tw)*1000,0)} 원통 내경`);
+  if(fsO){ let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9; const ex=(x,z)=>{ x0=Math.min(x0,x); x1=Math.max(x1,x); z0=Math.min(z0,z); z1=Math.max(z1,z); };
+    o.forEach(p=>{ if(p.t==="circle"){ ex(-p.r,-p.r); ex(p.r,p.r); } else if(p.t==="line"){ ex(p.x1,p.z1); ex(p.x2,p.z2); } else if(p.t==="poly") p.pts.forEach(q=>ex(q[0],q[1]));
+      else if(p.t==="text"){ const w=[...p.s].reduce((a,c)=>a+(/[가-힣]/.test(c)?1.0:0.62),0)*p.h, xa=p.anchor==="end"?p.x-w:p.anchor==="middle"?p.x-w/2:p.x; ex(xa,p.z-p.h*0.3); ex(xa+w,p.z+p.h); } });
+    return {o,box:[x0-0.5,z0-0.5,x1+0.5,z1+0.5],fs}; }
   return {o,box:[-Rmax-13,-Rmax-2-(RG.length?1.2+RG.length*fs*1.05:0),Rmax+13,Rmax+2],fs};
 }
 const SV={CONC:`fill="var(--conc)" stroke="var(--conc-line)" stroke-width=".07" stroke-linejoin="round"`,CFIL:`fill="var(--conc)" stroke="var(--conc)" stroke-width=".02"`,FILL:`fill="var(--fill)"`,RFIL:`fill="var(--rfill)"`,GRAV:`fill="var(--grav)" stroke="var(--conc-line)" stroke-width=".04"`,WATER:`fill="var(--water)" opacity=".75"`,
@@ -1411,7 +1415,7 @@ function genNotes(R){
 function genSheetPrims(R,noBot){
   const P=R.P;
   const sp=secPrims(R), [sx0,sz0,sx1,sz1]=sp.box;
-  let sc=SCALES[SCALES.length-1]; for(const s of SCALES){ const k=s/1000; if((sx1-sx0)/k<=232&&(sz1-sz0)/k<=262){ sc=s; break; } }
+  let sc=SCALES[SCALES.length-1]; for(const s of SCALES){ const k=s/1000; if((sx1-sx0)/k<=236&&(sz1-sz0)/k<=262){ sc=s; break; } }
   const k=sc/1000, W=420*k, H=297*k, o=[];
   o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:k*.2}); o.push({t:"poly",L:"SHT",pts:[[10*k,10*k],[W-10*k,10*k],[W-10*k,H-10*k],[10*k,H-10*k]],w:k*.5});
   // 정면 단면도 (왼쪽)
@@ -1420,8 +1424,8 @@ function genSheetPrims(R,noBot){
   o.push(...mapPrims(mono,1,dx,dz));
   o.push({t:"text",L:"STX",x:14*k,z:H-15*k,h:3.4*k,s:`정면 단면도   S = 1 : ${sc}`});
   // 평면도 (오른쪽 위)
-  const pp=planPrims(R), [px0,pz0,px1,pz1]=pp.box;
-  let scP=SCALES[SCALES.length-1]; for(const s of SCALES){ if((px1-px0)/(s/1000)<=150&&(pz1-pz0)/(s/1000)<=92){ scP=s; break; } }
+  let pp=null, scP=SCALES[SCALES.length-1]; for(const s of SCALES){ const q=planPrims(R,2.5*s/1000), [a,b,c,d]=q.box; if((c-a)/(s/1000)<=150&&(d-b)/(s/1000)<=100){ scP=s; pp=q; break; } }
+  if(!pp) pp=planPrims(R,2.5*scP/1000); const [px0,pz0,px1,pz1]=pp.box;
   const f=sc/scP, pcx=252*k-px0*f+ (150*k-(px1-px0)*f)/2, pcz=H-22*k-pz1*f;
   o.push(...mapPrims(pp.o,f,pcx,pcz).map(p=>({...p,h:p.h?Math.min(p.h*f,2.6*k):p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));   // 평면도 글자는 도면에서 2.6 mm 이하
   o.push({t:"text",L:"STX",x:252*k,z:H-15*k,h:3.4*k,s:`평면도   S = 1 : ${scP}`});
