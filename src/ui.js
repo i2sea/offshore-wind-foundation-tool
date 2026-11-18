@@ -393,14 +393,14 @@ function waveDraw(o,P,xa,xb,zHW,off,fs,crestLine){ const H=P.Hw; if(!(H>0)||!(xb
   const lab=[`설계파 H = ${fx(H,2)} m, T = ${fx(P.Tw,1)} s`]; if(W) lab.push(`${W.title||"설계파 산정 보고서"}${W.reportNo?` (${W.reportNo})`:""} 첨부`);
   lab.push(`파봉고 +${fx(ec,2)} m (${AC.useW?"설계파 보고서":"0.65H, 가정"}), 여유고 ${fx(AC.gap,1)} m`);
   lab.forEach((t,i)=>o.push({t:"text",L:"DIM",x:xb,z:zc+(crestLine!==false?AC.gap:0)+fs*(1.5+1.05*(lab.length-1-i)),h:fs*.75,s:t,anchor:"end"})); }
-function secPrims(R){
+function secPrims(R,opt){ opt=opt||{};
   const P=R.P, o=[], rso=R.rso, rsi=R.rsi, z2=R.z2, wt=R.wideTop;
   const Rmax=Math.max(R.Rbase,P.Dp/2);
   const zHW=P.hwl-P.zbDL, zMS=P.msl-P.zbDL, zLW=-P.zbDL, zSB=P.sbDL-P.zbDL;
   const F=R.fnd||{}, SC=F.sc&&F.sc.on?F.sc:null, zT=Math.max(P.ztop,zHW)+6, zB=-Math.max(4,P.tg+(P.tgb||0)+3);
   const fs=Math.max(1.4,(zT-zB)/44);
   /* 가로 자리: 오른쪽 = 높이 치수 2줄(세굴방지공 바깥) + 설계파 그림, 왼쪽 = 수위 표시 + 세굴방지공·저판 하면 표고 (수위 글자는 수면 근처, 세굴방지공은 해저면 근처라 겹치지 않음) */
-  const xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+7, xR=P.Hw>0?xd2+22:xd2+9, xL=-Math.max(Rmax+26,SC?SC.Re+1+fs*5.6:0);
+  const xd=Math.max(Rmax,SC?SC.Re:0)+3.5, xd2=xd+7, xR=P.Hw>0?xd2+(opt.waveW||22):xd2+9, xL=-Math.max(Rmax+26,SC?SC.Re+1+fs*5.6:0);
   const both=(pts,L,extra)=>{ o.push({t:"poly",pts,L,...extra}); o.push({t:"poly",pts:pts.map(p=>[-p[0],p[1]]),L,...extra}); };
   // 지반 (준설 바닥 = 그라우트 + 자갈 고르기층 아래)
   const pit=-P.tg-(P.tgb||0), xr=R.Rbase+Math.max(1,P.gbW||0);
@@ -1414,8 +1414,13 @@ function genNotes(R){
 }
 function genSheetPrims(R,noBot){
   const P=R.P;
-  const sp=secPrims(R), [sx0,sz0,sx1,sz1]=sp.box;
-  let sc=SCALES[SCALES.length-1]; for(const s of SCALES){ const k=s/1000; if((sx1-sx0)/k<=236&&(sz1-sz0)/k<=262){ sc=s; break; } }
+  /* 평면도는 오른쪽 끝에 붙임. 단면도는 1:500 이하를 우선 — 안 들어가면 설계파 그림을 좁혀 봄 */
+  let pp=null, scP=SCALES[SCALES.length-1]; for(const s of SCALES){ const q=planPrims(R,2.5*s/1000), [a,b,c,d]=q.box; if((c-a)/(s/1000)<=150&&(d-b)/(s/1000)<=100){ scP=s; pp=q; break; } }
+  if(!pp) pp=planPrims(R,2.5*scP/1000); const [px0,pz0,px1,pz1]=pp.box, planL=406-(px1-px0)/(scP/1000), availW=236;   // 해저면 선이 주기와 겹치지 않게 단면도는 250 mm까지
+  const fitSc=b=>SCALES.find(s=>(b[2]-b[0])/(s/1000)<=availW&&(b[3]-b[1])/(s/1000)<=262);
+  let sp=secPrims(R), sc=fitSc(sp.box)||SCALES[SCALES.length-1];
+  if(sc>500) for(const ww of [18,14,10]){ const q=secPrims(R,{waveW:ww}), s2=fitSc(q.box); if(s2&&s2<sc){ sp=q; sc=s2; } if(sc<=500) break; }
+  const [sx0,sz0,sx1,sz1]=sp.box;
   const k=sc/1000, W=420*k, H=297*k, o=[];
   o.push({t:"poly",L:"SHT",pts:[[0,0],[W,0],[W,H],[0,H]],w:k*.2}); o.push({t:"poly",L:"SHT",pts:[[10*k,10*k],[W-10*k,10*k],[W-10*k,H-10*k],[10*k,H-10*k]],w:k*.5});
   // 정면 단면도 (왼쪽)
@@ -1424,11 +1429,9 @@ function genSheetPrims(R,noBot){
   o.push(...mapPrims(mono,1,dx,dz));
   o.push({t:"text",L:"STX",x:14*k,z:H-15*k,h:3.4*k,s:`정면 단면도   S = 1 : ${sc}`});
   // 평면도 (오른쪽 위)
-  let pp=null, scP=SCALES[SCALES.length-1]; for(const s of SCALES){ const q=planPrims(R,2.5*s/1000), [a,b,c,d]=q.box; if((c-a)/(s/1000)<=150&&(d-b)/(s/1000)<=100){ scP=s; pp=q; break; } }
-  if(!pp) pp=planPrims(R,2.5*scP/1000); const [px0,pz0,px1,pz1]=pp.box;
-  const f=sc/scP, pcx=252*k-px0*f+ (150*k-(px1-px0)*f)/2, pcz=H-22*k-pz1*f;
+  const f=sc/scP, pcx=406*k-px1*f, pcz=H-22*k-pz1*f;
   o.push(...mapPrims(pp.o,f,pcx,pcz).map(p=>({...p,h:p.h?Math.min(p.h*f,2.6*k):p.h,w:p.w?p.w*f:p.w,r:p.t==="dot"?p.r*f:p.r})));   // 평면도 글자는 도면에서 2.6 mm 이하
-  o.push({t:"text",L:"STX",x:252*k,z:H-15*k,h:3.4*k,s:`평면도   S = 1 : ${scP}`});
+  o.push({t:"text",L:"STX",x:Math.max(252,planL)*k,z:H-15*k,h:3.4*k,s:`평면도   S = 1 : ${scP}`});
   // 주기·설계 조건·검토 결과·수량
   const N=genNotes(R), x0=252*k, wmax=156*k; let z=pcz+pz0*f-6*k;
   const head=s=>{ o.push({t:"text",L:"STX",x:x0,z,h:3.0*k,s}); z-=5.0*k; };
